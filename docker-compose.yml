@@ -2,6 +2,9 @@ services:
   backend:
     build: ./backend
     env_file: .env
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/welcome_wave
+      CHROMA_URL: http://chroma:8000
     ports:
       - "8000:8000"
   frontend:
@@ -14,6 +17,8 @@ services:
       POSTGRES_DB: welcome_wave
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
   chroma:
     image: chromadb/chroma:latest
     ports:
