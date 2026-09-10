@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Welcome Wave — Onboarding Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#14171C;
+    --ink-soft:#3C4038;
+    --muted:#6E7166;
+    --paper:#ECEEE7;
+    --surface:#FBFBF8;
+    --border:#D7D9CE;
+    --border-soft:#E3E5DB;
+
+    --violet:#6A4FD1;   /* roadmap / proactive */
+    --violet-tint:#EEEAFB;
+    --teal:#0C7D76;     /* ask / retrieval */
+    --teal-tint:#E4F3F1;
+    --amber:#A9720C;    /* verification / trust */
+    --amber-tint:#FBF0DD;
+    --coral:#C8492F;    /* staleness / errors */
+    --coral-tint:#FBEAE5;
+
+    --radius:3px;
+    --shadow-none: none;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    font-size:15px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,h4{
+    font-family:'Source Serif 4', serif;
+    font-weight:600;
+    margin:0;
+    letter-spacing:-0.01em;
+    color:var(--ink);
+  }
+  p{margin:0;}
+  button{font-family:inherit;}
+  .mono{font-family:'IBM Plex Mono', monospace; font-size:0.82em; letter-spacing:0.01em;}
+
+  a{color:inherit;}
+
+  /* ---------- App shell ---------- */
+  .app{
+    display:grid;
+    grid-template-columns:256px 1fr;
+    min-height:100vh;
+  }
+
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    background:var(--ink);
+    color:#EDEDE6;
+    padding:26px 18px;
+    display:flex;
+    flex-direction:column;
+    position:sticky;
+    top:0;
+    height:100vh;
+  }
+  .brand{
+    display:flex;
+    align-items:baseline;
+    gap:9px;
+    padding:2px 6px 22px;
+    border-bottom:1px solid rgba(255,255,255,0.11);
+    margin-bottom:18px;
+  }
+  .brand-mark{
+    width:8px;height:8px;border-radius:1px;
+    background:var(--teal);
+    flex:none;
+    transform:translateY(-2px) rotate(45deg);
+  }
+  .brand-name{
+    font-family:'Source Serif 4',serif;
+    font-weight:600;
+    font-size:19px;
+    color:#fff;
+  }
+  .brand-sub{
+    font-size:11.5px;
+    color:#8F9288;
+    margin-top:1px;
+    padding-left:6px;
+    font-style:italic;
+    font-family:'Source Serif 4',serif;
+  }
+
+  nav.nav-group{margin-bottom:6px;}
+  .nav-label{
+    font-size:11px;
+    text-transform:none;
+    color:#83857D;
+    padding:4px 10px 6px;
+    font-weight:500;
+  }
+  .nav-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    color:#BFC2B7;
+    padding:9px 10px;
+    border-radius:3px;
+    font-size:14px;
+    cursor:pointer;
+    position:relative;
+    transition:background .12s ease, color .12s ease;
+  }
+  .nav-item:hover{background:rgba(255,255,255,0.06); color:#fff;}
+  .nav-item.active{background:rgba(255,255,255,0.09); color:#fff;}
+  .nav-item.active .nav-dot{opacity:1;}
+  .nav-item .nav-dot{
+    width:5px;height:5px;border-radius:50%;
+    background:var(--dot,#fff);
+    opacity:0;
+    flex:none;
+    margin-left:auto;
+  }
+  .nav-icon{width:16px;height:16px;flex:none;opacity:.9;}
+  .nav-item[hidden]{display:none;}
+  .nav-count{
+    margin-left:auto;
+    font-size:11px;
+    font-family:'IBM Plex Mono',monospace;
+    background:rgba(255,255,255,0.14);
+    color:#fff;
+    border-radius:9px;
+    padding:1px 6px;
+    min-width:18px;
+    text-align:center;
+  }
+  .nav-item.active .nav-count{background:rgba(255,255,255,0.26);}
+
+  .sidebar-divider{
+    height:1px;background:rgba(255,255,255,0.1);
+    margin:14px 6px;
+  }
+
+  .sidebar-footer{
+    margin-top:auto;
+    padding:10px 8px 2px;
+    font-size:11.5px;
+    color:#8F9288;
+    border-top:1px solid rgba(255,255,255,0.1);
+    padding-top:14px;
+  }
+  .sidebar-footer .row{display:flex;justify-content:space-between;margin-bottom:7px;}
+  .sidebar-footer .row span:last-child{color:#DADCD2; font-family:'IBM Plex Mono',monospace; font-size:11px;}
+
+  /* ---------- Main ---------- */
+  main{padding:40px 56px 70px; max-width:1360px;}
+  .topbar{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:24px;
+    margin-bottom:28px;
+    flex-wrap:wrap;
+  }
+  .topbar-title .eyebrow{
+    font-size:12.5px;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+  .topbar-title h1{font-size:32px;font-weight:600;}
+  .topbar-title .desc{color:var(--muted); font-size:14px; margin-top:7px; max-width:56ch;}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ---------- Cards & primitives ---------- */
+  .card{
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:26px 30px;
+    position:relative;
+  }
+  .card + .card{margin-top:16px;}
+  .accent-bar{
+    position:absolute; top:0; left:0; bottom:0; width:3px;
+  }
+  .accent-violet .accent-bar{background:var(--violet);}
+  .accent-teal .accent-bar{background:var(--teal);}
+  .accent-amber .accent-bar{background:var(--amber);}
+  .accent-coral .accent-bar{background:var(--coral);}
+  .accent-violet{padding-left:27px;}
+  .accent-teal{padding-left:27px;}
+  .accent-amber{padding-left:27px;}
+  .accent-coral{padding-left:27px;}
+
+  .section-heading{
+    display:flex; align-items:baseline; gap:10px;
+    margin-bottom:16px;
+  }
+  .section-heading h2{font-size:18px; font-weight:600;}
+  .section-heading .count{font-size:12.5px; color:var(--muted); font-style:italic; font-family:'Source Serif 4',serif;}
+
+  .btn{
+    display:inline-flex; align-items:center; gap:6px;
+    border-radius:3px;
+    border:1px solid var(--border);
+    background:var(--surface);
+    color:var(--ink);
+    font-size:13.5px;
+    padding:8px 15px;
+    cursor:pointer;
+    transition:background .12s ease, border-color .12s;
+  }
+  .btn:hover{border-color:#A9ABA0;}
+  .btn-primary{
+    background:var(--ink); color:#fff; border-color:var(--ink);
+  }
+  .btn-primary:hover{background:#2B2F27;}
+  .btn-ghost{border-color:transparent; background:transparent;}
+  .btn-ghost:hover{background:var(--paper);}
+  .btn-sm{padding:5px 11px; font-size:12.5px;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+
+  /* ---------- Trust marks: verified = ink stamp, draft = pencil note, stale = notice flag ---------- */
+  .badge{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11.5px; font-weight:600;
+    padding:4px 9px;
+    line-height:1.35;
+    border-radius:2px;
+  }
+  .badge svg{width:12px;height:12px;flex:none;}
+  .badge-verified{
+    font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:0.05em;
+    background:var(--amber-tint); color:#7A560A; border:1px solid #D8B676;
+    transform:rotate(-1.4deg);
+  }
+  .badge-draft{
+    font-family:'Source Serif 4',serif; font-style:italic; font-weight:500; font-size:13px;
+    background:transparent; color:var(--ink-soft); border:1px dashed #ACAEA0;
+    border-radius:20px; padding:3px 11px;
+  }
+  .badge-stale{
+    font-family:'IBM Plex Mono',monospace; text-transform:uppercase; letter-spacing:0.05em;
+    background:var(--coral-tint); color:#9C3A24; border:1px solid #E3A594;
+  }
+  .badge-teal{background:var(--teal-tint); color:#0B4F4A; border-radius:20px; font-size:12px;}
+  .badge-violet{background:var(--violet-tint); color:#4A3798; border-radius:20px; font-size:12px;}
+
+  .icon-btn{
+    border:none; background:none; cursor:pointer;
+    color:var(--muted); padding:4px; border-radius:3px;
+    display:inline-flex;
+  }
+  .icon-btn:hover{background:var(--paper); color:var(--ink);}
+
+  input[type=text], input[type=search], textarea, select{
+    font-family:inherit; font-size:14px;
+    border:1px solid var(--border);
+    border-radius:3px;
+    padding:9px 12px;
+    background:var(--surface);
+    color:var(--ink);
+    width:100%;
+  }
+  input:focus, textarea:focus, select:focus, button:focus-visible, .nav-item:focus-visible{
+    outline:2px solid var(--teal);
+    outline-offset:1px;
+  }
+  label{font-size:13px; font-weight:500; color:var(--ink-soft); display:block; margin-bottom:6px;}
+
+  .muted{color:var(--muted);}
+  .small{font-size:12.5px;}
+
+  ::-webkit-scrollbar{width:10px;}
+  ::-webkit-scrollbar-thumb{background:#CDCFC2;border-radius:8px;}
+
+  /* ---------- Roadmap ---------- */
+  .roadmap-grid{
+    display:grid;
+    grid-template-columns:1.6fr 1fr;
+    gap:20px;
+  }
+  .checklist{list-style:none; margin:12px 0 0; padding:0;}
+  .checklist li{
+    display:flex; gap:10px; align-items:flex-start;
+    padding:10px 0;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .checklist li:last-child{border-bottom:none;}
+  .checklist input[type=checkbox]{
+    margin-top:3px; width:16px; height:16px; accent-color:var(--violet); flex:none;
+  }
+  .checklist label{margin:0; font-weight:400; font-size:14px; color:var(--ink); cursor:pointer;}
+  .checklist li.done label{color:var(--muted); text-decoration:line-through;}
+  .checklist .item-meta{font-size:12px; color:var(--muted); margin-top:2px;}
+
+  .task-callout{
+    background:var(--violet-tint);
+    border:1px solid #DCD3F7;
+    border-left:3px solid var(--violet);
+    border-radius:2px;
+    padding:16px 19px;
+    margin-top:16px;
+  }
+  .task-callout .label{font-size:12.5px; color:#5C46B4; font-weight:600; font-style:italic; font-family:'Source Serif 4',serif; margin-bottom:6px;}
+  .task-callout p{font-size:14.5px;}
+
+  /* ---------- Ask ---------- */
+  .ask-box{display:flex; gap:8px;}
+  .chip-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;}
+  .chip{
+    border:1px solid var(--border);
+    background:var(--surface);
+    border-radius:20px;
+    padding:6px 12px;
+    font-size:12.5px;
+    cursor:pointer;
+    color:var(--ink-soft);
+  }
+  .chip:hover{border-color:var(--teal); color:var(--teal);}
+
+  .answer-block{margin-top:22px; padding-top:20px; border-top:1px solid var(--border-soft);}
+  .answer-head{display:flex; align-items:center; gap:10px; margin-bottom:12px; flex-wrap:wrap;}
+  .answer-question{font-size:13px; color:var(--muted); font-style:italic; font-family:'Source Serif 4',serif;}
+  .answer-text{font-size:15.5px; line-height:1.7; color:var(--ink);}
+  .citation-list{display:flex; flex-direction:column; gap:7px; margin-top:16px;}
+  .citation{
+    display:flex; align-items:center; gap:8px;
+    font-size:12px;
+    font-family:'IBM Plex Mono',monospace;
+    color:#0B4F4A;
+    background:var(--teal-tint);
+    border-radius:2px;
+    padding:7px 11px;
+    width:fit-content;
+    cursor:pointer;
+    border:1px solid transparent;
+  }
+  .citation:hover{border-color:var(--teal);}
+  .citation svg{width:13px;height:13px;}
+
+  .state-empty, .state-error, .state-loading{
+    display:flex; flex-direction:column; align-items:flex-start;
+    gap:8px; padding:26px 4px 6px; color:var(--muted);
+  }
+  .state-empty svg, .state-error svg{width:26px;height:26px; opacity:.7;}
+  .skeleton{
+    height:13px; border-radius:2px;
+    background:linear-gradient(90deg,#E4E6DB 25%,#F1F2EB 37%,#E4E6DB 63%);
+    background-size:400% 100%;
+    animation:shimmer 1.3s ease infinite;
+    margin-bottom:8px;
+  }
+  @keyframes shimmer{0%{background-position:100% 0;}100%{background-position:0 0;}}
+  .demo-link{font-size:12px; color:var(--muted); text-decoration:underline; cursor:pointer; background:none; border:none; padding:0; margin-top:16px;}
+  .demo-link:hover{color:var(--ink);}
+
+  /* ---------- Queue rows ---------- */
+  .queue-row{
+    display:flex; justify-content:space-between; align-items:flex-start; gap:16px;
+    padding:16px 0;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .queue-row:last-child{border-bottom:none;}
+  .queue-row.leaving{opacity:0; transform:translateX(6px); transition:opacity .35s, transform .35s;}
+  .queue-q{font-family:'Source Serif 4',serif; font-size:16px; font-weight:600; margin-bottom:5px;}
+  .queue-a{font-size:13.5px; color:var(--ink-soft); max-width:60ch;}
+  .queue-meta{font-size:12px; color:var(--muted); margin-top:7px; display:flex; gap:10px; flex-wrap:wrap; font-family:'IBM Plex Mono',monospace;}
+  .queue-actions{display:flex; gap:8px; flex:none; padding-top:2px;}
+
+  .filter-row{display:flex; gap:10px; align-items:center; margin-bottom:16px;}
+  .filter-row select{width:auto; padding:7px 10px; font-size:13px;}
+
+  /* ---------- Dashboard ---------- */
+  .kpi-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:18px;}
+  .kpi{padding:18px 20px;}
+  .kpi .kpi-label{font-size:12.5px; color:var(--muted); margin-bottom:10px;}
+  .kpi .kpi-value{font-family:'Source Serif 4',serif; font-size:32px; font-weight:600;}
+  .kpi .kpi-sub{font-size:12px; color:var(--muted); margin-top:5px; font-style:italic; font-family:'Source Serif 4',serif;}
+
+  .bar-row{display:flex; align-items:center; gap:12px; margin-bottom:13px;}
+  .bar-row .bar-label{width:120px; font-size:13px; flex:none; color:var(--ink-soft);}
+  .bar-track{flex:1; height:7px; border-radius:1px; background:var(--border-soft); overflow:hidden;}
+  .bar-fill{height:100%;}
+  .bar-row .bar-value{width:44px; text-align:right; font-size:12px; color:var(--muted); flex:none; font-family:'IBM Plex Mono',monospace;}
+
+  .rank-list{list-style:none; margin:0; padding:0;}
+  .rank-list li{display:flex; justify-content:space-between; gap:10px; padding:10px 0; border-bottom:1px solid var(--border-soft); font-size:13.5px;}
+  .rank-list li:last-child{border-bottom:none;}
+  .rank-list .n{color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:12px; margin-right:8px;}
+  .rank-list .count{color:var(--muted); font-family:'IBM Plex Mono',monospace; font-size:12.5px;}
+
+  /* ---------- Source connect ---------- */
+  .dropzone{
+    border:1.5px dashed var(--border);
+    border-radius:2px;
+    padding:28px;
+    text-align:center;
+    color:var(--muted);
+    font-size:13.5px;
+    background:var(--paper);
+    cursor:pointer;
+  }
+  .dropzone:hover{border-color:var(--teal); color:var(--teal);}
+  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;}
+  .form-field{margin-bottom:14px;}
+  .scope-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .scope-chip{
+    display:flex; align-items:center; gap:6px;
+    border:1px solid var(--border); border-radius:20px; padding:5px 10px 5px 12px;
+    font-size:12.5px; background:var(--surface);
+  }
+  .scope-chip button{border:none;background:none;cursor:pointer;color:var(--muted);padding:0;display:flex;}
+  .lock-note{
+    display:flex; align-items:center; gap:8px;
+    font-size:12.5px; color:var(--ink-soft);
+    background:var(--paper); border:1px solid var(--border);
+    border-radius:6px; padding:10px 12px; margin-top:16px;
+  }
+  .lock-note svg{width:14px;height:14px; flex:none; color:var(--muted);}
+
+  table.sources-table{width:100%; border-collapse:collapse; margin-top:8px; font-size:13.5px;}
+  table.sources-table th{
+    text-align:left; font-size:11.5px; color:var(--muted); font-weight:500;
+    padding:8px 10px; border-bottom:1px solid var(--border);
+  }
+  table.sources-table td{padding:11px 10px; border-bottom:1px solid var(--border-soft); vertical-align:middle;}
+  .status-pill{display:inline-flex; align-items:center; gap:6px; font-size:12px; padding:3px 8px; border-radius:20px;}
+  .status-indexed{background:var(--amber-tint); color:#7A560A;}
+  .status-syncing{background:var(--teal-tint); color:#0B6567;}
+  .status-error{background:var(--coral-tint); color:#9C3A24;}
+  .dot{width:6px;height:6px;border-radius:50%; background:currentColor;}
+
+  /* ---------- Responsive ---------- */
+  .menu-toggle{display:none;}
+  .scrim{display:none; position:fixed; inset:0; background:rgba(0,0,0,.3); z-index:15;}
+
+  /* ---------- Landing / Role Select ---------- */
+  #consoleShell{display:none;}
+  .landing{
+    min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding:48px 24px;
+  }
+  .landing-inner{max-width:920px; width:100%;}
+  .landing-brand{display:flex; align-items:center; justify-content:center; gap:9px; margin-bottom:10px;}
+  .landing-brand .brand-mark{width:11px;height:11px;}
+  .landing-brand .brand-name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:20px; color:var(--ink);}
+  .landing-tagline{text-align:center; color:var(--muted); font-size:14.5px; margin-bottom:8px;}
+  .landing-heading{text-align:center; font-size:15px; color:var(--ink-soft); margin-bottom:36px;}
+
+  .role-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+  .role-card{
+    text-align:left; cursor:pointer;
+    border:1px solid var(--border);
+    background:var(--surface);
+    border-radius:9px;
+    padding:20px 18px 18px;
+    transition:border-color .15s ease, transform .12s ease, box-shadow .15s ease;
+    display:flex; flex-direction:column;
+  }
+  .role-card:hover{border-color:var(--ink); transform:translateY(-2px); box-shadow:0 6px 18px rgba(20,22,26,0.07);}
+  .role-card:focus-visible{outline:2px solid var(--teal); outline-offset:2px;}
+  .role-card h3{font-size:16px; margin-bottom:6px;}
+  .role-card .role-desc{font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:14px; min-height:52px;}
+  .access-tags{display:flex; flex-direction:column; gap:5px; margin-bottom:16px;}
+  .access-tag{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-soft);}
+  .access-tag .dot{width:6px;height:6px;border-radius:50%; flex:none;}
+  .role-card .continue{
+    margin-top:auto;
+    font-size:12.5px; font-weight:500; color:var(--ink);
+    display:flex; align-items:center; gap:5px;
+  }
+  .landing-footnote{text-align:center; font-size:12.5px; color:var(--muted); margin-top:30px; max-width:56ch; margin-left:auto; margin-right:auto;}
+
+  .switch-role-btn{
+    display:inline-flex; align-items:center; gap:6px;
+    border:1px solid var(--border); background:var(--surface);
+    border-radius:6px; padding:8px 13px; font-size:13px; color:var(--ink-soft);
+    cursor:pointer; flex:none; height:fit-content;
+  }
+  .switch-role-btn:hover{border-color:#B9BAB2; color:var(--ink);}
+  .switch-role-btn svg{width:13px;height:13px;}
+
+  .role-pill{
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11.5px; color:#B9BAB2;
+    padding:3px 0 14px;
+  }
+  .role-pill .dot{width:6px;height:6px;border-radius:50%; background:#5EC9CB;}
+
+  @media (max-width:880px){
+    .role-grid{grid-template-columns:1fr 1fr;}
+  }
+  @media (max-width:560px){
+    .role-grid{grid-template-columns:1fr;}
+  }
+  @media (max-width:880px){
+    .app{grid-template-columns:1fr;}
+    .sidebar{
+      position:fixed; z-index:20; left:0; top:0; height:100vh; width:230px;
+      transform:translateX(-100%); transition:transform .2s ease;
+    }
+    .sidebar.open{transform:translateX(0);}
+    main{padding:20px 18px 50px;}
+    .menu-toggle{
+      display:inline-flex; align-items:center; gap:8px;
+      border:1px solid var(--border); background:var(--surface);
+      border-radius:6px; padding:8px 10px; margin-bottom:16px; cursor:pointer; font-size:13px;
+    }
+    .roadmap-grid{grid-template-columns:1fr;}
+    .kpi-grid{grid-template-columns:1fr;}
+    .form-grid{grid-template-columns:1fr;}
+    .topbar{flex-direction:column;}
+    .scrim.show{display:block;}
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- ================= LANDING / ROLE SELECT ================= -->
+<section class="landing" id="landingView">
+  <div class="landing-inner">
+    <div class="landing-brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Welcome Wave</span>
+    </div>
+    <p class="landing-tagline">Grounded answers. Verified trust. No guesswork onboarding.</p>
+    <p class="landing-heading">Select a role to continue</p>
+
+    <div class="role-grid" role="group" aria-label="Select a role">
+      <button class="role-card" data-role="newhire">
+        <h3>New Hire</h3>
+        <p class="role-desc">Land on a role-specific roadmap and ask grounded questions from day one.</p>
+        <div class="access-tags">
+          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+        </div>
+        <span class="continue">Continue as New Hire →</span>
+      </button>
+
+      <button class="role-card" data-role="expert">
+        <h3>Domain Expert</h3>
+        <p class="role-desc">Review AI drafts and confirm the answers your domain is responsible for.</p>
+        <div class="access-tags">
+          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+          <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue</span>
+          <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+        </div>
+        <span class="continue">Continue as Domain Expert →</span>
+      </button>
+
+      <button class="role-card" data-role="manager">
+        <h3>Manager</h3>
+        <p class="role-desc">See where documentation is thin and how much of it is actually trusted.</p>
+        <div class="access-tags">
+          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+          <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Dashboard</span>
+        </div>
+        <span class="continue">Continue as Manager →</span>
+      </button>
+
+      <button class="role-card" data-role="admin">
+        <h3>Admin</h3>
+        <p class="role-desc">Connect knowledge sources and assign them to roles across the console.</p>
+        <div class="access-tags">
+          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap + Source Connect</span>
+          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+          <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue + Dashboard</span>
+          <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+        </div>
+        <span class="continue">Continue as Admin →</span>
+      </button>
+    </div>
+
+    <p class="landing-footnote">In production this role is assigned automatically from your company directory — this preview lets you choose one to explore the console.</p>
+  </div>
+</section>
+
+<div class="app" id="consoleShell">
+
+  <!-- ================= SIDEBAR ================= -->
+  <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">Welcome&nbsp;Wave</span>
+    </div>
+    <div class="brand-sub" style="margin-bottom:2px;">Onboarding console · v2.0</div>
+    <div class="role-pill" style="margin-bottom:12px;"><span class="dot"></span>Viewing as <span id="sidebarRoleLabel">New Hire</span></div>
+
+    <nav class="nav-group" id="navGroup" aria-label="Console sections">
+      <button class="nav-item" data-view="roadmap" data-roles="newhire,expert,manager,admin" aria-current="page">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 10c2-4 5-6 7-6s5 2 7 6c-2 4-5 6-7 6s-5-2-7-6z"/><circle cx="10" cy="10" r="2"/></svg>
+        Roadmap
+        <span class="nav-dot" style="--dot:var(--violet)"></span>
+      </button>
+      <button class="nav-item" data-view="ask" data-roles="newhire,expert,manager,admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4h12v9H8l-4 3z"/></svg>
+        Ask &amp; Evidence
+        <span class="nav-dot" style="--dot:var(--teal)"></span>
+      </button>
+      <button class="nav-item" data-view="verify" data-roles="expert,admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10l4 4 8-9"/></svg>
+        Verify Queue
+        <span class="nav-count" id="verifyCount">0</span>
+      </button>
+      <button class="nav-item" data-view="reverify" data-roles="expert,admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 4v6l4 2"/><circle cx="10" cy="10" r="7"/></svg>
+        Re-verification
+        <span class="nav-count" id="reverifyCount">0</span>
+      </button>
+      <button class="nav-item" data-view="dashboard" data-roles="manager,admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 15V9M10 15V5m6 10v-6"/></svg>
+        Dashboard
+      </button>
+      <button class="nav-item" data-view="sources" data-roles="admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/></svg>
+        Source Connect
+      </button>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="row"><span>Active sources</span><span id="statActiveSources">3</span></div>
+      <div class="row"><span>Verified coverage</span><span id="statCoverage">57%</span></div>
+      <div class="row"><span>Avg. answer latency</span><span>1.8s</span></div>
+    </div>
+  </aside>
+
+  <div class="scrim" id="scrim"></div>
+
+  <!-- ================= MAIN ================= -->
+  <main>
+    <button class="menu-toggle" id="menuToggle" aria-label="Open navigation">
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 5h14M3 10h14M3 15h14"/></svg>
+      Menu
+    </button>
+
+    <div class="topbar">
+      <div class="topbar-title">
+        <div class="eyebrow" id="viewEyebrow">Proactive roadmap</div>
+        <h1 id="viewTitle">Your first week</h1>
+        <p class="desc" id="viewDesc">Generated the moment you were added — no prompt required, built only from content tagged for your role.</p>
+      </div>
+      <button class="switch-role-btn" id="switchRoleBtn">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10a6 6 0 0110-4.2M16 10a6 6 0 01-10 4.2"/><path d="M13 3v3h-3M7 17v-3h3"/></svg>
+        Switch role
+      </button>
+    </div>
+
+    <!-- ========== ROADMAP VIEW ========== -->
+    <section class="view active" id="view-roadmap">
+      <div class="roadmap-grid">
+        <div>
+          <div class="card accent-violet">
+            <div class="accent-bar"></div>
+            <div class="section-heading"><h2 id="roadmapRoleTitle">Engineering · New Hire</h2></div>
+            <p class="muted" id="roadmapOverview" style="margin-bottom:4px;">This roadmap is generated from content tagged for your role only — not a generic onboarding template.</p>
+
+            <ul class="checklist" id="readFirstList" aria-label="Read this first"></ul>
+          </div>
+        </div>
+
+        <div>
+          <div class="card accent-violet">
+            <div class="accent-bar"></div>
+            <div class="section-heading"><h2>Suggested first task</h2></div>
+            <div class="task-callout">
+              <p class="label">TODAY</p>
+              <p id="firstTaskText">Set up your local environment and shadow one live retrieval request.</p>
+            </div>
+          </div>
+          <div class="card accent-teal" style="margin-top:14px;">
+            <div class="accent-bar"></div>
+            <div class="section-heading"><h2>Jump to Ask</h2></div>
+            <p class="muted small">Have a specific question already? Skip ahead — every answer is grounded and labeled.</p>
+            <button class="btn btn-primary" style="margin-top:12px;" id="gotoAsk">Ask a question →</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== ASK VIEW ========== -->
+    <section class="view" id="view-ask">
+      <div class="card accent-teal">
+        <div class="accent-bar"></div>
+        <div class="section-heading"><h2>Ask anything in your scope</h2></div>
+        <div class="ask-box">
+          <input type="text" id="askInput" placeholder="e.g. What's my first task this week?" aria-label="Ask a question">
+          <button class="btn btn-primary" id="askSubmit">Ask</button>
+        </div>
+        <div class="chip-row" id="askChips" aria-label="Suggested questions"></div>
+
+        <div id="askResultArea"></div>
+
+        <button class="demo-link" id="askErrorDemo">Preview the error state →</button>
+      </div>
+    </section>
+
+    <!-- ========== VERIFY QUEUE VIEW ========== -->
+    <section class="view" id="view-verify">
+      <div class="card accent-amber">
+        <div class="accent-bar"></div>
+        <div class="section-heading">
+          <h2>Pending drafts</h2>
+          <span class="count" id="verifyHeaderCount">0 waiting</span>
+        </div>
+        <p class="muted small" style="margin-bottom:4px;">Verifying stamps an answer as canonical — it will be served instantly, ahead of any new AI draft, from now on.</p>
+        <div id="verifyList"></div>
+        <div id="verifyEmptyState" style="display:none;" class="state-empty">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10l4 4 8-9"/></svg>
+          <div><strong style="color:var(--ink)">Queue clear.</strong> Nothing waiting on your review right now.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== RE-VERIFICATION QUEUE VIEW ========== -->
+    <section class="view" id="view-reverify">
+      <div class="card accent-coral">
+        <div class="accent-bar"></div>
+        <div class="section-heading">
+          <h2>Needs re-verification</h2>
+          <span class="count" id="reverifyHeaderCount">0 flagged</span>
+        </div>
+        <p class="muted small" style="margin-bottom:12px;">A verified answer lands here automatically when the source chunk it depends on changes.</p>
+        <div class="filter-row">
+          <label style="margin:0;" for="domainFilter">Domain</label>
+          <select id="domainFilter">
+            <option value="all">All domains</option>
+          </select>
+          <label style="margin:0;" for="ownerFilter">Owner</label>
+          <select id="ownerFilter">
+            <option value="all">All owners</option>
+          </select>
+        </div>
+        <div id="reverifyList"></div>
+        <div id="reverifyEmptyState" style="display:none;" class="state-empty">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 10l4 4 8-9"/></svg>
+          <div><strong style="color:var(--ink)">Nothing stale.</strong> No verified answers are currently flagged.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== DASHBOARD VIEW ========== -->
+    <section class="view" id="view-dashboard">
+      <div class="kpi-grid">
+        <div class="card accent-teal kpi">
+          <div class="accent-bar"></div>
+          <div class="kpi-label">Recurring unanswered questions</div>
+          <div class="kpi-value" id="kpiRecurring">29</div>
+          <div class="kpi-sub">across 3 roles, last 14 days</div>
+        </div>
+        <div class="card accent-amber kpi">
+          <div class="accent-bar"></div>
+          <div class="kpi-label">Verified coverage (live)</div>
+          <div class="kpi-value" id="kpiCoverage">57%</div>
+          <div class="kpi-sub" id="kpiCoverageSub">4 of 7 tracked answers</div>
+        </div>
+        <div class="card accent-coral kpi">
+          <div class="accent-bar"></div>
+          <div class="kpi-label">Re-verification backlog</div>
+          <div class="kpi-value" id="kpiBacklog">1</div>
+          <div class="kpi-sub">flagged by source changes</div>
+        </div>
+      </div>
+
+      <div class="roadmap-grid">
+        <div class="card accent-teal">
+          <div class="accent-bar"></div>
+          <div class="section-heading"><h2>Top unanswered, by role</h2></div>
+          <ol class="rank-list" style="list-style:none;">
+            <li><span><span class="n">01</span>How do I request access to the CRM data source?</span><span class="count">14 asks</span></li>
+            <li><span><span class="n">02</span>Who owns the payroll integration docs?</span><span class="count">9 asks</span></li>
+            <li><span><span class="n">03</span>What's the escalation path for a P1 outside business hours?</span><span class="count">6 asks</span></li>
+          </ol>
+        </div>
+        <div class="card accent-amber">
+          <div class="accent-bar"></div>
+          <div class="section-heading"><h2>Verified coverage per role</h2></div>
+          <div class="bar-row"><span class="bar-label">Engineering</span><div class="bar-track"><div class="bar-fill" style="width:71%;background:var(--amber);"></div></div><span class="bar-value">71%</span></div>
+          <div class="bar-row"><span class="bar-label">Sales</span><div class="bar-track"><div class="bar-fill" style="width:54%;background:var(--amber);"></div></div><span class="bar-value">54%</span></div>
+          <div class="bar-row"><span class="bar-label">HR</span><div class="bar-track"><div class="bar-fill" style="width:88%;background:var(--amber);"></div></div><span class="bar-value">88%</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ========== SOURCE CONNECT VIEW ========== -->
+    <section class="view" id="view-sources">
+      <div class="card accent-violet">
+        <div class="accent-bar"></div>
+        <div class="section-heading"><h2>Connect a knowledge source</h2></div>
+        <div class="dropzone" id="dropzone">Drop a PDF, Markdown or DOCX file here, or click to browse</div>
+
+        <div class="form-grid">
+          <div class="form-field">
+            <label for="ghRepo">GitHub repository (optional)</label>
+            <input type="text" id="ghRepo" placeholder="org/repo-name">
+          </div>
+          <div class="form-field">
+            <label for="assignRole">Assign to role</label>
+            <select id="assignRole">
+              <option>Engineering</option>
+              <option>Sales</option>
+              <option>HR</option>
+              <option>Support</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Scope — exclude paths from indexing</label>
+          <div class="scope-row" id="scopeRow">
+            <span class="scope-chip">/secrets<button aria-label="Remove exclusion">✕</button></span>
+            <span class="scope-chip">/legal/contracts<button aria-label="Remove exclusion">✕</button></span>
+          </div>
+        </div>
+
+        <button class="btn btn-primary" id="connectSourceBtn">Connect source</button>
+
+        <div class="lock-note">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>
+          Read-only, always. Welcome Wave never writes back to a connected source — indexing only reads content in.
+        </div>
+      </div>
+
+      <div class="card accent-violet" style="margin-top:14px;">
+        <div class="accent-bar"></div>
+        <div class="section-heading"><h2>Connected sources</h2></div>
+        <table class="sources-table">
+          <thead><tr><th>Source</th><th>Role</th><th>Status</th><th>Last synced</th></tr></thead>
+          <tbody id="sourcesTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<script>
+(function(){
+
+  /* ============ DATA ============ */
+  var QA = [
+    { id:'ask-1', domain:'Onboarding', owner:'Aman Nautiyal',
+      question:"What's my first task this week?",
+      answer:"Set up your local dev environment using the README in the platform repo, then shadow one live retrieval request in the #onboarding notes.",
+      citations:[{label:'onboarding-checklist.md', ref:'§ Week 1'}],
+      status:'verified', verifiedBy:'Aman Nautiyal', verifiedAt:'Week 1 · Mon', roles:['newhire'] },
+
+    { id:'ask-2', domain:'Access & Permissions', owner:'Priya N.',
+      question:"How do I request access to the CRM data source?",
+      answer:"Ask your manager to add you as a viewer role in the CRM connector config — there is currently no self-service request flow.",
+      citations:[{label:'source-access.md', ref:'§ Access requests'}],
+      status:'draft', roles:['newhire','expert','admin'] },
+
+    { id:'ask-3', domain:'Finance Systems', owner:'J. Rao',
+      question:"Who owns the payroll integration docs?",
+      answer:"The payroll integration is documented by the Finance Systems team; the most recently listed owner is J. Rao.",
+      citations:[{label:'finance-systems-wiki export', ref:'Payroll section'}],
+      status:'draft', roles:['newhire','manager','admin'] },
+
+    { id:'ask-4', domain:'Access & Permissions', owner:'Priya N.',
+      question:"What happens if a verified answer's source changes?",
+      answer:"The dependency link to the changed chunk trips a staleness flag. The answer is visually downgraded until a domain expert re-confirms it.",
+      citations:[{label:'staleness-flow.md', ref:'§ Dependency graph'}],
+      status:'verified', verifiedBy:'Priya N.', verifiedAt:'Week 3 · Wed', roles:['expert'],
+      stale:true, staleReason:"source-access.md was edited 2 days ago" },
+
+    { id:'ask-5', domain:'Sales Enablement', owner:'T. Alvarez',
+      question:"What's the current discount approval limit for reps?",
+      answer:"Reps can approve discounts up to 12% without escalation; anything above requires sign-off from a sales manager.",
+      citations:[{label:'sales-playbook.docx', ref:'§ Discount policy'}],
+      status:'verified', verifiedBy:'T. Alvarez', verifiedAt:'Week 2 · Fri', roles:['newhire','manager'],
+      stale:true, staleReason:"sales-playbook.docx was updated yesterday" }
+  ];
+
+  var ROLE_DATA = {
+    newhire:{ title:"Engineering · New Hire", overview:"This roadmap is generated from content tagged for the Engineering role only — not a generic template.",
+      readFirst:[
+        {t:"Local environment setup guide", meta:"platform-repo · README.md"},
+        {t:"How retrieval + verification fits together", meta:"architecture.md · § End-to-end flow"},
+        {t:"Who to ask in each domain", meta:"team-directory.md"}],
+      task:"Set up your local environment and shadow one live retrieval request." },
+    expert:{ title:"Platform · Domain Expert", overview:"Your roadmap surfaces the review duties tied to your domain, not general reading.",
+      readFirst:[
+        {t:"What 'verify' actually commits to", meta:"verification-workflow.md"},
+        {t:"How staleness dependency links work", meta:"staleness-flow.md"},
+        {t:"Your current pending drafts", meta:"2 waiting in Verify Queue"}],
+      task:"Clear the two drafts currently waiting in your Verify Queue." },
+    manager:{ title:"Platform Team · Manager", overview:"Your roadmap points at gaps in your team's documentation, not general onboarding steps.",
+      readFirst:[
+        {t:"Reading the coverage dashboard", meta:"manager-guide.md"},
+        {t:"This week's top unanswered question", meta:"CRM data source access"},
+        {t:"Re-verification backlog owner list", meta:"1 item currently flagged"}],
+      task:"Review this week's verified-coverage gaps on the Dashboard." },
+    admin:{ title:"Platform Ops · Admin", overview:"Your roadmap starts at the ingestion layer — nothing is indexed until you connect a source.",
+      readFirst:[
+        {t:"Read-only ingestion guarantee", meta:"security-design.md · § 9.4"},
+        {t:"Scoping include/exclude before indexing", meta:"source-connect.md"},
+        {t:"Assigning sources to roles", meta:"role-scoping.md"}],
+      task:"Connect your team's first knowledge source." }
+  };
+
+  var state = { role:'newhire', activeSources:3, coverageBase:0 };
+
+  /* ============ ICON HELPERS ============ */
+  function checkIcon(){ return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-9"/></svg>'; }
+  function draftIcon(){ return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 15l1-4 8-8 3 3-8 8-4 1z"/></svg>'; }
+  function staleIcon(){ return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 4v6l4 2"/><circle cx="10" cy="10" r="7"/></svg>'; }
+  function docIcon(){ return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h6l3 3v11H6z"/><path d="M9 3v3H6"/></svg>'; }
+
+  /* ============ NAV / VIEW SWITCHING ============ */
+  var VIEW_META = {
+    roadmap:{ eyebrow:"Proactive roadmap", title:"Your first week", desc:"Generated the moment you were added — no prompt required, built only from content tagged for your role." },
+    ask:{ eyebrow:"Grounded Q&A", title:"Ask & Evidence", desc:"Every answer is generated strictly from retrieved, role-permitted context and carries a trust label plus clickable evidence." },
+    verify:{ eyebrow:"Verification & trust", title:"Verify Queue", desc:"Turn a correct AI draft into the canonical, owner-stamped answer everyone sees next." },
+    reverify:{ eyebrow:"Staleness & freshness", title:"Re-verification Queue", desc:"Verified answers whose source material changed, waiting on a fresh confirmation." },
+    dashboard:{ eyebrow:"Manager analytics", title:"Coverage & gaps", desc:"Where documentation is thin, and how much of your knowledge base is actually trusted." },
+    sources:{ eyebrow:"Ingestion", title:"Source Connect", desc:"Read-only connections only — Welcome Wave never writes back to anything it indexes." }
+  };
+
+  function setView(name){
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+    document.getElementById('view-'+name).classList.add('active');
+    document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.toggle('active', n.dataset.view===name); });
+    var m = VIEW_META[name];
+    document.getElementById('viewEyebrow').textContent = m.eyebrow;
+    document.getElementById('viewTitle').textContent = m.title;
+    document.getElementById('viewDesc').textContent = m.desc;
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('scrim').classList.remove('show');
+  }
+
+  document.querySelectorAll('.nav-item').forEach(function(btn){
+    btn.addEventListener('click', function(){ setView(btn.dataset.view); });
+  });
+  document.getElementById('gotoAsk').addEventListener('click', function(){ setView('ask'); });
+
+  /* mobile menu */
+  document.getElementById('menuToggle').addEventListener('click', function(){
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('scrim').classList.add('show');
+  });
+  document.getElementById('scrim').addEventListener('click', function(){
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('scrim').classList.remove('show');
+  });
+
+  /* ============ LANDING / ROLE SELECT ============ */
+  var ROLE_LABEL = { newhire:'New Hire', expert:'Domain Expert', manager:'Manager', admin:'Admin' };
+
+  document.querySelectorAll('.role-card').forEach(function(card){
+    card.addEventListener('click', function(){ enterConsole(card.dataset.role); });
+  });
+
+  function enterConsole(role){
+    state.role = role;
+    document.getElementById('sidebarRoleLabel').textContent = ROLE_LABEL[role];
+    applyRoleVisibility();
+    renderRoadmap();
+    renderAskChips();
+    document.getElementById('landingView').style.display = 'none';
+    document.getElementById('consoleShell').style.display = 'grid';
+    setView('roadmap');
+  }
+
+  document.getElementById('switchRoleBtn').addEventListener('click', function(){
+    document.getElementById('consoleShell').style.display = 'none';
+    document.getElementById('landingView').style.display = 'flex';
+  });
+
+  function applyRoleVisibility(){
+    document.querySelectorAll('.nav-item').forEach(function(item){
+      var roles = item.dataset.roles.split(',');
+      item.hidden = roles.indexOf(state.role) === -1;
+    });
+  }
+
+  /* ============ ROADMAP ============ */
+  function renderRoadmap(){
+    var d = ROLE_DATA[state.role];
+    document.getElementById('roadmapRoleTitle').textContent = d.title;
+    document.getElementById('roadmapOverview').textContent = d.overview;
+    document.getElementById('firstTaskText').textContent = d.task;
+    var list = document.getElementById('readFirstList');
+    list.innerHTML = '';
+    d.readFirst.forEach(function(item, i){
+      var li = document.createElement('li');
+      li.innerHTML = '<input type="checkbox" id="rf-'+i+'"><div><label for="rf-'+i+'">'+item.t+'</label><div class="item-meta mono">'+item.meta+'</div></div>';
+      var cb = li.querySelector('input');
+      cb.addEventListener('change', function(){ li.classList.toggle('done', cb.checked); });
+      list.appendChild(li);
+    });
+  }
+
+  /* ============ ASK ============ */
+  function trustBadge(item){
+    if(item.stale){
+      return '<span class="badge badge-stale">'+staleIcon()+'Needs re-verification</span>';
+    }
+    if(item.status==='verified'){
+      return '<span class="badge badge-verified">'+checkIcon()+'Verified · '+item.verifiedBy+'</span>';
+    }
+    return '<span class="badge badge-draft">'+draftIcon()+'AI draft · unverified</span>';
+  }
+
+  function renderAskChips(){
+    var chips = document.getElementById('askChips');
+    chips.innerHTML = '';
+    QA.filter(function(q){ return q.roles.indexOf(state.role) !== -1; }).forEach(function(q){
+      var c = document.createElement('button');
+      c.className = 'chip';
+      c.textContent = q.question;
+      c.addEventListener('click', function(){ document.getElementById('askInput').value = q.question; runAsk(q.question); });
+      chips.appendChild(c);
+    });
+  }
+
+  function runAsk(question){
+    var area = document.getElementById('askResultArea');
+    area.innerHTML =
+      '<div class="answer-block state-loading">' +
+        '<div class="skeleton" style="width:70%"></div>' +
+        '<div class="skeleton" style="width:92%"></div>' +
+        '<div class="skeleton" style="width:40%"></div>' +
+      '</div>';
+
+    setTimeout(function(){
+      var match = QA.find(function(q){ return q.question.toLowerCase() === question.trim().toLowerCase(); });
+      if(!match){
+        area.innerHTML =
+          '<div class="answer-block state-empty">' +
+            '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><path d="M10 7v4M10 14h.01"/></svg>' +
+            '<div><strong style="color:var(--ink)">No grounded answer found.</strong> Nothing in your role\'s knowledge base covers this yet — try rephrasing, or flag it for a domain expert.</div>' +
+          '</div>';
+        return;
+      }
+      area.innerHTML =
+        '<div class="answer-block">' +
+          '<div class="answer-head">' + trustBadge(match) + '<span class="answer-question">for &ldquo;'+match.question+'&rdquo;</span></div>' +
+          '<p class="answer-text">'+match.answer+'</p>' +
+          (match.stale ? '<p class="small" style="color:#9C3A24;margin-top:8px;">Flagged because '+match.staleReason+'.</p>' : '') +
+          '<div class="citation-list">' +
+            match.citations.map(function(c){ return '<span class="citation">'+docIcon()+c.label+' · '+c.ref+'</span>'; }).join('') +
+          '</div>' +
+        '</div>';
+    }, match_delay(question));
+  }
+  function match_delay(q){
+    var m = QA.find(function(x){ return x.question.toLowerCase()===q.trim().toLowerCase(); });
+    return (m && m.status==='verified') ? 250 : 750; // verified answers return near-instantly, no new LLM call
+  }
+
+  document.getElementById('askSubmit').addEventListener('click', function(){
+    var v = document.getElementById('askInput').value;
+    if(!v.trim()){
+      document.getElementById('askInput').focus();
+      return;
+    }
+    runAsk(v);
+  });
+  document.getElementById('askInput').addEventListener('keydown', function(e){
+    if(e.key==='Enter'){ document.getElementById('askSubmit').click(); }
+  });
+  document.getElementById('askErrorDemo').addEventListener('click', function(){
+    document.getElementById('askResultArea').innerHTML =
+      '<div class="answer-block state-error">' +
+        '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--coral)"><circle cx="10" cy="10" r="7"/><path d="M7 7l6 6M13 7l-6 6"/></svg>' +
+        '<div><strong style="color:var(--coral)">Retrieval failed.</strong> The knowledge index didn\'t respond in time. Try again — if it keeps happening, tell an admin.</div>' +
+        '<button class="btn btn-sm" style="margin-top:6px;">Retry</button>' +
+      '</div>';
+  });
+
+  /* ============ VERIFY QUEUE ============ */
+  function renderVerifyQueue(){
+    var list = document.getElementById('verifyList');
+    var pending = QA.filter(function(q){ return q.status==='draft'; });
+    list.innerHTML = '';
+    document.getElementById('verifyHeaderCount').textContent = pending.length + ' waiting';
+    document.getElementById('verifyCount').textContent = pending.length;
+    document.getElementById('verifyEmptyState').style.display = pending.length ? 'none' : 'flex';
+
+    pending.forEach(function(item){
+      var row = document.createElement('div');
+      row.className = 'queue-row';
+      row.id = 'verify-row-'+item.id;
+      row.innerHTML =
+        '<div>' +
+          '<div class="queue-q">'+item.question+'</div>' +
+          '<div class="queue-a">'+item.answer+'</div>' +
+          '<div class="queue-meta"><span class="mono">'+item.domain+'</span><span>Draft · unverified</span></div>' +
+        '</div>' +
+        '<div class="queue-actions">' +
+          '<button class="btn btn-sm" data-act="edit">Edit</button>' +
+          '<button class="btn btn-sm btn-primary" data-act="verify">Verify</button>' +
+        '</div>';
+      row.querySelector('[data-act="verify"]').addEventListener('click', function(){ verifyItem(item, row); });
+      list.appendChild(row);
+    });
+  }
+
+  function verifyItem(item, row){
+    item.status = 'verified';
+    item.verifiedBy = 'You';
+    item.verifiedAt = 'just now';
+    row.classList.add('leaving');
+    setTimeout(function(){
+      renderVerifyQueue();
+      renderReverifyQueue();
+      renderDashboard();
+    }, 320);
+  }
+
+  /* ============ RE-VERIFICATION QUEUE ============ */
+  function renderReverifyQueue(){
+    var flagged = QA.filter(function(q){ return q.stale; });
+    var domainSel = document.getElementById('domainFilter');
+    var ownerSel = document.getElementById('ownerFilter');
+
+    if(domainSel.options.length <= 1){
+      uniq(flagged.map(function(q){ return q.domain; })).forEach(function(d){
+        var o = document.createElement('option'); o.value=d; o.textContent=d; domainSel.appendChild(o);
+      });
+      uniq(flagged.map(function(q){ return q.owner; }).filter(Boolean)).forEach(function(o2){
+        var o = document.createElement('option'); o.value=o2; o.textContent=o2; ownerSel.appendChild(o);
+      });
+    }
+
+    var dFilter = domainSel.value, oFilter = ownerSel.value;
+    var filtered = flagged.filter(function(q){
+      return (dFilter==='all'||q.domain===dFilter) && (oFilter==='all'||q.owner===oFilter);
+    });
+
+    document.getElementById('reverifyHeaderCount').textContent = flagged.length + ' flagged';
+    document.getElementById('reverifyCount').textContent = flagged.length;
+    document.getElementById('reverifyEmptyState').style.display = filtered.length ? 'none' : 'flex';
+
+    var list = document.getElementById('reverifyList');
+    list.innerHTML = '';
+    filtered.forEach(function(item){
+      var row = document.createElement('div');
+      row.className = 'queue-row';
+      row.innerHTML =
+        '<div>' +
+          '<div class="queue-q">'+item.question+'</div>' +
+          '<div class="queue-a">'+item.answer+'</div>' +
+          '<div class="queue-meta"><span class="mono">'+item.domain+'</span><span>Owner: '+item.owner+'</span><span style="color:#9C3A24;">'+item.staleReason+'</span></div>' +
+        '</div>' +
+        '<div class="queue-actions"><button class="btn btn-sm btn-primary" data-act="reconfirm">Re-confirm</button></div>';
+      row.querySelector('[data-act="reconfirm"]').addEventListener('click', function(){
+        item.stale = false;
+        row.classList.add('leaving');
+        setTimeout(function(){ renderReverifyQueue(); renderDashboard(); }, 320);
+      });
+      list.appendChild(row);
+    });
+  }
+  document.getElementById('domainFilter').addEventListener('change', renderReverifyQueue);
+  document.getElementById('ownerFilter').addEventListener('change', renderReverifyQueue);
+
+  function uniq(arr){ return arr.filter(function(v,i){ return arr.indexOf(v)===i; }); }
+
+  /* ============ DASHBOARD ============ */
+  function renderDashboard(){
+    var verifiedCount = QA.filter(function(q){ return q.status==='verified'; }).length;
+    var total = QA.length;
+    var pct = Math.round((verifiedCount/total)*100);
+    document.getElementById('kpiCoverage').textContent = pct+'%';
+    document.getElementById('kpiCoverageSub').textContent = verifiedCount+' of '+total+' tracked answers';
+    document.getElementById('statCoverage').textContent = pct+'%';
+
+    var backlog = QA.filter(function(q){ return q.stale; }).length;
+    document.getElementById('kpiBacklog').textContent = backlog;
+  }
+
+  /* ============ SOURCES ============ */
+  var sources = [
+    { name:'employee-handbook.pdf', role:'HR', status:'indexed', synced:'2 hours ago' },
+    { name:'welcomewave (GitHub repo)', role:'Engineering', status:'indexed', synced:'14 minutes ago' },
+    { name:'sales-playbook.docx', role:'Sales', status:'syncing', synced:'now' }
+  ];
+  function renderSources(){
+    var body = document.getElementById('sourcesTableBody');
+    body.innerHTML = '';
+    sources.forEach(function(s){
+      var tr = document.createElement('tr');
+      var statusClass = s.status==='indexed' ? 'status-indexed' : s.status==='syncing' ? 'status-syncing' : 'status-error';
+      var statusText = s.status==='indexed' ? 'Indexed' : s.status==='syncing' ? 'Syncing' : 'Error';
+      tr.innerHTML = '<td>'+s.name+'</td><td>'+s.role+'</td>' +
+        '<td><span class="status-pill '+statusClass+'"><span class="dot"></span>'+statusText+'</span></td>' +
+        '<td class="mono small">'+s.synced+'</td>';
+      body.appendChild(tr);
+    });
+    document.getElementById('statActiveSources').textContent = sources.filter(function(s){return s.status!=='error';}).length;
+  }
+
+  document.getElementById('connectSourceBtn').addEventListener('click', function(){
+    var repo = document.getElementById('ghRepo').value.trim();
+    var role = document.getElementById('assignRole').value;
+    var name = repo ? repo+' (GitHub repo)' : 'new-upload.pdf';
+    sources.push({ name:name, role:role, status:'syncing', synced:'now' });
+    renderSources();
+    document.getElementById('ghRepo').value = '';
+    setTimeout(function(){
+      sources[sources.length-1].status = 'indexed';
+      sources[sources.length-1].synced = 'just now';
+      renderSources();
+    }, 1400);
+  });
+  document.getElementById('dropzone').addEventListener('click', function(){
+    sources.push({ name:'onboarding-checklist.md', role:'Engineering', status:'syncing', synced:'now' });
+    renderSources();
+    setTimeout(function(){ sources[sources.length-1].status='indexed'; sources[sources.length-1].synced='just now'; renderSources(); }, 1200);
+  });
+  document.querySelectorAll('.scope-chip button').forEach(function(btn){
+    btn.addEventListener('click', function(){ btn.closest('.scope-chip').remove(); });
+  });
+
+  /* ============ INIT ============ */
+  applyRoleVisibility();
+  renderRoadmap();
+  renderAskChips();
+  renderVerifyQueue();
+  renderReverifyQueue();
+  renderDashboard();
+  renderSources();
+  setView('roadmap');
+
+})();
+</script>
+</body>
+</html>
