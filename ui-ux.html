@@ -388,14 +388,14 @@
   /* ---------- Dashboard ---------- */
   .kpi-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:18px;}
   .kpi{padding:18px 20px;}
-  .kpi .kpi-label{font-size:12.5px; color:var(--muted); margin-bottom:10px;}
+  .kpi .kpi-label{font-size:12.5px; color:var(--muted); margin-bottom:10px; display:flex; align-items:center; gap:6px;}
   .kpi .kpi-value{font-family:'Source Serif 4',serif; font-size:32px; font-weight:600;}
   .kpi .kpi-sub{font-size:12px; color:var(--muted); margin-top:5px; font-style:italic; font-family:'Source Serif 4',serif;}
 
   .bar-row{display:flex; align-items:center; gap:12px; margin-bottom:13px;}
   .bar-row .bar-label{width:120px; font-size:13px; flex:none; color:var(--ink-soft);}
   .bar-track{flex:1; height:7px; border-radius:1px; background:var(--border-soft); overflow:hidden;}
-  .bar-fill{height:100%;}
+  .bar-fill{height:100%; transition:width .7s cubic-bezier(.22,.9,.3,1);}
   .bar-row .bar-value{width:44px; text-align:right; font-size:12px; color:var(--muted); flex:none; font-family:'IBM Plex Mono',monospace;}
 
   .rank-list{list-style:none; margin:0; padding:0;}
@@ -451,60 +451,143 @@
 
   /* ---------- Landing / Role Select ---------- */
   #consoleShell{display:none;}
+  #landingView{display:none;}
   .landing{
     min-height:100vh;
     display:flex; align-items:center; justify-content:center;
     padding:48px 24px;
+    position:relative;
+    overflow:hidden;
   }
-  .landing-inner{max-width:920px; width:100%;}
-  .landing-brand{display:flex; align-items:center; justify-content:center; gap:9px; margin-bottom:10px;}
-  .landing-brand .brand-mark{width:11px;height:11px;}
-  .landing-brand .brand-name{font-family:'Space Grotesk',sans-serif; font-weight:600; font-size:20px; color:var(--ink);}
-  .landing-tagline{text-align:center; color:var(--muted); font-size:14.5px; margin-bottom:8px;}
-  .landing-heading{text-align:center; font-size:15px; color:var(--ink-soft); margin-bottom:36px;}
+  .landing::before{
+    content:'';
+    position:absolute; inset:0;
+    background:
+      radial-gradient(600px 380px at 12% -8%, rgba(106,79,209,0.14), transparent 60%),
+      radial-gradient(560px 360px at 90% 8%, rgba(12,125,118,0.13), transparent 60%),
+      radial-gradient(520px 340px at 78% 96%, rgba(169,114,12,0.11), transparent 60%),
+      radial-gradient(520px 320px at 6% 96%, rgba(200,73,47,0.10), transparent 60%);
+    pointer-events:none;
+  }
+  .landing-inner{max-width:960px; width:100%; position:relative;}
+  .landing-brand{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:12px;}
+  .landing-brand .brand-cluster{display:flex; gap:3px;}
+  .landing-brand .brand-cluster span{width:9px;height:9px;border-radius:2px;}
+  .landing-brand .brand-name{font-family:'Source Serif 4',serif; font-weight:600; font-size:23px; color:var(--ink);}
+  .landing-tagline{text-align:center; color:var(--ink-soft); font-size:16px; margin-bottom:28px; font-family:'Source Serif 4',serif; font-style:italic;}
+
+  .how-strip{
+    display:grid; grid-template-columns:repeat(3,1fr); gap:14px;
+    margin-bottom:38px;
+  }
+  .how-step{
+    background:var(--surface); border:1px solid var(--border-soft); border-radius:4px;
+    padding:14px 16px; display:flex; gap:12px; align-items:flex-start;
+  }
+  .how-step .num{
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+    width:22px; height:22px; border-radius:50%; flex:none;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff;
+  }
+  .how-step p{font-size:13px; color:var(--ink-soft); line-height:1.5;}
+  .how-step strong{display:block; font-size:13.5px; color:var(--ink); margin-bottom:2px; font-weight:600;}
+
+  .landing-heading{text-align:center; font-size:14px; color:var(--muted); margin-bottom:18px; letter-spacing:0.02em;}
 
   .role-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
   .role-card{
     text-align:left; cursor:pointer;
     border:1px solid var(--border);
     background:var(--surface);
-    border-radius:9px;
-    padding:20px 18px 18px;
-    transition:border-color .15s ease, transform .12s ease, box-shadow .15s ease;
+    border-radius:6px;
+    padding:0;
+    transition:border-color .18s ease, transform .18s ease, box-shadow .18s ease;
     display:flex; flex-direction:column;
+    overflow:hidden;
+    opacity:0; transform:translateY(10px);
+    animation:cardIn .5s ease forwards;
   }
-  .role-card:hover{border-color:var(--ink); transform:translateY(-2px); box-shadow:0 6px 18px rgba(20,22,26,0.07);}
+  .role-card:nth-child(1){animation-delay:.05s;}
+  .role-card:nth-child(2){animation-delay:.12s;}
+  .role-card:nth-child(3){animation-delay:.19s;}
+  .role-card:nth-child(4){animation-delay:.26s;}
+  @keyframes cardIn{to{opacity:1; transform:translateY(0);}}
+  .role-card .card-top{height:5px; flex:none;}
+  .role-card .card-body{padding:19px 18px 18px; display:flex; flex-direction:column; flex:1;}
+  .role-card:hover{transform:translateY(-4px); box-shadow:0 14px 28px rgba(20,23,17,0.10);}
+  .role-card[data-role="newhire"]:hover{border-color:var(--violet);}
+  .role-card[data-role="expert"]:hover{border-color:var(--amber);}
+  .role-card[data-role="manager"]:hover{border-color:var(--teal);}
+  .role-card[data-role="admin"]:hover{border-color:var(--coral);}
   .role-card:focus-visible{outline:2px solid var(--teal); outline-offset:2px;}
-  .role-card h3{font-size:16px; margin-bottom:6px;}
-  .role-card .role-desc{font-size:12.5px; color:var(--muted); line-height:1.5; margin-bottom:14px; min-height:52px;}
+  .role-icon{
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom:13px; flex:none;
+  }
+  .role-icon svg{width:17px;height:17px;}
+  .role-card h3{font-size:16.5px; margin-bottom:6px;}
+  .role-card .role-desc{font-size:12.5px; color:var(--muted); line-height:1.55; margin-bottom:14px; min-height:52px;}
   .access-tags{display:flex; flex-direction:column; gap:5px; margin-bottom:16px;}
   .access-tag{display:flex; align-items:center; gap:7px; font-size:12px; color:var(--ink-soft);}
   .access-tag .dot{width:6px;height:6px;border-radius:50%; flex:none;}
   .role-card .continue{
     margin-top:auto;
-    font-size:12.5px; font-weight:500; color:var(--ink);
+    font-size:12.5px; font-weight:600; color:var(--ink);
     display:flex; align-items:center; gap:5px;
+    padding-top:12px; border-top:1px solid var(--border-soft);
   }
   .landing-footnote{text-align:center; font-size:12.5px; color:var(--muted); margin-top:30px; max-width:56ch; margin-left:auto; margin-right:auto;}
 
   .switch-role-btn{
     display:inline-flex; align-items:center; gap:6px;
     border:1px solid var(--border); background:var(--surface);
-    border-radius:6px; padding:8px 13px; font-size:13px; color:var(--ink-soft);
+    border-radius:3px; padding:8px 13px; font-size:13px; color:var(--ink-soft);
     cursor:pointer; flex:none; height:fit-content;
+    transition:transform .12s ease;
   }
-  .switch-role-btn:hover{border-color:#B9BAB2; color:var(--ink);}
+  .switch-role-btn:hover{border-color:#A9ABA0; color:var(--ink);}
+  .switch-role-btn:active{transform:scale(.96);}
   .switch-role-btn svg{width:13px;height:13px;}
 
   .role-pill{
     display:inline-flex; align-items:center; gap:6px;
-    font-size:11.5px; color:#B9BAB2;
+    font-size:11.5px; color:#A9ACA0;
     padding:3px 0 14px;
+    font-style:italic; font-family:'Source Serif 4',serif;
   }
   .role-pill .dot{width:6px;height:6px;border-radius:50%; background:#5EC9CB;}
 
+  /* ---------- Login (mock SSO step) ---------- */
+  #loginView{display:flex;}
+  .login-card{
+    max-width:380px; width:100%; margin:0 auto;
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:36px 34px 30px;
+    position:relative;
+    box-shadow:0 24px 60px rgba(20,23,17,0.09);
+  }
+  .login-card .card-top{
+    position:absolute; top:0; left:0; right:0; height:4px; border-radius:6px 6px 0 0;
+    background:linear-gradient(90deg,var(--violet),var(--teal),var(--amber),var(--coral));
+  }
+  .login-field{margin-bottom:16px;}
+  .sso-btn{
+    width:100%; justify-content:center;
+    padding:10px 14px; font-size:14px; font-weight:500;
+    margin-bottom:10px;
+  }
+  .login-divider{
+    display:flex; align-items:center; gap:10px; margin:18px 0;
+    font-size:11.5px; color:var(--muted);
+  }
+  .login-divider::before, .login-divider::after{content:''; flex:1; height:1px; background:var(--border-soft);}
+  .login-footnote{text-align:center; font-size:12px; color:var(--muted); margin-top:16px;}
+
   @media (max-width:880px){
     .role-grid{grid-template-columns:1fr 1fr;}
+    .how-strip{grid-template-columns:1fr;}
   }
   @media (max-width:560px){
     .role-grid{grid-template-columns:1fr;}
@@ -529,6 +612,93 @@
     .scrim.show{display:block;}
   }
 
+  /* ---------- Info tooltips ---------- */
+  .info-tip{
+    position:relative; display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; border-radius:50%;
+    border:1px solid var(--border); color:var(--muted);
+    font-size:10.5px; font-family:'IBM Plex Mono',monospace; cursor:help;
+    flex:none;
+  }
+  .info-tip::after{
+    content:attr(data-tip);
+    position:absolute; bottom:135%; left:50%; transform:translateX(-50%) translateY(4px);
+    background:var(--ink); color:#F3F4EE;
+    font-family:'Inter',sans-serif; font-size:12px; font-weight:400; line-height:1.4;
+    padding:9px 12px; border-radius:4px; width:230px;
+    opacity:0; visibility:hidden; transition:opacity .15s ease, transform .15s ease;
+    pointer-events:none; z-index:30;
+  }
+  .info-tip::before{
+    content:''; position:absolute; bottom:120%; left:50%; transform:translateX(-50%);
+    border:5px solid transparent; border-top-color:var(--ink);
+    opacity:0; visibility:hidden; transition:opacity .15s ease; z-index:30;
+  }
+  .info-tip:hover::after, .info-tip:focus-visible::after{opacity:1; visibility:visible; transform:translateX(-50%) translateY(0);}
+  .info-tip:hover::before, .info-tip:focus-visible::before{opacity:1; visibility:visible;}
+
+  /* ---------- Trust legend ---------- */
+  .legend-row{display:flex; gap:18px; flex-wrap:wrap; margin:2px 0 20px; padding-bottom:16px; border-bottom:1px solid var(--border-soft);}
+  .legend-item{display:flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-soft);}
+  .legend-swatch{width:10px;height:10px;border-radius:2px; flex:none;}
+
+  /* ---------- Functional buttons ---------- */
+  .btn-teal{background:var(--teal); color:#fff; border-color:var(--teal);}
+  .btn-teal:hover{background:#0A6B65;}
+  .btn-amber{background:var(--amber); color:#fff; border-color:var(--amber);}
+  .btn-amber:hover{background:#8F5E09;}
+  .btn-coral{background:var(--coral); color:#fff; border-color:var(--coral);}
+  .btn-coral:hover{background:#A93B24;}
+  .btn-violet{background:var(--violet); color:#fff; border-color:var(--violet);}
+  .btn-violet:hover{background:#5940B5;}
+  .btn{transition:background .12s ease, border-color .12s ease, transform .1s ease;}
+  .btn:active{transform:scale(.96);}
+
+  /* ---------- View transition ---------- */
+  .view{display:none; opacity:0; transform:translateY(6px);}
+  .view.active{display:block; animation:viewIn .28s ease forwards;}
+  @keyframes viewIn{to{opacity:1; transform:translateY(0);}}
+
+  /* ---------- Nav accent + active states ---------- */
+  .nav-item{border-left:2px solid transparent;}
+  .nav-item[data-view="roadmap"].active{border-left-color:var(--violet);}
+  .nav-item[data-view="ask"].active{border-left-color:var(--teal);}
+  .nav-item[data-view="verify"].active{border-left-color:var(--amber);}
+  .nav-item[data-view="reverify"].active{border-left-color:var(--coral);}
+  .nav-item[data-view="dashboard"].active{border-left-color:var(--teal);}
+  .nav-item[data-view="sources"].active{border-left-color:var(--violet);}
+
+  /* ---------- Stamp thump + toast ---------- */
+  @keyframes stampThump{
+    0%{transform:rotate(-1.4deg) scale(0.4); opacity:0;}
+    60%{transform:rotate(-1.4deg) scale(1.12); opacity:1;}
+    100%{transform:rotate(-1.4deg) scale(1);}
+  }
+  .badge-verified.stamped{animation:stampThump .38s ease;}
+
+  .toast-stack{
+    position:fixed; bottom:22px; right:22px; z-index:50;
+    display:flex; flex-direction:column; gap:8px; align-items:flex-end;
+  }
+  .toast{
+    background:var(--ink); color:#F3F4EE;
+    padding:11px 16px; border-radius:4px; font-size:13px;
+    display:flex; align-items:center; gap:9px;
+    box-shadow:0 10px 26px rgba(0,0,0,0.18);
+    animation:toastIn .25s ease, toastOut .3s ease 2.7s forwards;
+    max-width:320px;
+  }
+  .toast .dot{width:7px;height:7px;border-radius:50%; flex:none;}
+  @keyframes toastIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+  @keyframes toastOut{to{opacity:0; transform:translateY(-6px);}}
+
+  /* ---------- Misc micro-interactions ---------- */
+  .chip, .role-card, .queue-actions .btn, .status-pill{transition-property:transform,border-color,background,box-shadow; transition-duration:.15s;}
+  .chip:active{transform:scale(.95);}
+  .checklist input[type=checkbox]{cursor:pointer;}
+  .kpi{transition:transform .18s ease;}
+  .kpi:hover{transform:translateY(-3px);}
+
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
   }
@@ -536,60 +706,134 @@
 </head>
 <body>
 
+<div class="toast-stack" id="toastStack" aria-live="polite"></div>
+
+<!-- ================= LOGIN (mock SSO) ================= -->
+<section class="landing" id="loginView">
+  <div class="login-card">
+    <div class="card-top"></div>
+    <div class="landing-brand" style="margin-bottom:6px;">
+      <span class="brand-cluster" aria-hidden="true">
+        <span style="background:var(--violet)"></span><span style="background:var(--teal)"></span><span style="background:var(--amber)"></span><span style="background:var(--coral)"></span>
+      </span>
+      <span class="brand-name">Welcome Wave</span>
+    </div>
+    <p class="landing-tagline" style="margin-bottom:24px; font-size:13.5px;">Sign in to your onboarding console</p>
+
+    <div class="login-field">
+      <label for="loginEmail">Work email</label>
+      <input type="text" id="loginEmail" placeholder="you@company.com">
+    </div>
+
+    <button class="btn btn-primary sso-btn" id="loginContinue">Continue</button>
+
+    <div class="login-divider">or</div>
+
+    <button class="btn sso-btn" id="ssoBtn">
+      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 8h14"/></svg>
+      Continue with company SSO
+    </button>
+
+    <p class="login-footnote">This preview skips real authentication — enter anything and continue.</p>
+  </div>
+</section>
+
 <!-- ================= LANDING / ROLE SELECT ================= -->
 <section class="landing" id="landingView">
   <div class="landing-inner">
     <div class="landing-brand">
-      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-cluster" aria-hidden="true">
+        <span style="background:var(--violet)"></span><span style="background:var(--teal)"></span><span style="background:var(--amber)"></span><span style="background:var(--coral)"></span>
+      </span>
       <span class="brand-name">Welcome Wave</span>
     </div>
     <p class="landing-tagline">Grounded answers. Verified trust. No guesswork onboarding.</p>
-    <p class="landing-heading">Select a role to continue</p>
+
+    <div class="how-strip">
+      <div class="how-step">
+        <span class="num" style="background:var(--violet)">1</span>
+        <p><strong>Pick a role</strong>Your roadmap and permissions are scoped to it immediately.</p>
+      </div>
+      <div class="how-step">
+        <span class="num" style="background:var(--teal)">2</span>
+        <p><strong>Ask anything in scope</strong>Every answer is generated only from retrieved, permitted content.</p>
+      </div>
+      <div class="how-step">
+        <span class="num" style="background:var(--amber)">3</span>
+        <p><strong>Experts verify it</strong>A confirmed answer is served instantly — flagged again if its source changes.</p>
+      </div>
+    </div>
+
+    <p class="landing-heading">SELECT A ROLE TO CONTINUE</p>
 
     <div class="role-grid" role="group" aria-label="Select a role">
       <button class="role-card" data-role="newhire">
-        <h3>New Hire</h3>
-        <p class="role-desc">Land on a role-specific roadmap and ask grounded questions from day one.</p>
-        <div class="access-tags">
-          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
-          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+        <div class="card-top" style="background:var(--violet)"></div>
+        <div class="card-body">
+          <div class="role-icon" style="background:var(--violet-tint); color:var(--violet);">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>
+          </div>
+          <h3>New Hire</h3>
+          <p class="role-desc">Land on a role-specific roadmap and ask grounded questions from day one.</p>
+          <div class="access-tags">
+            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+          </div>
+          <span class="continue">Continue as New Hire →</span>
         </div>
-        <span class="continue">Continue as New Hire →</span>
       </button>
 
       <button class="role-card" data-role="expert">
-        <h3>Domain Expert</h3>
-        <p class="role-desc">Review AI drafts and confirm the answers your domain is responsible for.</p>
-        <div class="access-tags">
-          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
-          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-          <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue</span>
-          <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+        <div class="card-top" style="background:var(--amber)"></div>
+        <div class="card-body">
+          <div class="role-icon" style="background:var(--amber-tint); color:var(--amber);">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3l6 2.5v4c0 4-2.5 6.8-6 7.5-3.5-.7-6-3.5-6-7.5v-4L10 3z"/><path d="M7.5 10l1.8 1.8L13 8"/></svg>
+          </div>
+          <h3>Domain Expert</h3>
+          <p class="role-desc">Review AI drafts and confirm the answers your domain is responsible for.</p>
+          <div class="access-tags">
+            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+            <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue</span>
+            <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+          </div>
+          <span class="continue">Continue as Domain Expert →</span>
         </div>
-        <span class="continue">Continue as Domain Expert →</span>
       </button>
 
       <button class="role-card" data-role="manager">
-        <h3>Manager</h3>
-        <p class="role-desc">See where documentation is thin and how much of it is actually trusted.</p>
-        <div class="access-tags">
-          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
-          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-          <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Dashboard</span>
+        <div class="card-top" style="background:var(--teal)"></div>
+        <div class="card-body">
+          <div class="role-icon" style="background:var(--teal-tint); color:var(--teal);">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 15V9M10 15V5m6 10v-6"/></svg>
+          </div>
+          <h3>Manager</h3>
+          <p class="role-desc">See where documentation is thin and how much of it is actually trusted.</p>
+          <div class="access-tags">
+            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+            <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Dashboard</span>
+          </div>
+          <span class="continue">Continue as Manager →</span>
         </div>
-        <span class="continue">Continue as Manager →</span>
       </button>
 
       <button class="role-card" data-role="admin">
-        <h3>Admin</h3>
-        <p class="role-desc">Connect knowledge sources and assign them to roles across the console.</p>
-        <div class="access-tags">
-          <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap + Source Connect</span>
-          <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-          <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue + Dashboard</span>
-          <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+        <div class="card-top" style="background:var(--coral)"></div>
+        <div class="card-body">
+          <div class="role-icon" style="background:var(--coral-tint); color:var(--coral);">
+            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/></svg>
+          </div>
+          <h3>Admin</h3>
+          <p class="role-desc">Connect knowledge sources and assign them to roles across the console.</p>
+          <div class="access-tags">
+            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap + Source Connect</span>
+            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+            <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue + Dashboard</span>
+            <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+          </div>
+          <span class="continue">Continue as Admin →</span>
         </div>
-        <span class="continue">Continue as Admin →</span>
       </button>
     </div>
 
@@ -598,6 +842,7 @@
 </section>
 
 <div class="app" id="consoleShell">
+
 
   <!-- ================= SIDEBAR ================= -->
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
@@ -703,10 +948,18 @@
     <section class="view" id="view-ask">
       <div class="card accent-teal">
         <div class="accent-bar"></div>
-        <div class="section-heading"><h2>Ask anything in your scope</h2></div>
+        <div class="section-heading">
+          <h2>Ask anything in your scope</h2>
+          <span class="info-tip" tabindex="0" data-tip="Answers are generated only from content retrieved for your role — nothing outside your permitted scope is ever used.">i</span>
+        </div>
+        <div class="legend-row">
+          <span class="legend-item"><span class="legend-swatch" style="background:var(--amber)"></span>Verified — confirmed by a domain expert</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:#ACAEA0"></span>AI draft — not yet reviewed</span>
+          <span class="legend-item"><span class="legend-swatch" style="background:var(--coral)"></span>Needs re-verification — source changed since last check</span>
+        </div>
         <div class="ask-box">
           <input type="text" id="askInput" placeholder="e.g. What's my first task this week?" aria-label="Ask a question">
-          <button class="btn btn-primary" id="askSubmit">Ask</button>
+          <button class="btn btn-teal" id="askSubmit">Ask</button>
         </div>
         <div class="chip-row" id="askChips" aria-label="Suggested questions"></div>
 
@@ -722,6 +975,7 @@
         <div class="accent-bar"></div>
         <div class="section-heading">
           <h2>Pending drafts</h2>
+          <span class="info-tip" tabindex="0" data-tip="Verifying stamps an answer as canonical. It's then served instantly to everyone, skipping AI generation entirely, until its source changes.">i</span>
           <span class="count" id="verifyHeaderCount">0 waiting</span>
         </div>
         <p class="muted small" style="margin-bottom:4px;">Verifying stamps an answer as canonical — it will be served instantly, ahead of any new AI draft, from now on.</p>
@@ -739,6 +993,7 @@
         <div class="accent-bar"></div>
         <div class="section-heading">
           <h2>Needs re-verification</h2>
+          <span class="info-tip" tabindex="0" data-tip="When a source document changes, every verified answer that depended on it is automatically dropped back here for a fresh check.">i</span>
           <span class="count" id="reverifyHeaderCount">0 flagged</span>
         </div>
         <p class="muted small" style="margin-bottom:12px;">A verified answer lands here automatically when the source chunk it depends on changes.</p>
@@ -765,20 +1020,20 @@
       <div class="kpi-grid">
         <div class="card accent-teal kpi">
           <div class="accent-bar"></div>
-          <div class="kpi-label">Recurring unanswered questions</div>
-          <div class="kpi-value" id="kpiRecurring">29</div>
+          <div class="kpi-label">Recurring unanswered questions <span class="info-tip" tabindex="0" data-tip="Questions asked repeatedly that returned no grounded answer — a signal of missing documentation.">i</span></div>
+          <div class="kpi-value" id="kpiRecurring" style="color:var(--teal)">29</div>
           <div class="kpi-sub">across 3 roles, last 14 days</div>
         </div>
         <div class="card accent-amber kpi">
           <div class="accent-bar"></div>
-          <div class="kpi-label">Verified coverage (live)</div>
-          <div class="kpi-value" id="kpiCoverage">57%</div>
+          <div class="kpi-label">Verified coverage (live) <span class="info-tip" tabindex="0" data-tip="Share of tracked answers that a human has confirmed. Updates instantly as drafts get verified.">i</span></div>
+          <div class="kpi-value" id="kpiCoverage" style="color:var(--amber)">57%</div>
           <div class="kpi-sub" id="kpiCoverageSub">4 of 7 tracked answers</div>
         </div>
         <div class="card accent-coral kpi">
           <div class="accent-bar"></div>
-          <div class="kpi-label">Re-verification backlog</div>
-          <div class="kpi-value" id="kpiBacklog">1</div>
+          <div class="kpi-label">Re-verification backlog <span class="info-tip" tabindex="0" data-tip="Verified answers currently flagged because a source they depend on was edited.">i</span></div>
+          <div class="kpi-value" id="kpiBacklog" style="color:var(--coral)">1</div>
           <div class="kpi-sub">flagged by source changes</div>
         </div>
       </div>
@@ -796,9 +1051,9 @@
         <div class="card accent-amber">
           <div class="accent-bar"></div>
           <div class="section-heading"><h2>Verified coverage per role</h2></div>
-          <div class="bar-row"><span class="bar-label">Engineering</span><div class="bar-track"><div class="bar-fill" style="width:71%;background:var(--amber);"></div></div><span class="bar-value">71%</span></div>
-          <div class="bar-row"><span class="bar-label">Sales</span><div class="bar-track"><div class="bar-fill" style="width:54%;background:var(--amber);"></div></div><span class="bar-value">54%</span></div>
-          <div class="bar-row"><span class="bar-label">HR</span><div class="bar-track"><div class="bar-fill" style="width:88%;background:var(--amber);"></div></div><span class="bar-value">88%</span></div>
+          <div class="bar-row"><span class="bar-label">Engineering</span><div class="bar-track"><div class="bar-fill" data-width="71%" style="width:0%;background:var(--amber);"></div></div><span class="bar-value">71%</span></div>
+          <div class="bar-row"><span class="bar-label">Sales</span><div class="bar-track"><div class="bar-fill" data-width="54%" style="width:0%;background:var(--amber);"></div></div><span class="bar-value">54%</span></div>
+          <div class="bar-row"><span class="bar-label">HR</span><div class="bar-track"><div class="bar-fill" data-width="88%" style="width:0%;background:var(--amber);"></div></div><span class="bar-value">88%</span></div>
         </div>
       </div>
     </section>
@@ -807,7 +1062,7 @@
     <section class="view" id="view-sources">
       <div class="card accent-violet">
         <div class="accent-bar"></div>
-        <div class="section-heading"><h2>Connect a knowledge source</h2></div>
+        <div class="section-heading"><h2>Connect a knowledge source</h2><span class="info-tip" tabindex="0" data-tip="Indexing only reads content in. Welcome Wave never writes back to anything it connects to.">i</span></div>
         <div class="dropzone" id="dropzone">Drop a PDF, Markdown or DOCX file here, or click to browse</div>
 
         <div class="form-grid">
@@ -834,7 +1089,7 @@
           </div>
         </div>
 
-        <button class="btn btn-primary" id="connectSourceBtn">Connect source</button>
+        <button class="btn btn-violet" id="connectSourceBtn">Connect source</button>
 
         <div class="lock-note">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>
@@ -938,9 +1193,33 @@
     sources:{ eyebrow:"Ingestion", title:"Source Connect", desc:"Read-only connections only — Welcome Wave never writes back to anything it indexes." }
   };
 
+  /* ============ TOASTS ============ */
+  function showToast(message, color){
+    var stack = document.getElementById('toastStack');
+    var t = document.createElement('div');
+    t.className = 'toast';
+    t.innerHTML = '<span class="dot" style="background:'+(color||'#5EC9CB')+'"></span>' + message;
+    stack.appendChild(t);
+    setTimeout(function(){ t.remove(); }, 3000);
+  }
+
+  /* ============ LOGIN ============ */
+  function proceedFromLogin(){
+    document.getElementById('loginView').style.display = 'none';
+    document.getElementById('landingView').style.display = 'flex';
+  }
+  document.getElementById('loginContinue').addEventListener('click', proceedFromLogin);
+  document.getElementById('ssoBtn').addEventListener('click', proceedFromLogin);
+  document.getElementById('loginEmail').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ proceedFromLogin(); }
+  });
+
   function setView(name){
     document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
-    document.getElementById('view-'+name).classList.add('active');
+    // restart the entrance animation each time a view is shown
+    var target = document.getElementById('view-'+name);
+    void target.offsetWidth;
+    target.classList.add('active');
     document.querySelectorAll('.nav-item').forEach(function(n){ n.classList.toggle('active', n.dataset.view===name); });
     var m = VIEW_META[name];
     document.getElementById('viewEyebrow').textContent = m.eyebrow;
@@ -948,6 +1227,13 @@
     document.getElementById('viewDesc').textContent = m.desc;
     document.getElementById('sidebar').classList.remove('open');
     document.getElementById('scrim').classList.remove('show');
+    if(name === 'dashboard'){
+      setTimeout(function(){
+        document.querySelectorAll('#view-dashboard .bar-fill').forEach(function(el){
+          el.style.width = el.dataset.width;
+        });
+      }, 60);
+    }
   }
 
   document.querySelectorAll('.nav-item').forEach(function(btn){
@@ -981,6 +1267,7 @@
     document.getElementById('landingView').style.display = 'none';
     document.getElementById('consoleShell').style.display = 'grid';
     setView('roadmap');
+    showToast('Signed in as ' + ROLE_LABEL[role], '#5EC9CB');
   }
 
   document.getElementById('switchRoleBtn').addEventListener('click', function(){
@@ -1018,7 +1305,7 @@
       return '<span class="badge badge-stale">'+staleIcon()+'Needs re-verification</span>';
     }
     if(item.status==='verified'){
-      return '<span class="badge badge-verified">'+checkIcon()+'Verified · '+item.verifiedBy+'</span>';
+      return '<span class="badge badge-verified stamped">'+checkIcon()+'Verified · '+item.verifiedBy+'</span>';
     }
     return '<span class="badge badge-draft">'+draftIcon()+'AI draft · unverified</span>';
   }
@@ -1111,7 +1398,7 @@
         '</div>' +
         '<div class="queue-actions">' +
           '<button class="btn btn-sm" data-act="edit">Edit</button>' +
-          '<button class="btn btn-sm btn-primary" data-act="verify">Verify</button>' +
+          '<button class="btn btn-sm btn-amber" data-act="verify">Verify</button>' +
         '</div>';
       row.querySelector('[data-act="verify"]').addEventListener('click', function(){ verifyItem(item, row); });
       list.appendChild(row);
@@ -1123,6 +1410,7 @@
     item.verifiedBy = 'You';
     item.verifiedAt = 'just now';
     row.classList.add('leaving');
+    showToast('Verified — this is now the answer everyone gets.', 'var(--amber)');
     setTimeout(function(){
       renderVerifyQueue();
       renderReverifyQueue();
@@ -1165,8 +1453,9 @@
           '<div class="queue-a">'+item.answer+'</div>' +
           '<div class="queue-meta"><span class="mono">'+item.domain+'</span><span>Owner: '+item.owner+'</span><span style="color:#9C3A24;">'+item.staleReason+'</span></div>' +
         '</div>' +
-        '<div class="queue-actions"><button class="btn btn-sm btn-primary" data-act="reconfirm">Re-confirm</button></div>';
+        '<div class="queue-actions"><button class="btn btn-sm btn-coral" data-act="reconfirm">Re-confirm</button></div>';
       row.querySelector('[data-act="reconfirm"]').addEventListener('click', function(){
+        showToast('Re-confirmed — staleness flag cleared.', 'var(--coral)');
         item.stale = false;
         row.classList.add('leaving');
         setTimeout(function(){ renderReverifyQueue(); renderDashboard(); }, 320);
