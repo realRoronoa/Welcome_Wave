@@ -1,12 +1,16 @@
 export type Department = "sales" | "hr" | "engineering" ; //naming a new type department nothing else not string not anything
 
-export type FunctionalRole = "admin " | "domain-expert" | "manager" | "new_hire";
+export type FunctionalRole = 
+    | "admin " 
+    | "domain-expert" 
+    | "manager" 
+    | "new-hire";
 
 
 export interface User {      
-    id:"string";
-    name:"string";
-    email:"string";
+    id:string;
+    name:string;
+    email:string;
     department:Department;
     functionRole:FunctionalRole;
 } //
@@ -17,7 +21,7 @@ export interface RoadmapProgress {
 }
 
 
-export type AnswerStatus = "ai_draft" | "verfied" | "stale" | "not_found";
+export type AnswerStatus = "ai_draft" | "verified" | "stale" | "not_found";
 
 
 export interface Evidence {
@@ -34,7 +38,7 @@ export interface Answer {
     status:AnswerStatus;
     text:string;
     evidence:Evidence[];
-    verifiedBy?:String;
+    verifiedBy?:string;
     verifiedAt?:string;
     askedCount:number;
 }

@@ -182,6 +182,19 @@
   }
   .topbar-title h1{font-size:32px;font-weight:600;}
   .topbar-title .desc{color:var(--muted); font-size:14px; margin-top:7px; max-width:56ch;}
+  .topbar-actions{position:relative;display:flex;align-items:flex-start;}
+  .profile-menu-trigger{display:flex;align-items:center;gap:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:3px;padding:7px 10px;cursor:pointer;text-align:left;min-width:190px;}
+  .profile-menu-trigger:hover{border-color:#A9ABA0;background:var(--paper);}
+  .profile-menu-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--violet-tint);color:var(--violet);font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;flex:none;}
+  .profile-menu-copy{display:flex;flex-direction:column;min-width:0;flex:1;}
+  .profile-menu-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .profile-menu-role{font-size:11px;color:var(--muted);white-space:nowrap;}
+  .profile-menu-chevron{font-size:12px;color:var(--muted);}
+  .profile-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:25;width:190px;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:3px;box-shadow:0 12px 24px rgba(20,23,17,.12);}
+  .profile-menu[hidden]{display:none;}
+  .profile-menu button{display:block;width:100%;border:0;background:transparent;color:var(--ink-soft);padding:8px 10px;text-align:left;font-size:12.5px;cursor:pointer;border-radius:2px;}
+  .profile-menu button:hover{background:var(--paper);color:var(--ink);}
+  .profile-menu .menu-danger{color:var(--coral);}
 
   .view{display:none;}
   .view.active{display:block;}
@@ -309,6 +322,10 @@
   .checklist label{margin:0; font-weight:400; font-size:14px; color:var(--ink); cursor:pointer;}
   .checklist li.done label{color:var(--muted); text-decoration:line-through;}
   .checklist .item-meta{font-size:12px; color:var(--muted); margin-top:2px;}
+  .roadmap-progress{margin:16px 0 4px;padding:12px 0 4px;border-top:1px solid var(--border-soft);}
+  .roadmap-progress-head{display:flex;justify-content:space-between;gap:12px;font-size:12px;color:var(--muted);margin-bottom:7px;}
+  .roadmap-progress-track{height:6px;background:var(--border-soft);border-radius:2px;overflow:hidden;}
+  .roadmap-progress-fill{height:100%;width:0;background:var(--violet);transition:width .25s ease;}
 
   .task-callout{
     background:var(--violet-tint);
@@ -950,10 +967,18 @@
         <h1 id="viewTitle">Your first week</h1>
         <p class="desc" id="viewDesc">Generated the moment you were added — no prompt required, built only from content tagged for your role.</p>
       </div>
-      <button class="switch-role-btn" id="switchRoleBtn">
-        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 10a6 6 0 0110-4.2M16 10a6 6 0 01-10 4.2"/><path d="M13 3v3h-3M7 17v-3h3"/></svg>
-        Switch role
-      </button>
+      <div class="topbar-actions">
+        <button class="profile-menu-trigger" id="profileMenuTrigger" aria-expanded="false" aria-controls="profileMenu">
+          <span class="profile-menu-avatar" id="topbarAvatar">AN</span>
+          <span class="profile-menu-copy"><span class="profile-menu-name" id="topbarName">Your name</span><span class="profile-menu-role" id="topbarRole">New Hire · Engineering</span></span>
+          <span class="profile-menu-chevron">⌄</span>
+        </button>
+        <div class="profile-menu" id="profileMenu" hidden>
+          <button type="button" id="openProfileMenuItem">View profile</button>
+          <button type="button" id="switchRoleBtn">Switch role</button>
+          <button type="button" class="menu-danger" id="signOutBtn">Sign out</button>
+        </div>
+      </div>
     </div>
 
     <!-- ========== ROADMAP VIEW ========== -->
@@ -964,6 +989,10 @@
             <div class="accent-bar"></div>
             <div class="section-heading"><h2 id="roadmapRoleTitle">Engineering · New Hire</h2></div>
             <p class="muted" id="roadmapOverview" style="margin-bottom:4px;">This roadmap is generated from content tagged for your role only — not a generic onboarding template.</p>
+            <div class="roadmap-progress" aria-live="polite">
+              <div class="roadmap-progress-head"><span>Reading progress</span><strong id="roadmapProgressLabel">0 of 3 complete</strong></div>
+              <div class="roadmap-progress-track"><div class="roadmap-progress-fill" id="roadmapProgressFill"></div></div>
+            </div>
 
             <ul class="checklist" id="readFirstList" aria-label="Read this first"></ul>
           </div>
@@ -1308,6 +1337,7 @@
   ];
   var DEPARTMENTS = ['Engineering','Sales','HR'];
   var ROADMAP_PROGRESS = {};
+  var ROADMAP_CHECKS = {};
   var state = { role:'newhire', activeSources:3, coverageBase:0, identity:USERS[0] };
 
   /* ============ ICON HELPERS ============ */
@@ -1440,6 +1470,9 @@
     state.role = role;
     state.identity = state.identity && state.identity.role === role ? state.identity : USERS.find(function(user){ return user.role === role; }) || USERS[0];
     document.getElementById('sidebarRoleLabel').textContent = ROLE_LABEL[role];
+    document.getElementById('topbarAvatar').textContent = state.identity.name.split(' ').map(function(part){ return part[0]; }).join('').slice(0,2).toUpperCase();
+    document.getElementById('topbarName').textContent = state.identity.name;
+    document.getElementById('topbarRole').textContent = ROLE_LABEL[role] + ' · ' + state.identity.department;
     applyRoleVisibility();
     renderRoadmap();
     renderAskChips();
@@ -1453,9 +1486,32 @@
     showToast('Signed in as ' + ROLE_LABEL[role], '#5EC9CB');
   }
 
+  function closeProfileMenu(){
+    document.getElementById('profileMenu').hidden = true;
+    document.getElementById('profileMenuTrigger').setAttribute('aria-expanded', 'false');
+  }
+
+  document.getElementById('profileMenuTrigger').addEventListener('click', function(){
+    var menu = document.getElementById('profileMenu');
+    menu.hidden = !menu.hidden;
+    this.setAttribute('aria-expanded', String(!menu.hidden));
+  });
+  document.getElementById('openProfileMenuItem').addEventListener('click', function(){
+    closeProfileMenu();
+    setView('profile');
+  });
   document.getElementById('switchRoleBtn').addEventListener('click', function(){
+    closeProfileMenu();
     document.getElementById('consoleShell').style.display = 'none';
     document.getElementById('landingView').style.display = 'flex';
+  });
+  document.getElementById('signOutBtn').addEventListener('click', function(){
+    closeProfileMenu();
+    state.identity = null;
+    state.role = null;
+    document.getElementById('consoleShell').style.display = 'none';
+    document.getElementById('landingView').style.display = 'flex';
+    showToast('You have been signed out.', 'var(--teal)');
   });
 
   function applyRoleVisibility(){
@@ -1471,6 +1527,8 @@
     document.getElementById('roadmapRoleTitle').textContent = d.title;
     document.getElementById('roadmapOverview').textContent = d.overview;
     document.getElementById('firstTaskText').textContent = d.task;
+    var checklistKey = state.identity.email + ':' + state.role;
+    var savedChecks = ROADMAP_CHECKS[checklistKey] || {};
     var taskButton = document.getElementById('completeTaskBtn');
     var taskKey = state.identity.email;
     var completed = ROADMAP_PROGRESS[taskKey];
@@ -1484,13 +1542,29 @@
     };
     var list = document.getElementById('readFirstList');
     list.innerHTML = '';
+    document.getElementById('roadmapProgressLabel').textContent = '0 of ' + d.readFirst.length + ' complete';
     d.readFirst.forEach(function(item, i){
       var li = document.createElement('li');
-      li.innerHTML = '<input type="checkbox" id="rf-'+i+'"><div><label for="rf-'+i+'">'+item.t+'</label><div class="item-meta mono">'+item.meta+'</div></div>';
+      li.innerHTML = '<input type="checkbox" id="rf-'+i+'"'+(savedChecks[i] ? ' checked' : '')+'><div><label for="rf-'+i+'">'+item.t+'</label><div class="item-meta mono">'+item.meta+'</div></div>';
       var cb = li.querySelector('input');
-      cb.addEventListener('change', function(){ li.classList.toggle('done', cb.checked); });
+      li.classList.toggle('done', cb.checked);
+      cb.addEventListener('change', function(){
+        var checks = ROADMAP_CHECKS[checklistKey] || {};
+        checks[i] = cb.checked;
+        ROADMAP_CHECKS[checklistKey] = checks;
+        li.classList.toggle('done', cb.checked);
+        updateRoadmapProgress(d.readFirst.length, checks);
+      });
       list.appendChild(li);
     });
+    updateRoadmapProgress(d.readFirst.length, savedChecks);
+  }
+
+  function updateRoadmapProgress(total, checks){
+    var complete = Object.keys(checks).filter(function(index){ return checks[index]; }).length;
+    var percent = total ? Math.round((complete / total) * 100) : 0;
+    document.getElementById('roadmapProgressLabel').textContent = complete + ' of ' + total + ' complete';
+    document.getElementById('roadmapProgressFill').style.width = percent + '%';
   }
 
   /* ============ ASK ============ */
