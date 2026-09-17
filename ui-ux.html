@@ -57,6 +57,7 @@
     display:grid;
     grid-template-columns:256px 1fr;
     min-height:100vh;
+    min-width:0;
   }
 
   /* ---------- Sidebar ---------- */
@@ -165,7 +166,7 @@
   .sidebar-footer .row span:last-child{color:#DADCD2; font-family:'IBM Plex Mono',monospace; font-size:11px;}
 
   /* ---------- Main ---------- */
-  main{padding:40px 56px 70px; max-width:1360px;}
+  main{padding:40px 56px 70px; max-width:1360px; min-width:0; overflow:hidden;}
   .topbar{
     display:flex;
     align-items:flex-start;
@@ -192,6 +193,7 @@
     border-radius:var(--radius);
     padding:26px 30px;
     position:relative;
+    min-width:0;
   }
   .card + .card{margin-top:16px;}
   .accent-bar{
@@ -416,7 +418,7 @@
     cursor:pointer;
   }
   .dropzone:hover{border-color:var(--teal); color:var(--teal);}
-  .form-grid{display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:16px;}
+  .form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr)); gap:16px; margin-top:16px;}
   .form-field{margin-bottom:14px;}
   .scope-row{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
   .scope-chip{
@@ -432,6 +434,23 @@
     border-radius:6px; padding:10px 12px; margin-top:16px;
   }
   .lock-note svg{width:14px;height:14px; flex:none; color:var(--muted);}
+
+  /* ---------- Profile ---------- */
+  .profile-grid{display:grid;grid-template-columns:minmax(240px,.8fr) minmax(0,1.2fr);gap:20px;}
+  .profile-identity-card{display:flex;flex-direction:column;justify-content:center;min-height:238px;}
+  .profile-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--violet-tint);color:var(--violet);font-family:'Source Serif 4',serif;font-size:23px;font-weight:600;margin-bottom:16px;}
+  .profile-badges{display:flex;gap:7px;flex-wrap:wrap;margin-top:16px;}
+  .profile-details{margin:0;display:grid;gap:0;}
+  .profile-details div{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--border-soft);}
+  .profile-details div:last-child{border-bottom:none;}
+  .profile-details dt{color:var(--muted);font-size:13px;}
+  .profile-details dd{margin:0;color:var(--ink);font-size:13.5px;text-align:right;overflow-wrap:anywhere;}
+  .profile-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  .profile-metrics>div{display:flex;flex-direction:column;gap:3px;padding:14px;background:var(--paper);border:1px solid var(--border-soft);border-radius:3px;min-width:0;}
+  .profile-metric-value{font-family:'Source Serif 4',serif;font-size:24px;font-weight:600;overflow-wrap:anywhere;}
+  .profile-metric-label{font-size:12px;color:var(--muted);}
+  .profile-access-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+  .profile-access-list span{border:1px solid var(--border);background:var(--surface);color:var(--ink-soft);border-radius:20px;padding:6px 11px;font-size:12.5px;}
 
   table.sources-table{width:100%; border-collapse:collapse; margin-top:8px; font-size:13.5px;}
   table.sources-table th{
@@ -451,7 +470,7 @@
 
   /* ---------- Landing / Role Select ---------- */
   #consoleShell{display:none;}
-  #landingView{display:none;}
+  #landingView{display:flex;}
   .landing{
     min-height:100vh;
     display:flex; align-items:center; justify-content:center;
@@ -560,7 +579,7 @@
   .role-pill .dot{width:6px;height:6px;border-radius:50%; background:#5EC9CB;}
 
   /* ---------- Login (mock SSO step) ---------- */
-  #loginView{display:flex;}
+  #loginView{display:none;}
   .login-card{
     max-width:380px; width:100%; margin:0 auto;
     background:var(--surface); border:1px solid var(--border); border-radius:6px;
@@ -573,6 +592,12 @@
     background:linear-gradient(90deg,var(--violet),var(--teal),var(--amber),var(--coral));
   }
   .login-field{margin-bottom:16px;}
+  .login-detection{
+    background:var(--teal-tint); border:1px solid var(--border);
+    color:var(--ink-soft); border-radius:3px; padding:9px 11px;
+    font-size:12.5px; margin-bottom:16px;
+  }
+  .login-detection strong{color:var(--teal);}
   .sso-btn{
     width:100%; justify-content:center;
     padding:10px 14px; font-size:14px; font-weight:500;
@@ -608,6 +633,8 @@
     .roadmap-grid{grid-template-columns:1fr;}
     .kpi-grid{grid-template-columns:1fr;}
     .form-grid{grid-template-columns:1fr;}
+    .profile-grid{grid-template-columns:1fr;}
+    .profile-metrics{grid-template-columns:1fr 1fr 1fr;}
     .topbar{flex-direction:column;}
     .scrim.show{display:block;}
   }
@@ -720,6 +747,8 @@
     </div>
     <p class="landing-tagline" style="margin-bottom:24px; font-size:13.5px;">Sign in to your onboarding console</p>
 
+    <div class="login-detection" id="loginDetection">Selected role: <strong id="loginRoleLabel">New Hire</strong></div>
+
     <div class="login-field">
       <label for="loginEmail">Work email</label>
       <input type="text" id="loginEmail" placeholder="you@company.com">
@@ -733,6 +762,8 @@
       <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 8h14"/></svg>
       Continue with company SSO
     </button>
+
+    <button class="demo-link" id="backToRoles" type="button">Back to role selection</button>
 
     <p class="login-footnote">This preview skips real authentication — enter anything and continue.</p>
   </div>
@@ -882,9 +913,22 @@
         <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/></svg>
         Source Connect
       </button>
+      <button class="nav-item" data-view="team" data-roles="expert,manager">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="6" r="3"/><path d="M4 17c0-3 2.7-5 6-5s6 2 6 5M15 4.5a2.5 2.5 0 0 1 2 4.2M17 13.5c1.7.6 2.7 1.8 3 3.5"/></svg>
+        My Team
+      </button>
+      <button class="nav-item" data-view="users" data-roles="admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="7" cy="7" r="3"/><path d="M2 17c0-3 2.2-5 5-5s5 2 5 5M14 6h5M16.5 3.5v5"/></svg>
+        Users &amp; Departments
+      </button>
+      <button class="nav-item" data-view="profile" data-roles="newhire,expert,manager,admin">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="10" cy="6" r="3"/><path d="M3.5 17c.8-3 3-4.5 6.5-4.5s5.7 1.5 6.5 4.5"/></svg>
+        Profile
+      </button>
     </nav>
 
     <div class="sidebar-footer">
+
       <div class="row"><span>Active sources</span><span id="statActiveSources">3</span></div>
       <div class="row"><span>Verified coverage</span><span id="statCoverage">57%</span></div>
       <div class="row"><span>Avg. answer latency</span><span>1.8s</span></div>
@@ -932,6 +976,7 @@
             <div class="task-callout">
               <p class="label">TODAY</p>
               <p id="firstTaskText">Set up your local environment and shadow one live retrieval request.</p>
+              <button class="btn btn-primary btn-sm" id="completeTaskBtn" style="margin-top:12px;">Mark task complete</button>
             </div>
           </div>
           <div class="card accent-teal" style="margin-top:14px;">
@@ -1089,7 +1134,10 @@
           </div>
         </div>
 
-        <button class="btn btn-violet" id="connectSourceBtn">Connect source</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-violet" id="connectSourceBtn">Connect source</button>
+          <button class="btn btn-sm" id="malformedUploadBtn">Preview malformed upload</button>
+        </div>
 
         <div class="lock-note">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="9" width="12" height="8" rx="1.5"/><path d="M7 9V6a3 3 0 016 0v3"/></svg>
@@ -1101,9 +1149,86 @@
         <div class="accent-bar"></div>
         <div class="section-heading"><h2>Connected sources</h2></div>
         <table class="sources-table">
-          <thead><tr><th>Source</th><th>Role</th><th>Status</th><th>Last synced</th></tr></thead>
+          <thead><tr><th>Source</th><th>Role</th><th>Status</th><th>Last synced</th><th></th></tr></thead>
           <tbody id="sourcesTableBody"></tbody>
         </table>
+      </div>
+    </section>
+
+    <!-- ========== TEAM VIEW ========== -->
+    <section class="view" id="view-team">
+      <div class="card accent-teal">
+        <div class="accent-bar"></div>
+        <div class="section-heading"><h2>My team</h2><span class="info-tip" tabindex="0" data-tip="Team visibility is derived from the department attached to the active identity.">i</span></div>
+        <p class="muted small" id="teamScopeText">New hires in your department appear here automatically.</p>
+        <table class="sources-table">
+          <thead><tr><th>Name</th><th>First task</th><th>Questions asked</th></tr></thead>
+          <tbody id="teamTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ========== USERS VIEW ========== -->
+    <section class="view" id="view-users">
+      <div class="card accent-coral">
+        <div class="accent-bar"></div>
+        <div class="section-heading"><h2>Users &amp; departments</h2><span class="info-tip" tabindex="0" data-tip="Functional role controls actions; department controls the knowledge scope each person can see.">i</span></div>
+        <div class="form-grid">
+          <div class="form-field"><label for="newDepartment">Add department</label><input type="text" id="newDepartment" placeholder="e.g. Support"></div>
+          <div class="form-field" style="align-self:end;"><button class="btn btn-coral" id="addDepartmentBtn">Add department</button></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-field"><label for="newUserName">Name</label><input type="text" id="newUserName" placeholder="Full name"></div>
+          <div class="form-field"><label for="newUserEmail">Email</label><input type="email" id="newUserEmail" placeholder="name@company.com"></div>
+          <div class="form-field"><label for="newUserDepartment">Department</label><select id="newUserDepartment"></select></div>
+          <div class="form-field"><label for="newUserRole">Functional role</label><select id="newUserRole"><option value="newhire">New Hire</option><option value="expert">Domain Expert</option><option value="manager">Manager</option><option value="admin">Admin</option></select></div>
+        </div>
+        <button class="btn btn-primary" id="addUserBtn">Create user</button>
+        <div class="small muted" id="usersFormMessage" style="margin-top:10px;"></div>
+      </div>
+      <div class="card">
+        <div class="section-heading"><h2>All users</h2><span class="count" id="userCount"></span></div>
+        <table class="sources-table"><thead><tr><th>Name</th><th>Email</th><th>Department</th><th>Role</th></tr></thead><tbody id="usersTableBody"></tbody></table>
+      </div>
+    </section>
+
+    <!-- ========== PROFILE VIEW ========== -->
+    <section class="view" id="view-profile">
+      <div class="profile-grid">
+        <div class="card accent-violet profile-identity-card">
+          <div class="accent-bar"></div>
+          <div class="profile-avatar" id="profileAvatar">AN</div>
+          <div class="section-heading" style="margin-bottom:4px;"><h2 id="profileName">Your name</h2></div>
+          <p class="muted" id="profileEmail">you@company.com</p>
+          <div class="profile-badges">
+            <span class="badge badge-violet" id="profileRole">New Hire</span>
+            <span class="badge badge-teal" id="profileDepartment">Engineering</span>
+          </div>
+        </div>
+        <div class="card accent-teal">
+          <div class="accent-bar"></div>
+          <div class="section-heading"><h2>Personal details</h2></div>
+          <dl class="profile-details">
+            <div><dt>Work email</dt><dd id="profileEmailDetail">you@company.com</dd></div>
+            <div><dt>Functional role</dt><dd id="profileRoleDetail">New Hire</dd></div>
+            <div><dt>Department scope</dt><dd id="profileDepartmentDetail">Engineering</dd></div>
+            <div><dt>Access level</dt><dd id="profileAccessDetail">Department-scoped</dd></div>
+          </dl>
+        </div>
+      </div>
+      <div class="card accent-amber">
+        <div class="accent-bar"></div>
+        <div class="section-heading"><h2>My onboarding activity</h2></div>
+        <div class="profile-metrics">
+          <div><span class="profile-metric-value" id="profileQuestions">0</span><span class="profile-metric-label">questions asked</span></div>
+          <div><span class="profile-metric-value" id="profileTaskStatus">In progress</span><span class="profile-metric-label">roadmap task</span></div>
+          <div><span class="profile-metric-value" id="profileLastSeen">Today</span><span class="profile-metric-label">last active</span></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="section-heading"><h2>What you can access</h2></div>
+        <p class="muted small" id="profileScopeText">Your answers and roadmap are limited to content tagged for your department.</p>
+        <div class="profile-access-list" id="profileAccessList"></div>
       </div>
     </section>
 
@@ -1175,7 +1300,15 @@
       task:"Connect your team's first knowledge source." }
   };
 
-  var state = { role:'newhire', activeSources:3, coverageBase:0 };
+  var USERS = [
+    {name:'Aman Nautiyal', email:'aman@company.com', department:'Engineering', role:'newhire'},
+    {name:'Priya N.', email:'priya@company.com', department:'Engineering', role:'expert'},
+    {name:'Meera Pillai', email:'meera@company.com', department:'Sales', role:'manager'},
+    {name:'Sanjay Admin', email:'sanjay@company.com', department:'All', role:'admin'}
+  ];
+  var DEPARTMENTS = ['Engineering','Sales','HR'];
+  var ROADMAP_PROGRESS = {};
+  var state = { role:'newhire', activeSources:3, coverageBase:0, identity:USERS[0] };
 
   /* ============ ICON HELPERS ============ */
   function checkIcon(){ return '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 10l4 4 8-9"/></svg>'; }
@@ -1190,7 +1323,10 @@
     verify:{ eyebrow:"Verification & trust", title:"Verify Queue", desc:"Turn a correct AI draft into the canonical, owner-stamped answer everyone sees next." },
     reverify:{ eyebrow:"Staleness & freshness", title:"Re-verification Queue", desc:"Verified answers whose source material changed, waiting on a fresh confirmation." },
     dashboard:{ eyebrow:"Manager analytics", title:"Coverage & gaps", desc:"Where documentation is thin, and how much of your knowledge base is actually trusted." },
-    sources:{ eyebrow:"Ingestion", title:"Source Connect", desc:"Read-only connections only — Welcome Wave never writes back to anything it indexes." }
+    sources:{ eyebrow:"Ingestion", title:"Source Connect", desc:"Read-only connections only — Welcome Wave never writes back to anything it indexes." },
+    team:{ eyebrow:"Department visibility", title:"My Team", desc:"New hires assigned to your department, with onboarding progress and question activity." },
+    users:{ eyebrow:"Role & permission scoping", title:"Users & Departments", desc:"Manage functional roles and department scope for every Welcome Wave identity." }
+    ,profile:{ eyebrow:"Personal workspace", title:"My Profile", desc:"Your identity, department scope, onboarding progress, and activity in Welcome Wave." }
   };
 
   /* ============ TOASTS ============ */
@@ -1204,14 +1340,53 @@
   }
 
   /* ============ LOGIN ============ */
-  function proceedFromLogin(){
+  var pendingRole = null;
+
+  function showLoginForRole(role){
+    pendingRole = role;
+    document.getElementById('loginRoleLabel').textContent = ROLE_LABEL[role];
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginView').style.display = 'flex';
+    document.getElementById('landingView').style.display = 'none';
+    document.getElementById('loginEmail').focus();
+  }
+
+  function detectIdentity(email){
+    var normalized = email.trim().toLowerCase();
+    var known = USERS.find(function(user){ return user.email.toLowerCase() === normalized; });
+    if(known) return known;
+    return {
+      name: email.split('@')[0].replace(/[._-]+/g, ' ').replace(/\b\w/g, function(letter){ return letter.toUpperCase(); }),
+      email: email.trim(),
+      department: pendingRole === 'admin' ? 'All' : 'Engineering',
+      role: pendingRole
+    };
+  }
+
+  function authenticateFromLogin(){
+    var email = document.getElementById('loginEmail').value.trim();
+    if(!email){
+      document.getElementById('loginEmail').focus();
+      showToast('Enter your work email to continue.', 'var(--coral)');
+      return;
+    }
+    state.identity = detectIdentity(email);
+    enterConsole(state.identity.role);
+    showToast('Signed in as ' + state.identity.name + ' · ' + ROLE_LABEL[state.identity.role], 'var(--teal)');
+  }
+
+  document.getElementById('loginContinue').addEventListener('click', authenticateFromLogin);
+  document.getElementById('ssoBtn').addEventListener('click', function(){
+    var fallback = USERS.find(function(user){ return user.role === pendingRole; });
+    document.getElementById('loginEmail').value = fallback ? fallback.email : 'you@company.com';
+    authenticateFromLogin();
+  });
+  document.getElementById('loginEmail').addEventListener('keydown', function(e){
+    if(e.key === 'Enter'){ authenticateFromLogin(); }
+  });
+  document.getElementById('backToRoles').addEventListener('click', function(){
     document.getElementById('loginView').style.display = 'none';
     document.getElementById('landingView').style.display = 'flex';
-  }
-  document.getElementById('loginContinue').addEventListener('click', proceedFromLogin);
-  document.getElementById('ssoBtn').addEventListener('click', proceedFromLogin);
-  document.getElementById('loginEmail').addEventListener('keydown', function(e){
-    if(e.key === 'Enter'){ proceedFromLogin(); }
   });
 
   function setView(name){
@@ -1234,6 +1409,9 @@
         });
       }, 60);
     }
+    if(name === 'team') renderTeam();
+    if(name === 'users') renderUsers();
+    if(name === 'profile') renderProfile();
   }
 
   document.querySelectorAll('.nav-item').forEach(function(btn){
@@ -1255,16 +1433,21 @@
   var ROLE_LABEL = { newhire:'New Hire', expert:'Domain Expert', manager:'Manager', admin:'Admin' };
 
   document.querySelectorAll('.role-card').forEach(function(card){
-    card.addEventListener('click', function(){ enterConsole(card.dataset.role); });
+    card.addEventListener('click', function(){ showLoginForRole(card.dataset.role); });
   });
 
   function enterConsole(role){
     state.role = role;
+    state.identity = state.identity && state.identity.role === role ? state.identity : USERS.find(function(user){ return user.role === role; }) || USERS[0];
     document.getElementById('sidebarRoleLabel').textContent = ROLE_LABEL[role];
     applyRoleVisibility();
     renderRoadmap();
     renderAskChips();
+    renderTeam();
+    renderUsers();
+    renderProfile();
     document.getElementById('landingView').style.display = 'none';
+    document.getElementById('loginView').style.display = 'none';
     document.getElementById('consoleShell').style.display = 'grid';
     setView('roadmap');
     showToast('Signed in as ' + ROLE_LABEL[role], '#5EC9CB');
@@ -1288,6 +1471,17 @@
     document.getElementById('roadmapRoleTitle').textContent = d.title;
     document.getElementById('roadmapOverview').textContent = d.overview;
     document.getElementById('firstTaskText').textContent = d.task;
+    var taskButton = document.getElementById('completeTaskBtn');
+    var taskKey = state.identity.email;
+    var completed = ROADMAP_PROGRESS[taskKey];
+    taskButton.textContent = completed ? 'Task completed' : 'Mark task complete';
+    taskButton.disabled = !!completed;
+    taskButton.onclick = function(){
+      ROADMAP_PROGRESS[taskKey] = true;
+      showToast('Task marked complete — progress is visible to your team.', 'var(--teal)');
+      renderRoadmap();
+      renderTeam();
+    };
     var list = document.getElementById('readFirstList');
     list.innerHTML = '';
     d.readFirst.forEach(function(item, i){
@@ -1401,6 +1595,14 @@
           '<button class="btn btn-sm btn-amber" data-act="verify">Verify</button>' +
         '</div>';
       row.querySelector('[data-act="verify"]').addEventListener('click', function(){ verifyItem(item, row); });
+      row.querySelector('[data-act="edit"]').addEventListener('click', function(){
+        var revised = window.prompt('Edit this draft before verifying:', item.answer);
+        if(revised && revised.trim()){
+          item.answer = revised.trim();
+          renderVerifyQueue();
+          showToast('Draft updated. Review it once more before verifying.', 'var(--amber)');
+        }
+      });
       list.appendChild(row);
     });
   }
@@ -1481,6 +1683,81 @@
     document.getElementById('kpiBacklog').textContent = backlog;
   }
 
+  /* ============ TEAM + USER ADMIN ============ */
+  function renderTeam(){
+    var body = document.getElementById('teamTableBody');
+    if(!body) return;
+    var department = state.identity ? state.identity.department : 'Engineering';
+    document.getElementById('teamScopeText').textContent = 'New hires in ' + department + ' appear here automatically.';
+    var team = USERS.filter(function(user){ return user.role === 'newhire' && user.department === department; });
+    body.innerHTML = team.length ? team.map(function(user){
+      var done = ROADMAP_PROGRESS[user.email];
+      var asks = QA.filter(function(item){ return item.roles.indexOf('newhire') !== -1 && item.owner === user.name; }).length;
+      return '<tr><td>'+user.name+'</td><td><span class="status-pill '+(done?'status-indexed':'status-syncing')+'"><span class="dot"></span>'+(done?'Completed':'In progress')+'</span></td><td>'+asks+'</td></tr>';
+    }).join('') : '<tr><td colspan="3" class="muted">No new hires in this department yet.</td></tr>';
+  }
+
+  function renderUsers(){
+    var body = document.getElementById('usersTableBody');
+    var select = document.getElementById('newUserDepartment');
+    if(!body || !select) return;
+    select.innerHTML = DEPARTMENTS.map(function(department){ return '<option>'+department+'</option>'; }).join('');
+    document.getElementById('userCount').textContent = USERS.length + ' identities';
+    body.innerHTML = USERS.map(function(user){
+      return '<tr><td>'+user.name+'</td><td class="mono small">'+user.email+'</td><td><span class="badge badge-teal">'+user.department+'</span></td><td>'+ROLE_LABEL[user.role]+'</td></tr>';
+    }).join('');
+  }
+
+  function renderProfile(){
+    var identity = state.identity;
+    if(!identity || !document.getElementById('profileName')) return;
+    var roleLabel = ROLE_LABEL[identity.role] || identity.role;
+    var completed = !!ROADMAP_PROGRESS[identity.email];
+    var questionCount = QA.filter(function(item){ return item.owner === identity.name; }).length;
+    var accessLevel = identity.role === 'admin' ? 'Organization-wide' : identity.role === 'manager' ? 'Department analytics' : identity.role === 'expert' ? 'Department review' : 'Department-scoped';
+    var scopeText = identity.role === 'admin' ? 'You can manage connected sources, users, departments, and organization-wide analytics.' : 'Your answers and roadmap are limited to content tagged for ' + identity.department + '.';
+    document.getElementById('profileAvatar').textContent = identity.name.split(' ').map(function(part){ return part[0]; }).join('').slice(0,2).toUpperCase();
+    document.getElementById('profileName').textContent = identity.name;
+    document.getElementById('profileEmail').textContent = identity.email;
+    document.getElementById('profileRole').textContent = roleLabel;
+    document.getElementById('profileDepartment').textContent = identity.department;
+    document.getElementById('profileEmailDetail').textContent = identity.email;
+    document.getElementById('profileRoleDetail').textContent = roleLabel;
+    document.getElementById('profileDepartmentDetail').textContent = identity.department;
+    document.getElementById('profileAccessDetail').textContent = accessLevel;
+    document.getElementById('profileQuestions').textContent = questionCount;
+    document.getElementById('profileTaskStatus').textContent = completed ? 'Completed' : 'In progress';
+    document.getElementById('profileScopeText').textContent = scopeText;
+    document.getElementById('profileAccessList').innerHTML = (identity.role === 'admin' ? ['All departments','Source management','User administration','Dashboard analytics'] : identity.role === 'expert' ? ['Roadmap','Ask & Evidence','Verify Queue','Re-verification','My Team'] : identity.role === 'manager' ? ['Roadmap','Ask & Evidence','Dashboard','My Team'] : ['Roadmap','Ask & Evidence']).map(function(label){ return '<span>'+label+'</span>'; }).join('');
+  }
+
+  function addDepartment(){
+    var input = document.getElementById('newDepartment');
+    var department = input.value.trim();
+    var message = document.getElementById('usersFormMessage');
+    if(!department){ message.textContent = 'Enter a department name first.'; return; }
+    if(DEPARTMENTS.some(function(item){ return item.toLowerCase() === department.toLowerCase(); })){ message.textContent = 'That department already exists.'; return; }
+    DEPARTMENTS.push(department);
+    input.value = '';
+    message.textContent = department + ' added.';
+    renderUsers();
+  }
+
+  function addUser(){
+    var name = document.getElementById('newUserName').value.trim();
+    var email = document.getElementById('newUserEmail').value.trim();
+    var department = document.getElementById('newUserDepartment').value;
+    var role = document.getElementById('newUserRole').value;
+    var message = document.getElementById('usersFormMessage');
+    if(!name || !email){ message.textContent = 'Enter a name and email first.'; return; }
+    USERS.push({name:name, email:email, department:department, role:role});
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserEmail').value = '';
+    message.textContent = name + ' added as ' + ROLE_LABEL[role] + '.';
+    renderUsers();
+    renderTeam();
+  }
+
   /* ============ SOURCES ============ */
   var sources = [
     { name:'employee-handbook.pdf', role:'HR', status:'indexed', synced:'2 hours ago' },
@@ -1496,7 +1773,15 @@
       var statusText = s.status==='indexed' ? 'Indexed' : s.status==='syncing' ? 'Syncing' : 'Error';
       tr.innerHTML = '<td>'+s.name+'</td><td>'+s.role+'</td>' +
         '<td><span class="status-pill '+statusClass+'"><span class="dot"></span>'+statusText+'</span></td>' +
-        '<td class="mono small">'+s.synced+'</td>';
+        '<td class="mono small">'+s.synced+'</td>' +
+        '<td><button class="btn btn-sm" data-source="'+s.name+'">Simulate update</button></td>';
+      tr.querySelector('[data-source]').addEventListener('click', function(){
+        var affected = QA.filter(function(item){ return item.status === 'verified' && item.citations.some(function(citation){ return citation.label === s.name; }); });
+        affected.forEach(function(item){ item.stale = true; item.staleReason = s.name + ' was updated just now'; });
+        showToast(affected.length ? affected.length + ' answer(s) flagged for re-verification.' : 'Source re-indexed. No dependent verified answers were found.', affected.length ? 'var(--amber)' : 'var(--teal)');
+        renderReverifyQueue();
+        renderDashboard();
+      });
       body.appendChild(tr);
     });
     document.getElementById('statActiveSources').textContent = sources.filter(function(s){return s.status!=='error';}).length;
@@ -1515,6 +1800,9 @@
       renderSources();
     }, 1400);
   });
+  document.getElementById('malformedUploadBtn').addEventListener('click', function(){
+    showToast('INGESTION_ERROR: file could not be parsed. The console remains available.', 'var(--coral)');
+  });
   document.getElementById('dropzone').addEventListener('click', function(){
     sources.push({ name:'onboarding-checklist.md', role:'Engineering', status:'syncing', synced:'now' });
     renderSources();
@@ -1523,6 +1811,8 @@
   document.querySelectorAll('.scope-chip button').forEach(function(btn){
     btn.addEventListener('click', function(){ btn.closest('.scope-chip').remove(); });
   });
+  document.getElementById('addDepartmentBtn').addEventListener('click', addDepartment);
+  document.getElementById('addUserBtn').addEventListener('click', addUser);
 
   /* ============ INIT ============ */
   applyRoleVisibility();
