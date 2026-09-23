@@ -1,10 +1,12 @@
 export type Department = "sales" | "hr" | "engineering" ; //naming a new type department nothing else not string not anything
 
 export type FunctionalRole = 
-    | "admin " 
-    | "domain-expert" 
-    | "manager" 
-    | "new-hire";
+    |"admin" 
+    |"domain_expert" 
+    |"manager" 
+    |"new_hire";
+
+
 
 
 export interface User {      
@@ -12,12 +14,20 @@ export interface User {
     name:string;
     email:string;
     department:Department;
-    functionRole:FunctionalRole;
+    functionalRole:FunctionalRole;
 } //
+
+
+export interface RoadmapData{
+    department : Department,
+    overview : string,
+    readFirst : string[];
+    firstTask : string;
+}
 
 export interface RoadmapProgress {
     completed : boolean;
-    completeAt:string | null;
+    completedAt:string | null;
 }
 
 
@@ -40,6 +50,7 @@ export interface Answer {
     evidence:Evidence[];
     verifiedBy?:string;
     verifiedAt?:string;
+    staleReason?:string;  //staleReason: "The source document changed yesterday"
     askedCount:number;
 }
 
@@ -47,7 +58,7 @@ export interface Answer {
 export type AuditAction = "ASK"|"VERIFY_ANSWER" | "FLAG_STALE" | "TASK_COMPLETED" | "CONNECT_SOURCE" ;
 
 
-export interface AuditEvents{
+export interface AuditEvent{
     id:string;
     actorId:string;
     action:AuditAction;
