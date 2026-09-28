@@ -26,8 +26,10 @@
     --coral:#C8492F;    /* staleness / errors */
     --coral-tint:#FBEAE5;
 
-    --radius:3px;
-    --shadow-none: none;
+    --radius:6px;
+    --shadow-sm: 0 1px 2px rgba(20,23,17,0.05);
+    --shadow-md: 0 10px 26px rgba(20,23,17,0.08);
+    --shadow-lg: 0 24px 60px rgba(20,23,17,0.14);
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -58,27 +60,37 @@
     grid-template-columns:256px 1fr;
     min-height:100vh;
     min-width:0;
+    background:
+      radial-gradient(900px 500px at 100% 0%, rgba(106,79,209,0.05), transparent 60%),
+      radial-gradient(800px 460px at 100% 100%, rgba(12,125,118,0.05), transparent 60%);
   }
 
   /* ---------- Sidebar ---------- */
   .sidebar{
     background:var(--ink);
     color:#EDEDE6;
-    padding:26px 18px;
+    padding:28px 18px 20px;
     display:flex;
     flex-direction:column;
     position:sticky;
     top:0;
     height:100vh;
+    box-shadow:2px 0 0 rgba(0,0,0,0.08);
   }
   .brand{
     display:flex;
-    align-items:baseline;
+    align-items:center;
     gap:9px;
     padding:2px 6px 22px;
     border-bottom:1px solid rgba(255,255,255,0.11);
     margin-bottom:18px;
   }
+  .brand-mark-cluster{display:flex; gap:3px; flex:none;}
+  .brand-mark-cluster span{width:7px; height:7px; border-radius:2px;}
+  .brand-mark-cluster span:nth-child(1){background:var(--violet);}
+  .brand-mark-cluster span:nth-child(2){background:var(--teal);}
+  .brand-mark-cluster span:nth-child(3){background:var(--amber);}
+  .brand-mark-cluster span:nth-child(4){background:var(--coral);}
   .brand-mark{
     width:8px;height:8px;border-radius:1px;
     background:var(--teal);
@@ -118,14 +130,15 @@
     border:none;
     color:#BFC2B7;
     padding:9px 10px;
-    border-radius:3px;
+    border-radius:5px;
     font-size:14px;
     cursor:pointer;
     position:relative;
-    transition:background .12s ease, color .12s ease;
+    transition:background .18s ease, color .18s ease, transform .12s ease;
   }
-  .nav-item:hover{background:rgba(255,255,255,0.06); color:#fff;}
+  .nav-item:hover{background:rgba(255,255,255,0.06); color:#fff; transform:translateX(2px);}
   .nav-item.active{background:rgba(255,255,255,0.09); color:#fff;}
+  .nav-item:active{transform:translateX(2px) scale(.98);}
   .nav-item.active .nav-dot{opacity:1;}
   .nav-item .nav-dot{
     width:5px;height:5px;border-radius:50%;
@@ -156,13 +169,16 @@
 
   .sidebar-footer{
     margin-top:auto;
-    padding:10px 8px 2px;
+    padding:12px 12px 4px;
     font-size:11.5px;
     color:#8F9288;
     border-top:1px solid rgba(255,255,255,0.1);
-    padding-top:14px;
+    padding-top:16px;
+    background:rgba(255,255,255,0.03);
+    border-radius:8px;
   }
-  .sidebar-footer .row{display:flex;justify-content:space-between;margin-bottom:7px;}
+  .sidebar-footer .row{display:flex;justify-content:space-between;margin-bottom:9px;}
+  .sidebar-footer .row:last-child{margin-bottom:2px;}
   .sidebar-footer .row span:last-child{color:#DADCD2; font-family:'IBM Plex Mono',monospace; font-size:11px;}
 
   /* ---------- Main ---------- */
@@ -173,6 +189,8 @@
     justify-content:space-between;
     gap:24px;
     margin-bottom:28px;
+    padding-bottom:22px;
+    border-bottom:1px solid var(--border-soft);
     flex-wrap:wrap;
   }
   .topbar-title .eyebrow{
@@ -183,14 +201,14 @@
   .topbar-title h1{font-size:32px;font-weight:600;}
   .topbar-title .desc{color:var(--muted); font-size:14px; margin-top:7px; max-width:56ch;}
   .topbar-actions{position:relative;display:flex;align-items:flex-start;}
-  .profile-menu-trigger{display:flex;align-items:center;gap:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:3px;padding:7px 10px;cursor:pointer;text-align:left;min-width:190px;}
-  .profile-menu-trigger:hover{border-color:#A9ABA0;background:var(--paper);}
+  .profile-menu-trigger{display:flex;align-items:center;gap:9px;border:1px solid var(--border);background:var(--surface);color:var(--ink);border-radius:5px;padding:7px 10px;cursor:pointer;text-align:left;min-width:190px;box-shadow:var(--shadow-sm);transition:border-color .15s ease, box-shadow .15s ease;}
+  .profile-menu-trigger:hover{border-color:#A9ABA0;background:var(--surface);box-shadow:var(--shadow-md);}
   .profile-menu-avatar{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--violet-tint);color:var(--violet);font-family:'Source Serif 4',serif;font-weight:600;font-size:12px;flex:none;}
   .profile-menu-copy{display:flex;flex-direction:column;min-width:0;flex:1;}
   .profile-menu-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .profile-menu-role{font-size:11px;color:var(--muted);white-space:nowrap;}
   .profile-menu-chevron{font-size:12px;color:var(--muted);}
-  .profile-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:25;width:190px;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:3px;box-shadow:0 12px 24px rgba(20,23,17,.12);}
+  .profile-menu{position:absolute;right:0;top:calc(100% + 7px);z-index:25;width:190px;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:5px;box-shadow:0 12px 24px rgba(20,23,17,.12);}
   .profile-menu[hidden]{display:none;}
   .profile-menu button{display:block;width:100%;border:0;background:transparent;color:var(--ink-soft);padding:8px 10px;text-align:left;font-size:12.5px;cursor:pointer;border-radius:2px;}
   .profile-menu button:hover{background:var(--paper);color:var(--ink);}
@@ -207,8 +225,14 @@
     padding:26px 30px;
     position:relative;
     min-width:0;
+    box-shadow:var(--shadow-sm);
+    transition:box-shadow .2s ease, transform .2s ease;
   }
   .card + .card{margin-top:16px;}
+  .view.active .card{animation:cardRise .42s cubic-bezier(.22,.9,.32,1) both;}
+  .view.active .card:nth-of-type(2){animation-delay:.05s;}
+  .view.active .card:nth-of-type(3){animation-delay:.1s;}
+  @keyframes cardRise{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
   .accent-bar{
     position:absolute; top:0; left:0; bottom:0; width:3px;
   }
@@ -230,24 +254,25 @@
 
   .btn{
     display:inline-flex; align-items:center; gap:6px;
-    border-radius:3px;
+    border-radius:5px;
     border:1px solid var(--border);
     background:var(--surface);
     color:var(--ink);
     font-size:13.5px;
     padding:8px 15px;
     cursor:pointer;
-    transition:background .12s ease, border-color .12s;
+    box-shadow:var(--shadow-sm);
+    transition:background .12s ease, border-color .12s, box-shadow .15s ease, transform .1s ease;
   }
-  .btn:hover{border-color:#A9ABA0;}
+  .btn:hover{border-color:#A9ABA0; box-shadow:var(--shadow-md); transform:translateY(-1px);}
   .btn-primary{
     background:var(--ink); color:#fff; border-color:var(--ink);
   }
   .btn-primary:hover{background:#2B2F27;}
-  .btn-ghost{border-color:transparent; background:transparent;}
-  .btn-ghost:hover{background:var(--paper);}
+  .btn-ghost{border-color:transparent; background:transparent; box-shadow:none;}
+  .btn-ghost:hover{background:var(--paper); box-shadow:none; transform:none;}
   .btn-sm{padding:5px 11px; font-size:12.5px;}
-  .btn:disabled{opacity:.45; cursor:not-allowed;}
+  .btn:disabled{opacity:.45; cursor:not-allowed; transform:none; box-shadow:none;}
 
   /* ---------- Trust marks: verified = ink stamp, draft = pencil note, stale = notice flag ---------- */
   .badge{
@@ -277,7 +302,7 @@
 
   .icon-btn{
     border:none; background:none; cursor:pointer;
-    color:var(--muted); padding:4px; border-radius:3px;
+    color:var(--muted); padding:4px; border-radius:5px;
     display:inline-flex;
   }
   .icon-btn:hover{background:var(--paper); color:var(--ink);}
@@ -285,7 +310,7 @@
   input[type=text], input[type=search], textarea, select{
     font-family:inherit; font-size:14px;
     border:1px solid var(--border);
-    border-radius:3px;
+    border-radius:5px;
     padding:9px 12px;
     background:var(--surface);
     color:var(--ink);
@@ -317,9 +342,21 @@
   }
   .checklist li:last-child{border-bottom:none;}
   .checklist input[type=checkbox]{
-    margin-top:3px; width:16px; height:16px; accent-color:var(--violet); flex:none;
+    -webkit-appearance:none; appearance:none;
+    margin-top:2px; width:18px; height:18px; flex:none; position:relative;
+    border:1.6px solid var(--border); border-radius:5px; background:var(--surface);
+    cursor:pointer; transition:background .15s ease, border-color .15s ease, transform .1s ease;
   }
-  .checklist label{margin:0; font-weight:400; font-size:14px; color:var(--ink); cursor:pointer;}
+  .checklist input[type=checkbox]:hover{border-color:var(--violet);}
+  .checklist input[type=checkbox]:active{transform:scale(.88);}
+  .checklist input[type=checkbox]::after{
+    content:''; position:absolute; left:3px; top:5px; width:9px; height:5px;
+    border-left:2px solid #fff; border-bottom:2px solid #fff; transform:rotate(-45deg) scale(0);
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1);
+  }
+  .checklist input[type=checkbox]:checked{background:var(--violet); border-color:var(--violet);}
+  .checklist input[type=checkbox]:checked::after{transform:rotate(-45deg) scale(1);}
+  .checklist label{margin:0; font-weight:400; font-size:14px; color:var(--ink); cursor:pointer; transition:color .2s ease;}
   .checklist li.done label{color:var(--muted); text-decoration:line-through;}
   .checklist .item-meta{font-size:12px; color:var(--muted); margin-top:2px;}
   .roadmap-progress{margin:16px 0 4px;padding:12px 0 4px;border-top:1px solid var(--border-soft);}
@@ -406,10 +443,10 @@
 
   /* ---------- Dashboard ---------- */
   .kpi-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:18px;}
-  .kpi{padding:18px 20px;}
-  .kpi .kpi-label{font-size:12.5px; color:var(--muted); margin-bottom:10px; display:flex; align-items:center; gap:6px;}
-  .kpi .kpi-value{font-family:'Source Serif 4',serif; font-size:32px; font-weight:600;}
-  .kpi .kpi-sub{font-size:12px; color:var(--muted); margin-top:5px; font-style:italic; font-family:'Source Serif 4',serif;}
+  .kpi{padding:20px 22px;}
+  .kpi .kpi-label{font-size:12.5px; color:var(--muted); margin-bottom:12px; display:flex; align-items:center; gap:6px;}
+  .kpi .kpi-value{font-family:'Source Serif 4',serif; font-size:38px; font-weight:600; letter-spacing:-0.01em;}
+  .kpi .kpi-sub{font-size:12px; color:var(--muted); margin-top:6px; font-style:italic; font-family:'Source Serif 4',serif;}
 
   .bar-row{display:flex; align-items:center; gap:12px; margin-bottom:13px;}
   .bar-row .bar-label{width:120px; font-size:13px; flex:none; color:var(--ink-soft);}
@@ -463,7 +500,7 @@
   .profile-details dt{color:var(--muted);font-size:13px;}
   .profile-details dd{margin:0;color:var(--ink);font-size:13.5px;text-align:right;overflow-wrap:anywhere;}
   .profile-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-  .profile-metrics>div{display:flex;flex-direction:column;gap:3px;padding:14px;background:var(--paper);border:1px solid var(--border-soft);border-radius:3px;min-width:0;}
+  .profile-metrics>div{display:flex;flex-direction:column;gap:3px;padding:14px;background:var(--paper);border:1px solid var(--border-soft);border-radius:5px;min-width:0;}
   .profile-metric-value{font-family:'Source Serif 4',serif;font-size:24px;font-weight:600;overflow-wrap:anywhere;}
   .profile-metric-label{font-size:12px;color:var(--muted);}
   .profile-access-list{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
@@ -531,18 +568,44 @@
 
   .landing-heading{text-align:center; font-size:14px; color:var(--muted); margin-bottom:18px; letter-spacing:0.02em;}
 
-  .role-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:14px;}
+  /* ---------- Landing page: dark hero band + role section ---------- */
+  #landingView{display:flex; flex-direction:column; padding:0; align-items:stretch; justify-content:flex-start; min-height:100vh; height:auto; overflow-y:auto;}
+  #landingView::before{content:none;}
+  .lp-hero{position:relative; overflow:hidden; background:var(--ink); color:#EDEDE6; padding:68px 24px 58px; flex:none;}
+  .lp-hero svg{position:absolute; inset:0; width:100%; height:100%;}
+  .lp-hero-inner{max-width:880px; margin:0 auto; position:relative; z-index:1; text-align:center;}
+  .lp-brand{display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:20px;}
+  .lp-brand .marks{display:flex; gap:4px;}
+  .lp-brand .marks span{width:9px; height:9px; border-radius:2px; transform:rotate(45deg); opacity:0; animation:lsMarkIn .5s ease forwards; display:inline-block;}
+  .lp-brand .marks span:nth-child(1){background:var(--violet); animation-delay:.05s;}
+  .lp-brand .marks span:nth-child(2){background:var(--teal); animation-delay:.17s;}
+  .lp-brand .marks span:nth-child(3){background:var(--amber); animation-delay:.29s;}
+  .lp-brand .marks span:nth-child(4){background:var(--coral); animation-delay:.41s;}
+  .lp-brand .name{font-family:'Source Serif 4',serif; font-size:22px; color:#fff;}
+  .lp-tagline{font-family:'Source Serif 4',serif; font-style:italic; font-size:19px; color:#D9DAD1; margin-bottom:36px; opacity:0; animation:lsRise .55s ease .2s forwards;}
+  .lp-steps{display:flex; gap:14px; justify-content:center; flex-wrap:wrap; opacity:0; animation:lsRise .55s ease .32s forwards;}
+  .lp-step{display:flex; gap:11px; align-items:flex-start; background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:15px 17px; max-width:236px; text-align:left;}
+  .lp-step .num{width:22px; height:22px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; color:#14171C;}
+  .lp-step strong{display:block; font-size:13.5px; color:#fff; margin-bottom:3px; font-weight:600;}
+  .lp-step p{font-size:12.5px; color:#B9BBB0; line-height:1.5; margin:0;}
+
+  .lp-roles{background:var(--paper); padding:54px 24px 64px; flex:1;}
+  .lp-roles-inner{max-width:1120px; margin:0 auto;}
+  .lp-role-heading{text-align:center; font-family:'Source Serif 4',serif; font-size:16px; color:var(--ink-soft); margin-bottom:26px; font-style:italic;}
+
+  .role-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:18px;}
   .role-card{
     text-align:left; cursor:pointer;
     border:1px solid var(--border);
     background:var(--surface);
-    border-radius:6px;
+    border-radius:10px;
     padding:0;
     transition:border-color .18s ease, transform .18s ease, box-shadow .18s ease;
     display:flex; flex-direction:column;
     overflow:hidden;
     opacity:0; transform:translateY(10px);
     animation:cardIn .5s ease forwards;
+    box-shadow:var(--shadow-sm);
   }
   .role-card:nth-child(1){animation-delay:.05s;}
   .role-card:nth-child(2){animation-delay:.12s;}
@@ -551,7 +614,9 @@
   @keyframes cardIn{to{opacity:1; transform:translateY(0);}}
   .role-card .card-top{height:5px; flex:none;}
   .role-card .card-body{padding:19px 18px 18px; display:flex; flex-direction:column; flex:1;}
-  .role-card:hover{transform:translateY(-4px); box-shadow:0 14px 28px rgba(20,23,17,0.10);}
+  .role-card:hover{transform:translateY(-5px); box-shadow:var(--shadow-md);}
+  .role-card:hover .role-icon{transform:scale(1.08);}
+  .role-icon{transition:transform .2s ease;}
   .role-card[data-role="newhire"]:hover{border-color:var(--violet);}
   .role-card[data-role="expert"]:hover{border-color:var(--amber);}
   .role-card[data-role="manager"]:hover{border-color:var(--teal);}
@@ -579,7 +644,7 @@
   .switch-role-btn{
     display:inline-flex; align-items:center; gap:6px;
     border:1px solid var(--border); background:var(--surface);
-    border-radius:3px; padding:8px 13px; font-size:13px; color:var(--ink-soft);
+    border-radius:5px; padding:8px 13px; font-size:13px; color:var(--ink-soft);
     cursor:pointer; flex:none; height:fit-content;
     transition:transform .12s ease;
   }
@@ -595,30 +660,55 @@
   }
   .role-pill .dot{width:6px;height:6px;border-radius:50%; background:#5EC9CB;}
 
-  /* ---------- Login (mock SSO step) ---------- */
-  #loginView{display:none;}
-  .login-card{
-    max-width:380px; width:100%; margin:0 auto;
-    background:var(--surface); border:1px solid var(--border); border-radius:6px;
-    padding:36px 34px 30px;
-    position:relative;
-    box-shadow:0 24px 60px rgba(20,23,17,0.09);
+  /* ---------- Login (mock SSO step) — split-screen story panel ---------- */
+  #loginView{display:none; padding:0; align-items:stretch; justify-content:stretch; overflow:hidden;}
+  #loginView::before{content:none;}
+  .login-split{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,440px); width:100%; min-height:100vh;}
+  .login-story{
+    position:relative; overflow:hidden; background:var(--ink); color:#EDEDE6;
+    padding:44px; display:flex; flex-direction:column; justify-content:space-between;
   }
-  .login-card .card-top{
-    position:absolute; top:0; left:0; right:0; height:4px; border-radius:6px 6px 0 0;
-    background:linear-gradient(90deg,var(--violet),var(--teal),var(--amber),var(--coral));
-  }
-  .login-field{margin-bottom:16px;}
+  .login-story svg{position:absolute; inset:0; width:100%; height:100%;}
+  .login-story .ls-content{position:relative; z-index:1;}
+  .login-story .ls-brand{display:flex; align-items:center; gap:9px;}
+  .login-story .ls-marks{display:flex; gap:4px;}
+  .login-story .ls-marks span{width:8px; height:8px; border-radius:2px; transform:rotate(45deg); display:inline-block; opacity:0; animation:lsMarkIn .5s ease forwards;}
+  .login-story .ls-marks span:nth-child(1){background:var(--violet); animation-delay:.05s;}
+  .login-story .ls-marks span:nth-child(2){background:var(--teal); animation-delay:.17s;}
+  .login-story .ls-marks span:nth-child(3){background:var(--amber); animation-delay:.29s;}
+  .login-story .ls-marks span:nth-child(4){background:var(--coral); animation-delay:.41s;}
+  @keyframes lsMarkIn{from{opacity:0; transform:rotate(45deg) scale(.3);} to{opacity:1; transform:rotate(45deg) scale(1);}}
+  .login-story .ls-name{font-family:'Source Serif 4',serif; font-size:19px; color:#fff;}
+  .login-story .ls-headline{max-width:24ch; font-size:29px; line-height:1.28; margin-top:70px; color:#F4F4EF; opacity:0; animation:lsRise .55s ease .3s forwards;}
+  .login-story .ls-sub{max-width:36ch; color:#B9BBB0; font-size:14px; margin-top:14px; line-height:1.65; opacity:0; animation:lsRise .55s ease .42s forwards;}
+  @keyframes lsRise{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);}}
+  .login-story .ls-footer{position:relative; z-index:1; display:flex; gap:20px; flex-wrap:wrap;}
+  .login-story .ls-stat{border-left:2px solid rgba(255,255,255,0.18); padding-left:11px;}
+  .login-story .ls-stat .n{font-family:'Source Serif 4',serif; font-size:19px; color:#fff; display:block;}
+  .login-story .ls-stat .l{font-size:11.5px; color:#9C9E93; margin-top:2px; display:block;}
+
+  .login-formside{background:var(--paper); display:flex; align-items:center; justify-content:center; padding:40px 32px;}
+  .login-card{width:100%; max-width:360px; opacity:0; animation:lsRise .5s ease .12s forwards;}
+  .login-card .kicker{display:flex; align-items:center; gap:6px; margin-bottom:20px;}
+  .login-card .kicker .dot{width:6px; height:6px; border-radius:50%; background:var(--teal);}
+  .login-card .kicker span{font-size:12.5px; color:var(--muted);}
+  .login-card h1{font-size:23px; margin-bottom:7px;}
+  .login-card .landing-tagline{text-align:left; font-family:inherit; font-style:normal; margin-bottom:24px; font-size:13.5px; color:var(--muted);}
+
   .login-detection{
-    background:var(--teal-tint); border:1px solid var(--border);
-    color:var(--ink-soft); border-radius:3px; padding:9px 11px;
-    font-size:12.5px; margin-bottom:16px;
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    background:var(--surface); border:1px solid var(--border-soft); border-radius:5px;
+    padding:10px 13px; margin-bottom:20px;
   }
-  .login-detection strong{color:var(--teal);}
+  .login-detection strong{color:var(--teal); font-weight:600;}
+  .login-field{margin-bottom:16px;}
+  .login-field label{display:block; font-size:12.5px; color:var(--ink-soft); margin-bottom:7px; font-weight:500;}
+  .login-field input{transition:border-color .15s ease, box-shadow .15s ease;}
+  .login-field input:focus{border-color:var(--teal); box-shadow:0 0 0 3px var(--teal-tint);}
   .sso-btn{
     width:100%; justify-content:center;
-    padding:10px 14px; font-size:14px; font-weight:500;
-    margin-bottom:10px;
+    padding:11px 14px; font-size:14px; font-weight:500;
+    margin-bottom:10px; box-shadow:var(--shadow-sm);
   }
   .login-divider{
     display:flex; align-items:center; gap:10px; margin:18px 0;
@@ -626,6 +716,13 @@
   }
   .login-divider::before, .login-divider::after{content:''; flex:1; height:1px; background:var(--border-soft);}
   .login-footnote{text-align:center; font-size:12px; color:var(--muted); margin-top:16px;}
+  @media (max-width:860px){
+    .login-split{grid-template-columns:1fr;}
+    .login-story{min-height:230px; padding:30px 26px 36px;}
+    .login-story .ls-headline{font-size:22px; margin-top:32px;}
+    .login-story .ls-footer{display:none;}
+    .login-formside{padding:36px 24px 48px;}
+  }
 
   @media (max-width:880px){
     .role-grid{grid-template-columns:1fr 1fr;}
@@ -704,13 +801,16 @@
   @keyframes viewIn{to{opacity:1; transform:translateY(0);}}
 
   /* ---------- Nav accent + active states ---------- */
-  .nav-item{border-left:2px solid transparent;}
-  .nav-item[data-view="roadmap"].active{border-left-color:var(--violet);}
-  .nav-item[data-view="ask"].active{border-left-color:var(--teal);}
-  .nav-item[data-view="verify"].active{border-left-color:var(--amber);}
-  .nav-item[data-view="reverify"].active{border-left-color:var(--coral);}
-  .nav-item[data-view="dashboard"].active{border-left-color:var(--teal);}
-  .nav-item[data-view="sources"].active{border-left-color:var(--violet);}
+  .nav-item{border-left:3px solid transparent; margin-left:-3px;}
+  .nav-item[data-view="roadmap"].active{border-left-color:var(--violet); background:rgba(106,79,209,0.16);}
+  .nav-item[data-view="ask"].active{border-left-color:var(--teal); background:rgba(12,125,118,0.16);}
+  .nav-item[data-view="verify"].active{border-left-color:var(--amber); background:rgba(169,114,12,0.16);}
+  .nav-item[data-view="reverify"].active{border-left-color:var(--coral); background:rgba(200,73,47,0.16);}
+  .nav-item[data-view="dashboard"].active{border-left-color:var(--teal); background:rgba(12,125,118,0.16);}
+  .nav-item[data-view="sources"].active{border-left-color:var(--violet); background:rgba(106,79,209,0.16);}
+  .nav-item[data-view="team"].active{border-left-color:var(--teal); background:rgba(12,125,118,0.16);}
+  .nav-item[data-view="users"].active{border-left-color:var(--coral); background:rgba(200,73,47,0.16);}
+  .nav-item[data-view="profile"].active{border-left-color:#9C9E93; background:rgba(255,255,255,0.07);}
 
   /* ---------- Stamp thump + toast ---------- */
   @keyframes stampThump{
@@ -740,8 +840,8 @@
   .chip, .role-card, .queue-actions .btn, .status-pill{transition-property:transform,border-color,background,box-shadow; transition-duration:.15s;}
   .chip:active{transform:scale(.95);}
   .checklist input[type=checkbox]{cursor:pointer;}
-  .kpi{transition:transform .18s ease;}
-  .kpi:hover{transform:translateY(-3px);}
+  .kpi{transition:transform .18s ease, box-shadow .18s ease;}
+  .kpi:hover{transform:translateY(-3px); box-shadow:var(--shadow-md);}
 
   @media (prefers-reduced-motion: reduce){
     *{animation-duration:0.001ms !important; transition-duration:0.001ms !important;}
@@ -754,138 +854,166 @@
 
 <!-- ================= LOGIN (mock SSO) ================= -->
 <section class="landing" id="loginView">
-  <div class="login-card">
-    <div class="card-top"></div>
-    <div class="landing-brand" style="margin-bottom:6px;">
-      <span class="brand-cluster" aria-hidden="true">
-        <span style="background:var(--violet)"></span><span style="background:var(--teal)"></span><span style="background:var(--amber)"></span><span style="background:var(--coral)"></span>
-      </span>
-      <span class="brand-name">Welcome Wave</span>
-    </div>
-    <p class="landing-tagline" style="margin-bottom:24px; font-size:13.5px;">Sign in to your onboarding console</p>
+  <div class="login-split">
+    <aside class="login-story">
+      <svg viewBox="0 0 800 900" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M0 260 C 160 210, 300 320, 480 270 C 620 232, 700 300, 800 260 L800 0 L0 0 Z" fill="#6A4FD1" opacity="0.14"/>
+        <path d="M0 420 C 180 370, 320 470, 500 410 C 640 365, 700 440, 800 400 L800 900 L0 900 Z" fill="#0C7D76" opacity="0.16"/>
+        <path d="M0 620 C 170 590, 330 660, 500 615 C 630 580, 700 650, 800 610 L800 900 L0 900 Z" fill="#A9720C" opacity="0.10"/>
+        <path d="M0 760 C 160 740, 340 800, 520 760 C 650 730, 720 790, 800 755 L800 900 L0 900 Z" fill="#C8492F" opacity="0.14"/>
+      </svg>
+      <div class="ls-content">
+        <div class="ls-brand">
+          <span class="ls-marks"><span></span><span></span><span></span><span></span></span>
+          <span class="ls-name">Welcome Wave</span>
+        </div>
+        <h2 class="ls-headline">Grounded answers. Verified trust. No guesswork onboarding.</h2>
+        <p class="ls-sub">Every answer a new hire sees is traced back to a source, checked for staleness, and signed off by someone who knows.</p>
+      </div>
+      <div class="ls-footer">
+        <div class="ls-stat"><span class="n">4 roles</span><span class="l">tailored access paths</span></div>
+        <div class="ls-stat"><span class="n">100%</span><span class="l">source-grounded answers</span></div>
+      </div>
+    </aside>
 
-    <div class="login-detection" id="loginDetection">Selected role: <strong id="loginRoleLabel">New Hire</strong></div>
+    <main class="login-formside">
+      <div class="login-card">
+        <div class="kicker"><span class="dot"></span><span>Onboarding console</span></div>
+        <h1>Sign in</h1>
+        <p class="landing-tagline">Sign in to your onboarding console</p>
 
-    <div class="login-field">
-      <label for="loginEmail">Work email</label>
-      <input type="text" id="loginEmail" placeholder="you@company.com">
-    </div>
+        <div class="login-detection" id="loginDetection">Selected role: <strong id="loginRoleLabel">New Hire</strong></div>
 
-    <button class="btn btn-primary sso-btn" id="loginContinue">Continue</button>
+        <div class="login-field">
+          <label for="loginEmail">Work email</label>
+          <input type="text" id="loginEmail" placeholder="you@company.com" autocomplete="email">
+        </div>
 
-    <div class="login-divider">or</div>
+        <button class="btn btn-primary sso-btn" id="loginContinue">Continue</button>
 
-    <button class="btn sso-btn" id="ssoBtn">
-      <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 8h14"/></svg>
-      Continue with company SSO
-    </button>
+        <div class="login-divider">or</div>
 
-    <button class="demo-link" id="backToRoles" type="button">Back to role selection</button>
+        <button class="btn sso-btn" id="ssoBtn">
+          <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="3" y="3" width="14" height="14" rx="2"/><path d="M3 8h14"/></svg>
+          Continue with company SSO
+        </button>
 
-    <p class="login-footnote">This preview skips real authentication — enter anything and continue.</p>
+        <button class="demo-link" id="backToRoles" type="button">Back to role selection</button>
+
+        <p class="login-footnote">This preview skips real authentication — enter anything and continue.</p>
+      </div>
+    </main>
   </div>
 </section>
 
 <!-- ================= LANDING / ROLE SELECT ================= -->
 <section class="landing" id="landingView">
-  <div class="landing-inner">
-    <div class="landing-brand">
-      <span class="brand-cluster" aria-hidden="true">
-        <span style="background:var(--violet)"></span><span style="background:var(--teal)"></span><span style="background:var(--amber)"></span><span style="background:var(--coral)"></span>
-      </span>
-      <span class="brand-name">Welcome Wave</span>
-    </div>
-    <p class="landing-tagline">Grounded answers. Verified trust. No guesswork onboarding.</p>
-
-    <div class="how-strip">
-      <div class="how-step">
-        <span class="num" style="background:var(--violet)">1</span>
-        <p><strong>Pick a role</strong>Your roadmap and permissions are scoped to it immediately.</p>
+  <div class="lp-hero">
+    <svg viewBox="0 0 1200 500" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M0 160 C 220 110, 420 210, 640 165 C 860 122, 1000 190, 1200 155 L1200 0 L0 0 Z" fill="#6A4FD1" opacity="0.16"/>
+      <path d="M0 280 C 240 235, 460 320, 680 280 C 880 245, 1040 300, 1200 270 L1200 500 L0 500 Z" fill="#0C7D76" opacity="0.15"/>
+      <path d="M0 380 C 260 350, 480 410, 700 385 C 900 362, 1050 405, 1200 385 L1200 500 L0 500 Z" fill="#A9720C" opacity="0.10"/>
+    </svg>
+    <div class="lp-hero-inner">
+      <div class="lp-brand">
+        <span class="marks"><span></span><span></span><span></span><span></span></span>
+        <span class="name">Welcome Wave</span>
       </div>
-      <div class="how-step">
-        <span class="num" style="background:var(--teal)">2</span>
-        <p><strong>Ask anything in scope</strong>Every answer is generated only from retrieved, permitted content.</p>
-      </div>
-      <div class="how-step">
-        <span class="num" style="background:var(--amber)">3</span>
-        <p><strong>Experts verify it</strong>A confirmed answer is served instantly — flagged again if its source changes.</p>
+      <p class="lp-tagline">Grounded answers. Verified trust. No guesswork onboarding.</p>
+      <div class="lp-steps">
+        <div class="lp-step">
+          <span class="num" style="background:var(--violet)">1</span>
+          <div><strong>Pick a role</strong><p>Your roadmap and permissions are scoped to it immediately.</p></div>
+        </div>
+        <div class="lp-step">
+          <span class="num" style="background:var(--teal)">2</span>
+          <div><strong>Ask anything in scope</strong><p>Every answer is generated only from retrieved, permitted content.</p></div>
+        </div>
+        <div class="lp-step">
+          <span class="num" style="background:var(--amber)">3</span>
+          <div><strong>Experts verify it</strong><p>A confirmed answer is served instantly — flagged again if its source changes.</p></div>
+        </div>
       </div>
     </div>
+  </div>
 
-    <p class="landing-heading">SELECT A ROLE TO CONTINUE</p>
+  <div class="lp-roles">
+    <div class="lp-roles-inner">
+      <p class="lp-role-heading">Select a role to continue</p>
 
-    <div class="role-grid" role="group" aria-label="Select a role">
-      <button class="role-card" data-role="newhire">
-        <div class="card-top" style="background:var(--violet)"></div>
-        <div class="card-body">
-          <div class="role-icon" style="background:var(--violet-tint); color:var(--violet);">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>
+      <div class="role-grid" role="group" aria-label="Select a role">
+        <button class="role-card" data-role="newhire">
+          <div class="card-top" style="background:var(--violet)"></div>
+          <div class="card-body">
+            <div class="role-icon" style="background:var(--violet-tint); color:var(--violet);">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/></svg>
+            </div>
+            <h3>New Hire</h3>
+            <p class="role-desc">Land on a role-specific roadmap and ask grounded questions from day one.</p>
+            <div class="access-tags">
+              <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+              <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+            </div>
+            <span class="continue">Continue as New Hire →</span>
           </div>
-          <h3>New Hire</h3>
-          <p class="role-desc">Land on a role-specific roadmap and ask grounded questions from day one.</p>
-          <div class="access-tags">
-            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
-            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-          </div>
-          <span class="continue">Continue as New Hire →</span>
-        </div>
-      </button>
+        </button>
 
-      <button class="role-card" data-role="expert">
-        <div class="card-top" style="background:var(--amber)"></div>
-        <div class="card-body">
-          <div class="role-icon" style="background:var(--amber-tint); color:var(--amber);">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3l6 2.5v4c0 4-2.5 6.8-6 7.5-3.5-.7-6-3.5-6-7.5v-4L10 3z"/><path d="M7.5 10l1.8 1.8L13 8"/></svg>
+        <button class="role-card" data-role="expert">
+          <div class="card-top" style="background:var(--amber)"></div>
+          <div class="card-body">
+            <div class="role-icon" style="background:var(--amber-tint); color:var(--amber);">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M10 3l6 2.5v4c0 4-2.5 6.8-6 7.5-3.5-.7-6-3.5-6-7.5v-4L10 3z"/><path d="M7.5 10l1.8 1.8L13 8"/></svg>
+            </div>
+            <h3>Domain Expert</h3>
+            <p class="role-desc">Review AI drafts and confirm the answers your domain is responsible for.</p>
+            <div class="access-tags">
+              <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+              <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+              <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue</span>
+              <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+            </div>
+            <span class="continue">Continue as Domain Expert →</span>
           </div>
-          <h3>Domain Expert</h3>
-          <p class="role-desc">Review AI drafts and confirm the answers your domain is responsible for.</p>
-          <div class="access-tags">
-            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
-            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-            <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue</span>
-            <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
-          </div>
-          <span class="continue">Continue as Domain Expert →</span>
-        </div>
-      </button>
+        </button>
 
-      <button class="role-card" data-role="manager">
-        <div class="card-top" style="background:var(--teal)"></div>
-        <div class="card-body">
-          <div class="role-icon" style="background:var(--teal-tint); color:var(--teal);">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 15V9M10 15V5m6 10v-6"/></svg>
+        <button class="role-card" data-role="manager">
+          <div class="card-top" style="background:var(--teal)"></div>
+          <div class="card-body">
+            <div class="role-icon" style="background:var(--teal-tint); color:var(--teal);">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 15V9M10 15V5m6 10v-6"/></svg>
+            </div>
+            <h3>Manager</h3>
+            <p class="role-desc">See where documentation is thin and how much of it is actually trusted.</p>
+            <div class="access-tags">
+              <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
+              <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+              <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Dashboard</span>
+            </div>
+            <span class="continue">Continue as Manager →</span>
           </div>
-          <h3>Manager</h3>
-          <p class="role-desc">See where documentation is thin and how much of it is actually trusted.</p>
-          <div class="access-tags">
-            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap</span>
-            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-            <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Dashboard</span>
-          </div>
-          <span class="continue">Continue as Manager →</span>
-        </div>
-      </button>
+        </button>
 
-      <button class="role-card" data-role="admin">
-        <div class="card-top" style="background:var(--coral)"></div>
-        <div class="card-body">
-          <div class="role-icon" style="background:var(--coral-tint); color:var(--coral);">
-            <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/></svg>
+        <button class="role-card" data-role="admin">
+          <div class="card-top" style="background:var(--coral)"></div>
+          <div class="card-body">
+            <div class="role-icon" style="background:var(--coral-tint); color:var(--coral);">
+              <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M3 8h14"/></svg>
+            </div>
+            <h3>Admin</h3>
+            <p class="role-desc">Connect knowledge sources and assign them to roles across the console.</p>
+            <div class="access-tags">
+              <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap + Source Connect</span>
+              <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
+              <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue + Dashboard</span>
+              <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
+            </div>
+            <span class="continue">Continue as Admin →</span>
           </div>
-          <h3>Admin</h3>
-          <p class="role-desc">Connect knowledge sources and assign them to roles across the console.</p>
-          <div class="access-tags">
-            <span class="access-tag"><span class="dot" style="background:var(--violet)"></span>Roadmap + Source Connect</span>
-            <span class="access-tag"><span class="dot" style="background:var(--teal)"></span>Ask &amp; Evidence</span>
-            <span class="access-tag"><span class="dot" style="background:var(--amber)"></span>Verify Queue + Dashboard</span>
-            <span class="access-tag"><span class="dot" style="background:var(--coral)"></span>Re-verification</span>
-          </div>
-          <span class="continue">Continue as Admin →</span>
-        </div>
-      </button>
+        </button>
+      </div>
+
+      <p class="landing-footnote">In production this role is assigned automatically from your company directory — this preview lets you choose one to explore the console.</p>
     </div>
-
-    <p class="landing-footnote">In production this role is assigned automatically from your company directory — this preview lets you choose one to explore the console.</p>
   </div>
 </section>
 
@@ -895,7 +1023,7 @@
   <!-- ================= SIDEBAR ================= -->
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-mark-cluster" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
       <span class="brand-name">Welcome&nbsp;Wave</span>
     </div>
     <div class="brand-sub" style="margin-bottom:2px;">Onboarding console · v2.0</div>
@@ -1436,6 +1564,21 @@
       setTimeout(function(){
         document.querySelectorAll('#view-dashboard .bar-fill').forEach(function(el){
           el.style.width = el.dataset.width;
+        });
+        document.querySelectorAll('#view-dashboard .kpi-value').forEach(function(el){
+          var text = el.textContent;
+          var match = text.match(/\d+/);
+          if(!match) return;
+          var target = parseInt(match[0], 10);
+          var suffix = text.slice(match.index + match[0].length);
+          var start = performance.now(), duration = 650;
+          function tick(now){
+            var p = Math.min(1, (now - start) / duration);
+            var eased = 1 - Math.pow(1 - p, 3);
+            el.textContent = Math.round(target * eased) + suffix;
+            if(p < 1) requestAnimationFrame(tick);
+          }
+          requestAnimationFrame(tick);
         });
       }, 60);
     }
