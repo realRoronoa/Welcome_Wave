@@ -7,3 +7,4 @@ frontend/dist/
 *.tsbuildinfo
 .pytest_cache/
 .mypy_cache/
+.claude
