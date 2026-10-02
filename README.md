@@ -152,17 +152,150 @@ npm run dev
 Pop-Location
 ```
 
-The frontend development server runs at <http://localhost:5173>.
+The frontend development server runs at <http://localhost:5173>. Under Docker it
+is published on <http://localhost:3000> instead — the container passes
+`--port 3000` to match the mapping in `docker-compose.yml`.
+
+## Frontend Console
+
+The console is a React + TypeScript single-page app. It currently runs on the
+fixtures in `src/mockData.ts`; no endpoint exists for it to call yet.
+
+### Views
+
+Four screens, each gated by the signed-in person's functional role:
+
+| View | Who sees it | What it does |
+| --- | --- | --- |
+| Roadmap | everyone | The department's reading list and first task, looked up rather than asked for |
+| Ask | everyone | Questions answered from that department's sources only, every answer carrying its trust state and citations |
+| Verify queue | domain expert, admin | Edit and sign off a draft, turning it into the canonical answer |
+| Dashboard | manager, admin | Verified coverage, the re-check backlog, and which questions are asked most but confirmed least |
+
+Sign-in stands in for the real thing, and asks for one thing: a role.
+Production reads it from the company directory. The prototype's dropdown is
+there because role is what actually changes the console — which screens open,
+and whose sources are in scope. The person behind the role is resolved from the
+fixtures and reported in a line of text, since which of several engineers signs
+in does not change what an engineer may do.
+
+### How state flows
+
+`App.tsx` is the only file that calls `useState` for shared data. `currentUser`
+and `answers` live there and reach every view as props:
+
+```
+App.tsx ──┬── RoadmapView   { user }
+          ├── AskView       { user, answers, setAnswers }
+          ├── VerifyQueue   { user, answers, setAnswers }
+          └── Dashboard     { user, answers }          ← no setter: read-only
+```
+
+Two consequences worth keeping:
+
+- **Swapping fixtures for the API is a change to `App.tsx` alone.** No view
+  knows whether its data came from `mockData.ts` or from `fetch()`.
+- **Verifying an answer updates every screen at once**, because all four read
+  the same array. Verify a draft in the queue and the Ask transcript already on
+  screen re-renders as verified — it stores the answer's id, not a copy.
+
+Components may import *fixed reference data* (`ROADMAPS`) directly, but never
+mutable state.
+
+### Wiring it to the backend
+
+`types.ts` is the contract both sides share — the shapes there are what the
+FastAPI responses have to match. When the endpoints land, replace the initial
+state in `App.tsx`:
+
+```ts
+const [answers, setAnswers] = useState<Answer[]>([]);
+
+useEffect(() => {
+  fetch(`/api/v1/answers?department=${currentUser.department}`)
+    .then((res) => res.json())
+    .then(setAnswers);
+}, [currentUser]);
+```
+
+Requests use relative `/api/...` paths. `vite.config.ts` proxies them to the
+backend, so no base URL is hardcoded and dev needs no CORS configuration.
+
+### Trust states
+
+Four states, from `AnswerStatus`. Each is distinguished by typographic form as
+well as colour, so they stay apart in greyscale and for colour-blind readers:
+
+| State | Treatment |
+| --- | --- |
+| `verified` | mono, uppercase, tinted, slightly tilted — a stamp |
+| `stale` | the same stamp struck through — stamped once, now undermined |
+| `ai_draft` | serif italic with a dashed edge and no fill — provisional by shape |
+| `not_found` | dotted and grey — it makes no claim, so it takes no colour |
+
+Colour is never the only carrier of meaning anywhere in the console.
+
+### Colour
+
+Surfaces are near-neutral cool greys. They are deliberately not navy: a
+saturated chrome competes with the content, which is what makes a dark UI read
+as a corporate intranet rather than a product.
+
+That leaves colour free to mean something, and in the console it means exactly
+two kinds of thing:
+
+| Role | Hue | Where it appears |
+| --- | --- | --- |
+| Proceed | violet (`--brand` filled, `--violet` drawn) | Continue, Mark complete, focus rings, the roadmap screen |
+| Retrieval | teal | the Ask screen and its submit |
+| Verification | amber | the verify queue, verified stamps, coverage bars |
+| Staleness | coral | stale stamps, Flag stale, the re-check backlog |
+
+The rule worth keeping: **a solid accent button is only for the action that
+accent names.** Verify is amber because amber means verification; Flag stale is
+coral for the same reason. Everything else affirmative is `btn-primary`. Before
+this, sign-in and Mark complete both borrowed amber — a button wearing a status
+colour teaches the status wrong, and a large amber fill is the cheapest-looking
+element a dark UI can have.
+
+`--brand` is the deep stop of the violet ramp rather than a fifth hue, because
+violet already means "the proactive half of the product" — which is what the
+brand means too. It exists separately only because white text on `--violet` at
+its drawing lightness does not reach 4.5:1, and on `--brand` it reaches 4.9:1.
+
+### Source layout
+
+```
+frontend/src/
+  App.tsx              shared state, routing between views, page shell
+  types.ts             the contract the backend must match
+  mockData.ts          fixtures standing in for the API
+  styles.css           tokens, then components, in that order
+  roleSelect/          sign-in: pick a role (stands in for the directory)
+  roadmap/             RoadmapView
+  ask/                 AskView
+  verifyQueue/         VerifyQueue
+  dashboard/           Dashboard
+  shared/              TrustBadge, Sidebar, icons, labels, navigation
+```
+
+`shared/navigation.ts` holds one lookup describing every view — its label, page
+title, and permitted roles. The sidebar and the page header both read from it,
+so adding a view means editing that lookup rather than touching either
+component. No routing library: navigation is `view` state in `App.tsx`.
 
 ## Validation
 
-Build the frontend with:
+Typecheck and build the frontend with:
 
 ```powershell
 Push-Location frontend
 npm run build
 Pop-Location
 ```
+
+`npm run build` runs `tsc --noEmit` first, so a type error fails the build
+before Vite is invoked.
 
 ## Structure
 

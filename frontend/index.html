@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#050c16" />
+    <meta name="theme-color" content="#0a0b0f" />
     <meta
       name="description"
       content="Welcome Wave — onboarding answers that are grounded in your company's own sources and signed off by the people who own them."
@@ -12,11 +12,13 @@
     <title>Welcome Wave — Onboarding Console</title>
 
     <!-- The stylesheet asks for these three families; without the link every
-         one of them silently fell back to a system default. -->
+         one of them silently fell back to a system default. Inter is requested
+         as a variable range rather than fixed instances, because the UI uses
+         550 for emphasis — a weight no fixed-instance request would supply. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,600;8..60,700&family=Inter:wght@400..700&family=IBM+Plex+Mono:wght@500;600&display=swap"
       rel="stylesheet"
     />
   </head>
