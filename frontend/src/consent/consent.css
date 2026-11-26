@@ -1,0 +1,113 @@
+/* Legal consent in the app (Ink + Teal): the consent screen before the workspace (ConsentScreen.tsx, inside the entry
+   frame, itself a navy panel), the recording notice on the KT pages (RecordingNotice.tsx), the confirmation before a
+   recording is added, and Settings > Organisation > Legal. Classes are lgc-prefixed. Forms and dialogs are navy panels
+   (.ww-panel). The only motion is a disclosure's chevron (a transform), and none under reduced motion. */
+
+/* ------------------------------------------------------------------------------------------- the consent screen */
+.lgc-docs { list-style: none; margin: 0 0 1.25rem; padding: 0; display: grid; gap: .75rem; }
+.lgc-doc { display: grid; gap: .5rem; padding: 1rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-l); background: var(--surface); }
+.lgc-doc-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.lgc-doc-head h2 { margin: 0; font-size: 1.02rem; letter-spacing: -.012em; }
+.lgc-tag { flex: none; padding: .12rem .5rem; border-radius: 999px; font-size: .72rem; font-weight: 600; letter-spacing: .02em;
+  color: var(--secondary); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.lgc-tag.is-updated { color: var(--warning); background: var(--warning-wash); box-shadow: inset 0 0 0 1px var(--warning-line); }
+.lgc-doc-lede { margin: 0; color: var(--ink-2); font-size: .92rem; line-height: 1.5; }
+.lgc-doc-k { margin: .25rem 0 0; font-size: .8rem; font-weight: 600; color: var(--ink); }
+.lgc-points { margin: .45rem 0 0; padding: 0 0 0 1.1rem; display: grid; gap: .4rem; font-size: .88rem; line-height: 1.5; color: var(--ink-2); }
+.lgc-brief summary, .lgc-out summary { display: inline-flex; align-items: center; gap: .4rem; min-height: 32px; cursor: pointer; list-style: none;
+  font-size: .86rem; font-weight: 550; color: var(--ink-2); border-radius: 4px; }
+.lgc-brief summary::-webkit-details-marker, .lgc-out summary::-webkit-details-marker { display: none; }
+.lgc-brief summary::before, .lgc-out summary::before { content: ""; width: .45rem; height: .45rem; margin: 0 .15rem 0 .1rem; border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); transition: transform .15s var(--ease); }
+.lgc-brief[open] summary::before, .lgc-out[open] summary::before { transform: rotate(45deg); }
+.lgc-brief summary:hover, .lgc-out summary:hover { color: var(--ink); }
+.lgc-doc-foot { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; margin: .15rem 0 0;
+  padding-top: .65rem; border-top: 1px solid var(--line); font-size: .82rem; color: var(--ink-soft); }
+.lgc-doc-foot a { color: var(--primary-text); font-weight: 550; text-decoration: underline; text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent); white-space: nowrap; }
+.lgc-doc-foot a:hover { color: var(--primary-hover); text-decoration-color: currentColor; }
+.lgc-says { margin: 0 0 .9rem; font-size: .92rem; line-height: 1.55; color: var(--ink); }
+.lgc-agree { width: 100%; padding: .8rem 1rem; border-radius: var(--radius-m); }
+.lgc-kept { margin: .7rem 0 0; font-size: .8rem; line-height: 1.5; color: var(--ink-soft); }
+.lgc-stale { display: grid; gap: .8rem; justify-items: start; padding: .9rem 1rem; border: 1px solid var(--warning-line); border-radius: var(--radius-m);
+  background: var(--warning-wash); }
+.lgc-stale p { margin: 0; color: var(--ink); font-size: .92rem; }
+.lgc-stale button { padding: .6rem 1.1rem; border-radius: var(--radius-m); }
+
+/* "If you do not agree": the ways out, folded */
+.lgc-out { margin-top: 1.4rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+.lgc-out-body { display: grid; gap: .7rem; padding: .5rem 0 .2rem; font-size: .88rem; line-height: 1.55; color: var(--ink-2); }
+.lgc-out-body p { margin: 0; }
+.lgc-out-body a { color: var(--primary-text); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.lgc-out-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.lgc-out-actions button { padding: .5rem .85rem; font-size: .86rem; border-radius: var(--radius-m); }
+.lgc-confirm { display: grid; gap: .7rem; padding: .85rem .95rem; border: 1px solid var(--rec-line); border-radius: var(--radius-m); background: var(--rec-wash); }
+.lgc-confirm p { color: var(--ink); }
+.lgc-gone { margin-top: 1.25rem; }
+
+/* --------------------------------------------------------------------------------- a checkbox with its statement */
+.lgc-check { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: .6rem; row-gap: .25rem; align-items: start; text-align: left; }
+.lgc-check input { width: 1.05rem; height: 1.05rem; margin: .18rem 0 0; cursor: pointer; }
+.lgc-check label { font-size: .9rem; line-height: 1.5; color: var(--ink); cursor: pointer; }
+.lgc-check a { color: var(--primary-text); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }
+.lgc-check.is-missed input { outline: 2px solid var(--rec); outline-offset: 2px; }
+.lgc-check-msg { grid-column: 2; margin: 0; font-size: .8rem; font-weight: 500; color: var(--rec); }
+
+/* ------------------------------------------------------------------------------- the recording notice (KT pages) */
+.lgc-notice { display: grid; gap: .8rem; margin: 0 0 1.5rem; padding: 1.1rem 1.25rem 1.15rem; border: 1px solid var(--panel-line-strong);
+  border-radius: var(--radius-l); scroll-margin-top: 5rem; }
+.lgc-notice:focus { outline: none; }
+.lgc-notice-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem 1rem; flex-wrap: wrap; }
+.lgc-notice-eyebrow { margin: 0 0 .2rem; font-size: .72rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--secondary); }
+.lgc-notice h2 { margin: 0; font-size: 1.08rem; letter-spacing: -.014em; }
+.lgc-notice-points { margin: 0; padding: 0 0 0 1.1rem; display: grid; gap: .4rem; max-width: 70ch; font-size: .9rem; line-height: 1.5; color: var(--ink-2); }
+.lgc-notice-foot { display: flex; align-items: center; justify-content: space-between; gap: .6rem 1rem; flex-wrap: wrap; }
+.lgc-notice-foot p { margin: 0; font-size: .82rem; color: var(--ink-soft); max-width: 52ch; }
+.lgc-notice-foot a, .lgc-notice-version a { color: var(--primary-text); text-decoration: underline; text-underline-offset: 3px; }
+.lgc-notice-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-left: auto; }
+.lgc-notice .dp-btn { margin: 0; }
+.lgc-notice .error { margin: 0; }
+.lgc-notice-version { font-size: .8rem; color: var(--ink-soft); white-space: nowrap; }
+
+/* ----------------------------------------------------------------------------- Settings > Organisation > Legal */
+.lgc-set { display: grid; gap: 1.4rem; }
+.lgc-set h3 { margin: 0 0 .6rem; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
+.lgc-dpa { display: grid; gap: .8rem; padding: 1rem 1.1rem; border: 1px solid var(--panel-line-strong); border-radius: var(--radius-l); }
+.lgc-dpa-row { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem 1.25rem; flex-wrap: wrap; }
+.lgc-dpa-title { margin: 0; font-weight: 600; color: var(--ink); }
+.lgc-dpa-text { margin: .2rem 0 0; font-size: .88rem; line-height: 1.5; color: var(--ink-2); max-width: 60ch; }
+.lgc-dpa-text strong { color: var(--ink); font-weight: 600; overflow-wrap: anywhere; }
+.lgc-dpa-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.lgc-dpa-actions button, .lgc-dpa-actions a { padding: .5rem .9rem; font-size: .86rem; border-radius: var(--radius-m); }
+.lgc-dpa-confirm { display: grid; gap: .8rem; }
+.lgc-check a, .lgc-operator a { color: var(--primary-text); text-decoration: underline; text-underline-offset: 3px; }
+.set-inline-error { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.set-inline-error .error { margin: 0; }
+.lgc-state { display: inline-flex; align-items: center; gap: .35rem; flex: none; padding: .14rem .55rem; border-radius: 999px; font-size: .74rem; font-weight: 600;
+  color: var(--warning); background: var(--warning-wash); box-shadow: inset 0 0 0 1px var(--warning-line); }
+.lgc-state.is-done { color: var(--success); background: var(--success-wash); box-shadow: inset 0 0 0 1px var(--success-line); }
+.lgc-dpa-earlier { margin: 0; padding: .7rem 0 0; border-top: 1px solid var(--line); list-style: none; display: grid; gap: .3rem; font-size: .82rem; color: var(--ink-soft); }
+.lgc-doclist { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--line); }
+.lgc-doclist li { display: flex; align-items: baseline; justify-content: space-between; gap: .25rem 1rem; flex-wrap: wrap; padding: .6rem 0; border-bottom: 1px solid var(--line); }
+.lgc-doclist a { font-weight: 550; color: var(--ink); text-decoration: none; }
+.lgc-doclist a:hover { color: var(--primary-text); text-decoration: underline; text-underline-offset: 3px; }
+.lgc-doclist span { font-size: .82rem; color: var(--ink-soft); }
+.lgc-doclist .lgc-yours { color: var(--ink-2); }
+.lgc-operator { margin: 0; display: grid; gap: 0; border-top: 1px solid var(--line); }
+.lgc-operator > div { display: grid; grid-template-columns: 11rem minmax(0, 1fr); gap: .25rem 1rem; padding: .6rem 0; border-bottom: 1px solid var(--line); font-size: .9rem; }
+.lgc-operator dt { color: var(--ink-soft); }
+.lgc-operator dd { margin: 0; color: var(--ink); overflow-wrap: anywhere; }
+.lgc-operator dd.is-unset { color: var(--ink-soft); }
+.lgc-hint { margin: .8rem 0 0; font-size: .84rem; line-height: 1.55; color: var(--ink-soft); max-width: 68ch; }
+.lgc-hint code { font-size: .78rem; overflow-wrap: anywhere; }
+
+@media (max-width: 640px) {
+  .lgc-operator > div { grid-template-columns: 1fr; gap: .1rem; }
+  .lgc-notice-actions { margin-left: 0; }
+  .lgc-agree { position: static; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lgc-brief summary::before, .lgc-out summary::before { transition: none; }
+}
+.dpa-prompt { align-items: center; } .dpa-prompt svg { margin-top: 0; } .dpa-prompt p { flex: 1; } .dpa-prompt a { color: inherit; text-decoration: underline; text-underline-offset: .18em; }
+.dpa-prompt button.icon { flex: none; }

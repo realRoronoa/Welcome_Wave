@@ -23,8 +23,10 @@ from datetime import date, datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from app import legal
 from app.api.auth import container, refuse_deactivated, require
 from app.ports import User
+from app.ratelimit import request_address
 from app.seed import ORG
 
 router = APIRouter(prefix="/demo")
@@ -38,10 +40,31 @@ def _org_projects(c):
     return c.store.projects_for(_ORG_READER)
 
 
+def _reseeded_if_gone(request: Request, c):
+    """The demo organisation as seeded again when it no longer exists. Anyone can sign in to the demo as its admin, and the
+    admin can delete the organisation (DELETE /api/org): without this, nobody could sign in again until a restart."""
+    if c.store.org_name(ORG):
+        return c
+    fresh = _rebuild(request, c)
+    fresh.store.audit(ORG, None, "demo.reset", ORG, {"why": "organisation deleted"})
+    return fresh
+
+
+def _rebuild(request: Request, c):
+    from app.api import audit
+    from app.container import build_container
+
+    fresh = build_container(c.settings, live=getattr(request.app.state, "live", None))
+    audit.on_start(fresh)
+    request.app.state.container = fresh
+    return fresh
+
+
 @router.get("/people")
-def people(c=Depends(container)):
+def people(request: Request, c=Depends(container)):
     """Who can sign in to the demo: every member of the organisation's projects, then everyone invited and not yet joined.
     No sign-in needed: the demo sign-in page lists them."""
+    c = _reseeded_if_gone(request, c)
     members, invited = {}, {}
     for p in _org_projects(c):
         for m in c.store.members(p.id):
@@ -92,10 +115,12 @@ def login(body: LoginIn, request: Request, c=Depends(container)):
     and an email that is not a member get the same 401, so the answer never tells whether an email exists. Every attempt
     counts towards a small limit per email and client (429 beyond it)."""
     email = body.email.strip().lower()
-    client = request.client.host if request.client else "unknown"
+    client = request_address(request.scope)
     if not _login_attempts.allow(f"{email}|{client}"):
         raise HTTPException(429, "Too many sign-in attempts. Wait a minute and try again.", headers={"Retry-After": "60"})
     password_ok = hmac.compare_digest(body.password.encode(), c.settings.demo_password.encode())
+    if password_ok:
+        c = _reseeded_if_gone(request, c)
     user = c.store.user_by_email(ORG, email) if email else None  # looked up either way: both failures take the same path
     if not password_ok or not user:
         raise HTTPException(401, BAD_LOGIN)
@@ -107,10 +132,14 @@ def login(body: LoginIn, request: Request, c=Depends(container)):
 class AcceptIn(BaseModel):
     project_id: str
     invitation_id: str
+    # the documents the invitee accepts by joining ('terms', 'privacy', and 'recording' if shown), as POST
+    # /api/invitations/accept takes them. Optional here: the demo's sign-in page stands in for a real sign-in, and an invitee
+    # who joined without them is asked at their first sign-in instead (GET /api/legal/status).
+    accept: list[str] = Field(default_factory=list, max_length=8)
 
 
 @router.post("/invitations/accept")
-def accept(body: AcceptIn, c=Depends(container)):
+def accept(body: AcceptIn, request: Request, c=Depends(container)):
     """Join as the invitee, as their first sign-in would in production. Returns the new member; their email and the demo
     password sign them in from then on. No sign-in needed: the invitee is not a member yet."""
     try:
@@ -122,10 +151,13 @@ def accept(body: AcceptIn, c=Depends(container)):
     inv = next((i for i in c.store.invitations(body.project_id) if i["id"] == body.invitation_id), None)
     if not inv:
         raise HTTPException(404, "That invitation has been accepted or revoked")
+    documents = legal.check_documents(body.accept, legal.PERSONAL)
     joined = c.store.accept_invitations(f"demo:{inv['id']}", inv["email"], inv.get("name") or "", ORG)
     if not joined:
         raise HTTPException(409, "That invitation can no longer be accepted")
     c.store.audit(ORG, joined.id, "invitation.accepted", inv["id"], {"demo": True})
+    if documents:
+        legal.record(c, joined, documents, "invitation", request)
     return joined
 
 
@@ -138,7 +170,7 @@ class PullRequestIn(BaseModel):
 def pull_request(body: PullRequestIn, user: User = Depends(require("new_hire")), c=Depends(container)):
     """Open a pull request for one of my code tasks (or push a new commit to the one already open), through the GitHub
     webhook handler. Returns the task as it is afterwards and the review the Review agent wrote."""
-    from app.agents.supervisor import OPEN_FOR_PR
+    from app.agents.supervisor.graph import OPEN_FOR_PR
     from app.api.webhooks import _github_event
 
     t = c.store.get_task(body.task_id)
@@ -178,12 +210,12 @@ def advance(body: AdvanceIn, user: User = Depends(require("manager")), c=Depends
     """Move the demo organisation's clock forward (app/lifecycle/clock.py), so its programs, check-ins, blockers and reports
     move through days 0-90 without waiting. For each day the clock crosses, the seeded people do what they plausibly would
     (app/lifecycle/simulation.py: check-ins on time, tasks done, a first change merged, completion when every criterion is
-    met), then the daily tick (app/agents/tick.py) runs as the real loop would have: the Coach's blocker rules and nudges, the weekly summaries, the Planner's completion drafts. Each
+    met), then the daily tick (app/agents/supervisor/tick.py) runs as the real loop would have: the Coach's blocker rules and nudges, the weekly summaries, the Planner's completion drafts. Each
     day's tick runs once (its dedupe key), so moving back and forth never repeats one. Then every active program is brought
     up to date at the new date."""
     from datetime import timedelta
 
-    from app.agents import tick
+    from app.agents.supervisor import tick
     from app.lifecycle import flags, hires, simulation
     from app.lifecycle.clock import advance as move
     from app.lifecycle.context import Ctx
@@ -206,11 +238,6 @@ def advance(body: AdvanceIn, user: User = Depends(require("manager")), c=Depends
 @router.post("/reset")
 def reset(request: Request, user: User = Depends(require("manager")), c=Depends(container)):
     """The demo organisation as it was seeded, at day 0: the in-memory data is built again (every change since is gone)."""
-    from app.api import audit
-    from app.container import build_container
-
-    fresh = build_container(c.settings, live=getattr(request.app.state, "live", None))
-    audit.on_start(fresh)
-    request.app.state.container = fresh
+    fresh = _rebuild(request, c)
     fresh.store.audit(ORG, user.id, "demo.reset", ORG, {})
     return {"offset_days": 0, "today": date.today()}

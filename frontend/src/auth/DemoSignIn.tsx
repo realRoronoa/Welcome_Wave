@@ -168,9 +168,9 @@ export default function DemoSignIn({ config, onSignedIn, notice, creating: cameT
             return (
               <li key={m.id} className={core.includes(m) ? undefined : "si-extra"}>
                 <button type="button" className="si-acct" onClick={() => pick(m)} disabled={!!busy && busy !== m.email}
-                        aria-label={`Sign in as ${plain(m.name)}, ${role}`} aria-busy={busy === m.email}>
+                        aria-busy={busy === m.email}>
                   <span className="si-av" aria-hidden="true">{busy === m.email ? <span className="en-spin" /> : initials(m.name)}</span>
-                  <span className="si-acct-text"><strong>{plain(m.name)}</strong><span>{m.email}</span></span>
+                  <span className="si-acct-text"><span className="sr-only">Sign in as </span><strong>{plain(m.name)}</strong><span>{m.email}</span></span>
                   <span className="si-role">{role}</span>
                   <Chevron />
                 </button>
@@ -200,9 +200,9 @@ export default function DemoSignIn({ config, onSignedIn, notice, creating: cameT
               return (
                 <li key={i.invitation_id}>
                   <button type="button" className="si-acct" onClick={() => accept(i)} disabled={!!busy && busy !== i.invitation_id}
-                          aria-label={`Accept the invitation for ${name} (${role}) and sign in`} aria-busy={busy === i.invitation_id}>
+                          aria-busy={busy === i.invitation_id}>
                     <span className="si-av invited" aria-hidden="true">{busy === i.invitation_id ? <span className="en-spin" /> : initials(name)}</span>
-                    <span className="si-acct-text"><strong>{name}</strong><span>{i.email}</span></span>
+                    <span className="si-acct-text"><span className="sr-only">Accept the invitation for </span><strong>{name}</strong><span>{i.email}</span></span>
                     <span className="si-role">{role}</span>
                     <span className="si-accept">Accept</span>
                   </button>

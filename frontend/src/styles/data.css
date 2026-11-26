@@ -61,7 +61,7 @@
 .dp-chip { display: inline-flex; align-items: center; gap: .35rem; max-width: 100%; height: 1.55rem; padding: 0 .5rem; border-radius: var(--radius-s);
   font: 500 .74rem/1 var(--code); color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line); text-decoration: none;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; transition: border-color .15s, color .15s, background .15s; }
-.dp-chip svg { flex: none; color: var(--ink-faint); }
+.dp-chip svg { flex: none; color: var(--ink-muted); }
 .dp-chip.is-count { font: 550 .76rem/1 var(--ui); } /* mono is for code and time, not counts */
 .dp code.dp-ic { padding: 0 .3rem; font-size: .84em; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 5px; overflow-wrap: anywhere; }
 a.dp-chip:hover { color: var(--ink); border-color: var(--line-hover); background: var(--surface-2); }
@@ -94,7 +94,8 @@ a.dp-chip:hover svg { color: var(--ink); }
 .dp-btn:disabled, .dp-btn:disabled:hover { opacity: 1; background: var(--surface-2); color: var(--ink-faint); box-shadow: inset 0 0 0 1px var(--line); cursor: not-allowed; transform: none; }
 .dp-btn.ghost:disabled, .dp-btn.ghost:disabled:hover { background: none; box-shadow: none; }
 a.dp-btn:hover { color: var(--ink); }
-a.dp-btn.primary:hover { color: var(--on-accent); }
+a.dp-btn.primary:hover { color: var(--btn-ink); }
+.dp-btn.primary:active:not(:disabled) { background: var(--btn-pressed); }
 
 .dp-hint { display: flex; gap: .55rem; align-items: flex-start; margin: .8rem 0 0; padding: .6rem .75rem; border-radius: var(--radius-m); font-size: .84rem;
   color: var(--ink-2); background: var(--surface-2); border: 1px dashed var(--line-strong); }
@@ -113,11 +114,11 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 .dp-code figcaption { display: flex; align-items: center; gap: .5rem; padding: .45rem .8rem; font: 500 .72rem/1.2 var(--code); color: var(--rail-text);
   border-bottom: 1px solid var(--rail-line); background: var(--rail-2); }
 .dp-code figcaption::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--rail-text); opacity: .6; } /* not teal: evidence is not a KT explanation */
-.dp-code pre { margin: 0; padding: .55rem 0; overflow-x: auto; }
+.dp-code pre { margin: 0; padding: .55rem 0; overflow-x: auto; overscroll-behavior-x: contain; }
 .dp-code code { display: block; font-size: .78rem; line-height: 1.7; color: var(--rail-bright); }
 .dp-code-line { display: grid; grid-template-columns: 3.2rem 1fr; }
 .dp-code-line > span:last-child { white-space: pre; padding-right: 1rem; }
-.dp-ln { text-align: right; padding-right: .9rem; color: var(--rail-text); opacity: .55; user-select: none; font-variant-numeric: tabular-nums; }
+.dp-ln { text-align: right; padding-right: .9rem; color: var(--rail-text); opacity: .75; user-select: none; font-variant-numeric: tabular-nums; }
 .dp-code-line:hover { background: color-mix(in srgb, var(--rail-accent) 7%, transparent); }
 
 /* =========================================================== onboarding health */
@@ -126,7 +127,7 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
   border-radius: var(--radius-l); box-shadow: var(--shadow-xs); overflow: hidden; transition: border-color .2s, box-shadow .2s var(--ease), transform .2s var(--ease); }
 .dp-kpi:hover { border-color: var(--line-strong); box-shadow: var(--shadow-m); transform: translateY(-2px); }
 .dp-kpi-label { display: flex; align-items: center; gap: .45rem; margin: 0; font-size: .8rem; font-weight: 550; color: var(--ink-soft); }
-.dp-kpi-label svg { color: var(--ink-faint); }
+.dp-kpi-label svg { color: var(--ink-muted); }
 .dp-kpi-value { margin: .35rem 0 .55rem; font-size: 2.1rem; line-height: 1; font-weight: 650; letter-spacing: -.035em; color: var(--ink); }
 .dp-kpi-value .count-up { font-variant-numeric: normal; }
 .dp-kpi-of { margin-left: .35rem; font-size: 1rem; font-weight: 500; letter-spacing: 0; color: var(--ink-soft); }
@@ -157,7 +158,7 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 .dp-banner code { font-size: .82rem; color: var(--ink); font-weight: 600; }
 .dp-banner a { font-weight: 600; font-size: .85rem; color: var(--ink); }
 
-.dp-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow-xs); overflow-x: auto; }
+.dp-table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow-xs); overflow-x: auto; overscroll-behavior-x: contain; }
 .dp-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
 .dp-table th, .dp-table td { text-align: left; padding: .7rem 1.1rem; border-bottom: 1px solid var(--line); white-space: nowrap; vertical-align: middle; }
 .dp-table tbody tr:last-child > * { border-bottom: 0; }
@@ -178,7 +179,7 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 .dp-table tr.gap .dp-num { color: var(--ink); font-weight: 600; }
 .dp-table tr.gap { box-shadow: inset 3px 0 0 var(--ink); } /* never explained: an ink bar and a hollow marker, not a colour */
 .dp-gap-mark { display: inline-block; width: 7px; height: 7px; margin-right: .5rem; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--ink); vertical-align: 1px; }
-.dp-none { color: var(--ink-faint); }
+.dp-none { color: var(--ink-muted); }
 
 .dp-repeats { list-style: none; margin: 0; padding: 0; display: grid; gap: .45rem; max-width: 820px; }
 .dp-repeats li { position: relative; display: flex; justify-content: space-between; gap: 1rem; padding: .65rem .9rem; border-radius: var(--radius-m);
@@ -211,14 +212,14 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 .dp-task-main { min-width: 0; }
 .dp-task-kicker { margin: 0 0 .15rem; font-size: .72rem; font-weight: 550; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-soft); }
 .dp-section-link { display: inline-flex; align-items: center; gap: .35rem; font-size: .86rem; font-weight: 550; text-decoration: none; white-space: nowrap;
-  color: var(--ink); } /* ink, not teal: teal means "explained in a KT call" */
-.dp-section-link:hover { color: var(--ink-2); }
+  color: var(--primary-text); } /* a link: teal */
+.dp-section-link:hover { color: var(--primary-hover); }
 .dp-section-link svg { transition: transform .2s var(--ease); }
 .dp-section-link:hover svg { transform: translateX(3px); }
 .dp-task-desc { margin: .3rem 0 0; color: var(--ink-2); font-size: .9rem; }
 .dp-criteria { list-style: none; margin: .7rem 0 0; padding: 0; display: grid; gap: .3rem; font-size: .86rem; color: var(--ink-2); }
 .dp-criteria li { display: flex; gap: .5rem; align-items: flex-start; }
-.dp-criteria svg { flex: none; margin-top: .22rem; padding: 2px; width: 16px; height: 16px; border-radius: 50%; color: var(--ink-faint); border: 1px solid var(--line-strong); }
+.dp-criteria svg { flex: none; margin-top: .22rem; padding: 2px; width: 16px; height: 16px; border-radius: 50%; color: var(--ink-muted); border: 1px solid var(--line-strong); }
 .s-done .dp-criteria svg { color: var(--surface); background: var(--ink); border-color: var(--ink); }
 .dp-task-side { display: flex; flex-direction: column; align-items: flex-end; gap: .5rem; min-width: 9.5rem; }
 .dp-task-side .dp-btn { margin-top: .3rem; }
@@ -249,7 +250,7 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 .dp-steps { list-style: none; margin: 1.1rem 0 0; padding: 0; display: grid; gap: .55rem; font-size: .88rem; color: var(--ink-2); }
 .dp-steps li { position: relative; display: flex; gap: .7rem; align-items: center; }
 .dp-steps li i { width: 12px; height: 12px; border-radius: 50%; flex: none; border: 2px solid var(--line-strong); background: var(--surface); }
-.dp-steps li.done i { border-color: var(--ink); background: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 10%, transparent); }
+.dp-steps li.done i { border-color: var(--primary-fill); background: var(--primary-fill); box-shadow: 0 0 0 3px var(--focus-ring); }
 .dp-steps li.done.changes_requested i { border-color: var(--ink); background: var(--surface); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 10%, transparent); }
 .dp-steps li.wait i { border-color: var(--info); animation: dp-breathe 2s ease-in-out infinite; }
 .dp-steps li + li::before { content: ""; position: absolute; left: 5px; top: -.6rem; height: .65rem; width: 2px; background: var(--line); }
@@ -332,7 +333,7 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 /* =========================================================== KT calls */
 .dp-start { display: flex; align-items: center; gap: .5rem; max-width: var(--page-w); margin-bottom: 1.5rem; padding: .4rem .4rem .4rem .55rem; border-radius: var(--radius-l);
   background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-s); transition: border-color .15s, box-shadow .15s; }
-.dp-start:focus-within { border-color: var(--ink); box-shadow: var(--shadow-s), 0 0 0 4px color-mix(in srgb, var(--ink) 9%, transparent); }
+.dp-start:focus-within { border-color: var(--focus); box-shadow: var(--shadow-s), 0 0 0 4px var(--focus-ring); }
 .dp-start-icon { display: grid; place-items: center; flex: none; width: 34px; height: 34px; border-radius: 9px; color: var(--ink-2); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
 .dp-start input { flex: 1; min-width: 0; border: 0; box-shadow: none; background: transparent; padding: .5rem .3rem; font-size: .95rem; }
 .dp-start input:focus { box-shadow: none; }
@@ -468,7 +469,7 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 .dp-terms dd { margin: .15rem 0 0; font-size: .88rem; color: var(--ink-2); }
 
 .dp-transcript { position: sticky; top: 1.25rem; padding-bottom: .6rem; }
-.dp-transcript ol { list-style: none; margin: 0 -.6rem; padding: 0; max-height: 68vh; overflow-y: auto; scroll-behavior: smooth; }
+.dp-transcript ol { list-style: none; margin: 0 -.6rem; padding: 0; max-height: 68vh; overflow-y: auto; overscroll-behavior: contain; scroll-behavior: smooth; }
 .dp-transcript li { position: relative; display: grid; grid-template-columns: 3.4rem minmax(0, 1fr); gap: .6rem; padding: .55rem .6rem; border-radius: var(--radius-m);
   transition: background .3s var(--ease); }
 .dp-transcript li.cont { padding-top: .1rem; }
@@ -539,12 +540,16 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 
 /* ---------- journey fixes: documents, plan edits, task actions, call states ---------- */
 .doc-pages { list-style: none; margin: 0; padding: 0; display: grid; gap: 1rem; }
-.doc-page { scroll-margin-top: 1.5rem; }
+.doc-page { scroll-margin-top: calc(var(--bar-h, 52px) + 1rem); } /* a cited page lands below the sticky bar, not under it */
 .doc-page.here { border-color: var(--ink-soft); box-shadow: 0 0 0 3px var(--hover), var(--shadow-xs); }
 .doc-page-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin: 0 0 .75rem; }
 .doc-page-n { display: flex; align-items: center; gap: .5rem; margin: 0; font: 600 .74rem var(--ui); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-soft); }
 .doc-cited { font: 500 .7rem var(--code); letter-spacing: 0; text-transform: none; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 999px; padding: .05rem .45rem; }
 .doc-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.65; color: var(--ink-2); font-size: .92rem; }
+/* a long document's pages off screen skip layout and paint until they come near; plain text with nothing that pops out, so
+   the paint containment this brings clips nothing. auto: once shown, a page keeps its real height as its placeholder. */
+.doc-text { content-visibility: auto; contain-intrinsic-size: auto 60rem; }
+@media (max-width: 640px) { .doc-text { contain-intrinsic-size: auto 120rem; } }
 @media (hover: hover) {
   .doc-page .doc-flag:not(.is-open):not(.is-sent) { opacity: 0; }
   .doc-page:hover .doc-flag, .doc-page:focus-within .doc-flag { opacity: 1; }
@@ -572,12 +577,12 @@ a.dp-btn.primary:hover { color: var(--on-accent); }
 
 /* adding a KT session's recording: a thin progress line under the session's actions */
 .dp-upload { flex-basis: 100%; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; }
-.dp-upload i { display: block; height: 100%; background: var(--ink); transition: width .2s var(--ease); }
+.dp-upload i { display: block; height: 100%; background: var(--primary-fill); transition: width .2s var(--ease); }
 .dp-upload-error { flex-basis: 100%; margin: .2rem 0 0; font-size: .82rem; }
 
 /* ---------- documentation feedback (src/lifecycle/FeedbackButton.tsx): a quiet flag and its little card ---------- */
 button.fb-flag { display: inline-flex; align-items: center; gap: .35rem; flex: none; padding: .3rem; border-radius: var(--radius-s); background: none;
-  box-shadow: none; color: var(--ink-faint); font: 500 .76rem/1 var(--ui); transition: color .15s, background .15s, opacity .15s; }
+  box-shadow: none; color: var(--ink-muted); font: 500 .76rem/1 var(--ui); transition: color .15s, background .15s, opacity .15s; }
 button.fb-flag.with-text { padding: .3rem .5rem; }
 button.fb-flag:hover, button.fb-flag.is-open { color: var(--ink); background: var(--surface-2); }
 button.fb-flag.is-sent { color: var(--ink-soft); }
@@ -609,14 +614,14 @@ button.fb-flag:active { transform: none; }
 .dp-done-lane .acc-body .dp-tasks { padding-top: .2rem; }
 .dp-done-lane .dp-task { box-shadow: none; }
 .dp-hint.dp-branch { padding: 0; background: none; border: 0; color: var(--ink-soft); font-size: .82rem; margin-top: .75rem; }
-.dp-hint.dp-branch > svg { color: var(--ink-faint); }
+.dp-hint.dp-branch > svg { color: var(--ink-muted); }
 
 .dp-brief { padding: 1.6rem 1.6rem .6rem; margin-bottom: 1rem; }
 .dp-brief-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem 2rem; flex-wrap: wrap; padding-bottom: 1.3rem; }
 .dp-brief-head > div:first-child { min-width: 0; flex: 1 1 22rem; }
 .dp-brief h2 { margin: 0; font-size: 1.3rem; letter-spacing: -.02em; line-height: 1.3; }
 .dp-brief-next { display: flex; gap: .5rem; align-items: flex-start; margin: .6rem 0 0; color: var(--ink-soft); font-size: .92rem; }
-.dp-brief-next svg { flex: none; margin-top: .25rem; color: var(--ink-faint); }
+.dp-brief-next svg { flex: none; margin-top: .25rem; color: var(--ink-muted); }
 .dp-brief-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .dp-brief .acc { gap: 0; }
 .dp-brief .acc-item { background: none; border: 0; border-top: 1px solid var(--line); border-radius: 0; box-shadow: none; }
@@ -635,9 +640,9 @@ button.fb-flag:active { transform: none; }
 .dp-brief-clip-text strong { font: 550 .86rem var(--code); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dp-brief-clip-text span { font-size: .8rem; color: var(--ink-soft); }
 
-.dp-dialog { width: min(680px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; overflow: auto; color: var(--ink);
+.dp-dialog { width: min(680px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; overflow: auto; overscroll-behavior: contain; color: var(--ink);
   background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--radius-l); box-shadow: var(--shadow-l); }
-.dp-dialog::backdrop { background: rgb(10 10 10 / .36); backdrop-filter: blur(3px); }
+.dp-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(3px); }
 .dp-dialog[open] { animation: dp-dialog-in .22s var(--ease-out) both; }
 @keyframes dp-dialog-in { from { opacity: 0; transform: translateY(8px) scale(.985); } }
 .dp-dialog-inner { padding: 1.6rem 1.7rem 1.8rem; display: grid; gap: 1.1rem; }
@@ -676,7 +681,7 @@ button.fb-flag:active { transform: none; }
 .dp-clean { color: var(--ink); }
 .dp-qa li:hover { border-color: var(--line-strong); }
 .dp-review-main .dp-hint > svg { color: var(--ink-soft); }
-.dp-foot-link, .dp-card-foot a, .dp-steps a { color: var(--ink); }
-.dp-foot-link:hover, .dp-card-foot a:hover, .dp-steps a:hover { color: var(--ink-2); }
+.dp-foot-link, .dp-card-foot a, .dp-steps a { color: var(--primary-text); }
+.dp-foot-link:hover, .dp-card-foot a:hover, .dp-steps a:hover { color: var(--primary-hover); }
 
-/* Teal means "explained in a KT session" only: task progress and repeated questions are neutral ink */
+/* Task progress and repeated questions are neutral ink here; teal (the brand) is for the primary action and progress marks */

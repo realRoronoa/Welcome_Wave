@@ -1,0 +1,207 @@
+1
+00:00:00,000 --> 00:00:07,493
+Meet Maya, a new backend engineer facing a large repository, scattered documents, and questions no one has written down.
+
+2
+00:00:07,493 --> 00:00:13,433
+Every new hire asks similar things, but the best explanations often live only in a senior engineer's head.
+
+3
+00:00:13,433 --> 00:00:17,441
+Welcome Wave connects those explanations to the exact code they describe.
+
+4
+00:00:17,441 --> 00:00:24,554
+A senior records a knowledge transfer session once. The next engineer can find the relevant moment, watch it, and learn.
+
+5
+00:00:24,554 --> 00:00:28,744
+Priya, the manager, invites Maya to her team's Welcome Wave project.
+
+6
+00:00:28,744 --> 00:00:35,023
+She selects a ninety-day program template, start date, mentor Ravi, team, and focus area.
+
+7
+00:00:35,023 --> 00:00:38,355
+The Planner agent drafts milestones and tasks from that setup.
+
+8
+00:00:38,355 --> 00:00:43,182
+Its plan waits in Approvals. Priya checks it and decides which tasks Maya receives.
+
+9
+00:00:43,182 --> 00:00:50,849
+Before day one, Maya gets a pre-boarding link with documents, access requests, a first-week preview, and a machine check.
+
+10
+00:00:50,849 --> 00:00:56,765
+Ravi explains engine slash validate dot pie while sharing his screen in a recorded knowledge transfer meeting.
+
+11
+00:00:56,765 --> 00:01:04,486
+The Librarian reads the connected GitHub repository without write access, splits files into searchable pieces, and indexes them.
+
+12
+00:01:04,486 --> 00:01:11,023
+The Note-taker analyses the recording's speech and screen moments, writes notes, and redacts transcript text.
+
+13
+00:01:11,023 --> 00:01:17,945
+Welcome Wave first matches a file path visible on screen, then a visible function name, then meaning if neither is legible.
+
+14
+00:01:17,945 --> 00:01:25,248
+The result links check privileged in engine slash validate dot pie to Ravi's recording at the relevant time, with a confidence score.
+
+15
+00:01:25,248 --> 00:01:28,983
+If that code changes later, the explanation can be marked stale.
+
+16
+00:01:28,983 --> 00:01:32,610
+Maya opens the code tour and sees which functions Ravi explained.
+
+17
+00:01:32,610 --> 00:01:36,786
+A click takes her straight to the matching clip, not to the beginning of a long meeting.
+
+18
+00:01:36,786 --> 00:01:40,409
+The coverage map shows modules that have no recorded explanation.
+
+19
+00:01:40,409 --> 00:01:43,655
+Knowledge risk highlights a critical file with only one owner.
+
+20
+00:01:43,655 --> 00:01:48,833
+The KT planner proposes a session to close that gap. A person chooses whether to book it.
+
+21
+00:01:48,833 --> 00:01:52,971
+Maya asks why check privileged returns a list instead of raising an exception.
+
+22
+00:01:52,971 --> 00:01:57,928
+The Guide searches code, documents, recorded moments, and verified answers.
+
+23
+00:01:57,928 --> 00:02:02,616
+It gives numbered citations and a matching clip, then checks that the claims are supported.
+
+24
+00:02:02,616 --> 00:02:06,507
+When evidence is weak, the Guide says so and offers to ask a person.
+
+25
+00:02:06,507 --> 00:02:12,827
+Maya chooses that option. Her mentor Ravi receives the question according to office hours and interruption limits.
+
+26
+00:02:12,827 --> 00:02:16,317
+Ravi can answer and save a verified answer for the next person.
+
+27
+00:02:16,317 --> 00:02:24,456
+The Scout ranks real first-task candidates using Maya's focus, task size, tests, KT coverage, and ownership risk.
+
+28
+00:02:24,456 --> 00:02:28,262
+Priya selects a safe issue and Maya receives a brief with first steps.
+
+29
+00:02:28,262 --> 00:02:32,121
+Maya writes a draft and asks for a private pre-submit review of her diff.
+
+30
+00:02:32,121 --> 00:02:40,063
+The Reviewer anchors each finding to changed lines, tests, or the relevant KT moment. Only Maya can see this private review.
+
+31
+00:02:40,063 --> 00:02:46,632
+She fixes the issue and opens a pull request on GitHub herself. Welcome Wave never pushes code to the repository.
+
+32
+00:02:46,632 --> 00:02:51,451
+The regular review proposes a recommendation; Priya makes the decision in Approvals.
+
+33
+00:02:51,451 --> 00:02:57,715
+Onboarding continues across ninety days, with tasks, milestones, access, and check-ins.
+
+34
+00:02:57,715 --> 00:03:04,147
+The Coach checks stalled work, failed environment checks, and blockers. It nudges Maya when she needs help.
+
+35
+00:03:04,147 --> 00:03:08,811
+If a blocker persists, escalation moves in stages after business-day delays.
+
+36
+00:03:08,811 --> 00:03:14,073
+Weekly summaries count progress and link to its evidence without quoting Maya's private questions.
+
+37
+00:03:14,073 --> 00:03:20,219
+Maya and Priya check in around day thirty, sixty, and ninety. Priya decides the completion sign-off.
+
+38
+00:03:20,219 --> 00:03:24,563
+When code changes, an old recording may no longer describe it accurately.
+
+39
+00:03:24,563 --> 00:03:31,959
+The Keeper proposes a re-recording or a document edit. A manager approves the proposal, and the repository owner applies edits.
+
+40
+00:03:31,959 --> 00:03:37,645
+If an expert is leaving, a handover lists their owned files, missing KT, and a successor.
+
+41
+00:03:37,645 --> 00:03:45,218
+Managers see blockers, coverage, and time to first pull request in reports. Small survey groups are suppressed for privacy.
+
+42
+00:03:45,218 --> 00:03:50,014
+The point is to keep useful explanations alive, even as a team and its code change.
+
+43
+00:03:50,014 --> 00:03:53,760
+Under the hood, a React browser app calls a FastAPI backend.
+
+44
+00:03:53,760 --> 00:04:01,047
+A LangGraph Supervisor routes each event to a specialist agent, while lifecycle and knowledge services enforce the business rules.
+
+45
+00:04:01,047 --> 00:04:04,584
+Demo mode uses seeded in-memory data and resets when restarted.
+
+46
+00:04:04,584 --> 00:04:13,852
+Self-hosted mode uses Postgres with pgvector, Firebase sign-in, and real integrations. Google Cloud runs the same application with managed services.
+
+47
+00:04:13,852 --> 00:04:20,578
+GitHub access is read-only. Calendar, Meet, Drive, Calendly, and email are optional integrations.
+
+48
+00:04:20,578 --> 00:04:26,599
+Role and project checks, organisation isolation, approvals, and an audit log protect the work.
+
+49
+00:04:26,599 --> 00:04:29,729
+Here is the whole loop. Ravi explains the code once.
+
+50
+00:04:29,729 --> 00:04:35,873
+Welcome Wave links the recording to source. Maya learns, asks with evidence, and contributes safely.
+
+51
+00:04:35,873 --> 00:04:40,271
+Priya makes the decisions. The team keeps the knowledge current for the next engineer.
+
+52
+00:04:40,271 --> 00:04:43,837
+Welcome Wave. Explain once, help every new engineer.

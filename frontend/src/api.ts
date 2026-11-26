@@ -1,3 +1,5 @@
+import type { LegalDetails } from "./legal/types";
+
 // Demo mode's session: the signed-in member's id, sent as X-Demo-User. A stored id means signed in; none means the sign-in page.
 const DEMO_USER_KEY = "ww-demo-user";
 let demoUser: string | null = null;
@@ -57,10 +59,18 @@ export async function liveRequest(signal: AbortSignal, topics?: string) {
   return res;
 }
 
+/** Fired on `window` when the API refuses a call until the terms are accepted (403 `legal_required`: LEGAL_ENFORCE is on
+ *  and a document changed while this page was open). consent/LegalGate.tsx listens and asks. */
+export const LEGAL_REQUIRED_EVENT = "ww:legal-required";
+
 export async function api<T = any>(path: string, init: RequestInit = {}): Promise<T> {
   let res = await send(path, init, false);
   if (res.status === 401 && !demo && tokenSource) res = await send(path, init, true); // token expired: refresh once
-  if (!res.ok) throw await toError(res);
+  if (!res.ok) {
+    const error = await toError(res);
+    if (error.status === 403 && error.code === "legal_required") dispatchEvent(new Event(LEGAL_REQUIRED_EVENT));
+    throw error;
+  }
   const text = res.status === 204 ? "" : await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
 }
@@ -130,12 +140,24 @@ export function errorMessage(e: unknown): string {
     }
     if (e.status === 429) return "Too many requests in a minute. Wait a moment and try again.";
     if (e.code === "deactivated" && /^Request failed/.test(e.message)) return "This account has been deactivated. Ask an admin of your organisation to reactivate it.";
+    // a failure of ours with no message of its own (a crash, a gateway's HTML page): plain words, with the reference to quote
+    if (e.status >= 500 && /^Request failed/.test(e.message)) return `Something went wrong on our side. Try again in a moment.${ref}`;
     return e.message + ref; // a structured detail ({code, message}) arrives here as its message
   }
   const code = (e as { code?: unknown })?.code;
   if (typeof code === "string" && code.startsWith("auth/")) return AUTH_ERRORS[code] ?? "Sign-in failed. Try again.";
   if (e instanceof TypeError) return "Could not reach the server. Check your connection and try again.";
   return e instanceof Error && e.message ? e.message : "Something went wrong.";
+}
+
+/** An outside link (a pull request, a calendar event) as an href, only when it is plain https (or http): anything else, such as
+ *  a javascript: or data: URL from a forged payload, becomes null and is not rendered as a link. */
+export function safeHref(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const u = new URL(url, location.origin);
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : null;
+  } catch { return null; }
 }
 
 export function mmss(s: number) {
@@ -179,6 +201,9 @@ export type Config = {
   calendly?: boolean; // Calendly bookings arrive by webhook
   email?: boolean; // this server sends email (invitations): the pages then say who a link was emailed to
   demo_password?: string | null; // demo only: the one password every demo account signs in with (shown on the sign-in page)
+  /** Who operates this server, as the legal documents name them (each null until its LEGAL_* setting is set), and the
+   *  current version of every document (backend/app/legal.py `public`). */
+  legal?: LegalDetails;
 };
 export type Project = { id: string; org_id: string; name: string; description: string };
 export type User = {

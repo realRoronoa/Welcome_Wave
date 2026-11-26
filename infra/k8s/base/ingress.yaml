@@ -1,0 +1,34 @@
+# One public address for the app. Like the Google Cloud load balancer (infra/terraform/lb.tf), it sends /api, /webhooks
+# and /health/ready straight to the API, so live-update streams and uploads never pass through nginx, and everything else
+# to the web app. /internal/* (the scheduled calls) is not routed: it is reachable only inside the cluster.
+#
+# The host names come from PUBLIC_URL (components/public-url): app.example.com below is replaced. TLS: the certificate is
+# the Secret ww-tls (cert-manager, or `kubectl create secret tls ww-tls`); on GKE a Google-managed certificate replaces it
+# (components/gke). The Ingress class and the controller's settings (body size, stream timeouts) are the overlay's.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: welcome-wave
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: ingress
+spec:
+  tls:
+    - hosts: [app.example.com]
+      secretName: ww-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: api, port: { name: http } } }
+          - path: /webhooks
+            pathType: Prefix
+            backend: { service: { name: api, port: { name: http } } }
+          - path: /health/ready
+            pathType: Exact
+            backend: { service: { name: api, port: { name: http } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: web, port: { name: http } } }

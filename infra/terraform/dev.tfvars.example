@@ -4,7 +4,8 @@ region          = "asia-south1"
 alert_email     = "oncall@example.com"
 billing_account = "" # XXXXXX-XXXXXX-XXXXXX to get budget alerts at 50%, 90% and 100%
 domain          = "" # e.g. dev.welcomewave.app ; empty = use run.app URLs
-api_host        = "" # after the first deploy: ww-api-xxxx-el.a.run.app (or the domain)
+api_host        = "" # after the first deploy: the domain, or ww-api-xxxx-el.a.run.app when there is no domain
+web_host        = "" # after the first deploy: ww-web-xxxx-el.a.run.app (sign-in and recording uploads on that URL)
 github_repo     = "" # owner/name, after connecting the repo to Cloud Build
 
 # Deploy configuration passed to cloudbuild.yaml (none of these are secrets)
@@ -13,13 +14,18 @@ build_substitutions = {
   _GITHUB_APP_SLUG        = ""
   _GITHUB_CLIENT_ID       = ""
   _GOOGLE_OAUTH_CLIENT_ID = "" # OAuth client (Web application) for Google Calendar + Meet; empty = sessions held elsewhere
-  _PUBLIC_URL             = "" # https://<domain> or the ww-web run.app URL
+  _PUBLIC_URL             = "" # https://<domain> (the default when `domain` is set) or the ww-web run.app URL
   _MODEL_FAST             = "" # generally-available Gemini ids; verify with python -m scripts.check_models
   _MODEL_SMART            = ""
   _MODEL_FALLBACK         = ""
   _API_MIN_INSTANCES      = "0"
-  _SIGNUP_ENABLED         = "true" # "false" = invitation-only
+  _SIGNUP_ENABLED         = "true"  # "false" = invitation-only
   _LANGSMITH_TRACING      = "false" # opt-in: "true" sends agent prompts and outputs to LangSmith (docs/SECURITY.md)
-  _LANGSMITH_ENDPOINT     = ""     # EU region: https://eu.api.smith.langchain.com (default: US)
+  _LANGSMITH_ENDPOINT     = ""      # EU region: https://eu.api.smith.langchain.com (default: US)
+  _SMTP_HOST              = ""      # email (optional); the password goes in the ww-smtp-password secret (set-secrets.sh)
+  _SMTP_PORT              = ""      # default 587 (STARTTLS); 465 = SSL
+  _SMTP_USER              = ""
+  _SMTP_FROM              = "" # the From address; default: _SMTP_USER
+  # _INGRESS          = "all"  # with a domain: only until its certificate is active (default then: load balancer only)
   # _DB_INSTANCE      = "ww-db-dev-restore"  # only when pointing the services at a restored instance
 }
