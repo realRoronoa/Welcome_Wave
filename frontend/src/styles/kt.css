@@ -1,11 +1,11 @@
-/* The manager side of a KT call (src/pages/kt-parts.tsx): transcript box and follow-up sessions. Teal only for KT meaning. */
+/* The manager side of a KT call (src/pages/kt-parts.tsx): transcript box and follow-up sessions. KT marks are teal with the KT badge. */
 .kt-transcript { display: grid; gap: .6rem; }
 .kt-transcript-box.dp-transcript { position: static; padding: 0; }
 .kt-transcript-box ol { max-height: min(56vh, 520px); margin: 0 -.6rem; }
 .kt-transcript li.kt-dim { opacity: .38; }
 .kt-find { display: flex; align-items: center; gap: .5rem; height: 2.2rem; padding: 0 .7rem; border: 1px solid var(--line); border-radius: var(--radius-m);
   background: var(--surface-2); color: var(--ink-soft); }
-.kt-find:focus-within { border-color: var(--ink); background: var(--surface); }
+.kt-find:focus-within { border-color: var(--focus); background: var(--surface); }
 .kt-find input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font: inherit; font-size: .88rem; color: var(--ink); padding: 0; }
 .kt-find-n { font-size: .76rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 

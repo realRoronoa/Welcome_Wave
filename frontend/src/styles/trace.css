@@ -1,0 +1,96 @@
+/* Agent traces: "watch it think" (src/lifecycle/Trace.tsx). Tokens only, so light and dark themes both work.
+   One quiet line per step, a glyph per kind of work, a hairline rail between them. Ink throughout; teal (with the KT badge's
+   meaning) only on a step about a KT session. Motion: opacity and transform only, none under prefers-reduced-motion. */
+
+.tk { --tk-ease: cubic-bezier(.22, 1, .36, 1); --tk-gap: .4rem; }
+.tk-svg { display: block; flex: none; }
+/* "think" is the mark (ui.tsx Logo); while the agent waits it runs its busy wave (styles.css .logo--busy) */
+
+/* ---------- a step: glyph, then one line ---------- */
+.tk-row { position: relative; display: grid; grid-template-columns: 15px minmax(0, 1fr); column-gap: .7rem; align-items: start;
+  font-size: .875rem; line-height: 22px; color: var(--ink-soft); }
+.tk-ico { width: 15px; height: 22px; display: grid; place-items: center; color: var(--ink-muted); }
+.tk-text { justify-self: start; max-width: 100%; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.tk-row.is-done .tk-ico { color: var(--ink-2); }
+.tk-row.is-kt .tk-ico { color: var(--kt); }               /* explained in a recorded KT session: the one place teal belongs */
+.tk-row.is-kt .tk-text { color: var(--kt-strong); }
+
+/* the rail: from under a step's glyph down to the next one's */
+.tk-row:not(:last-child)::after { content: ""; position: absolute; left: 7px; top: 20.5px; bottom: calc(-1 * var(--tk-gap) - 1.5px); width: 1px;
+  background: var(--line-strong); opacity: .7; transform-origin: 50% 0; }
+
+/* ---------- live: steps arrive one by one; the newest shimmers ---------- */
+.tk-live, .tk-wait { list-style: none; margin: 0 0 1.1rem; padding: 0; }
+.tk-live { display: grid; gap: var(--tk-gap); }
+.tk-wait { display: grid; grid-template-columns: 15px minmax(0, 1fr); column-gap: .7rem; font-size: .875rem; line-height: 22px; color: var(--ink-soft);
+  animation: tk-in .24s var(--tk-ease) backwards; }
+.tk-wait .tk-ico { color: var(--ink-soft); }
+.tk-live .tk-row { animation: tk-in .22s var(--tk-ease) backwards; }
+.tk-live .tk-row:first-child { animation-name: tk-swap; } /* the first step takes the waiting line's place: a swap, not an entrance */
+@keyframes tk-swap { from { opacity: .3; } }
+.tk-live .tk-row:not(:last-child)::after { animation: tk-rail .3s var(--tk-ease) backwards; }
+.tk-row.is-current { color: var(--ink); }
+.tk-row.is-current .tk-ico { color: var(--ink); }
+.tk-row.is-current.is-kt .tk-ico { color: var(--kt); }
+@keyframes tk-in { from { opacity: 0; transform: translateY(6px); } }
+@keyframes tk-rail { from { transform: scaleY(0); } }
+
+/* a band of the page colour passes over the current line: a shimmer made of transform alone */
+.tk-text.is-sheen { position: relative; }
+.tk-text.is-sheen::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 15%, color-mix(in srgb, var(--steel) 78%, transparent) 50%, transparent 85%);
+  transform: translateX(-100%); animation: tk-sheen 1.9s cubic-bezier(.45, .05, .55, .95) .35s infinite; }
+@keyframes tk-sheen { 70%, to { transform: translateX(100%); } }
+
+/* the answer landed: the lines lift away from the bottom up, then the summary takes their place */
+.tk-live.is-folding .tk-row { animation: tk-out .16s var(--tk-ease) both; animation-delay: calc(var(--i, 0) * 10ms); }
+.tk-live.is-folding .tk-row::after { animation: none; }
+@keyframes tk-out { to { opacity: 0; transform: translateY(-5px); } }
+
+/* ---------- done: "Thought for 6 steps · 4.2 s" opens the trace ---------- */
+.tk-done { margin: -.2rem 0 .75rem; }
+button.tk-sum { display: inline-flex; align-items: center; gap: .7rem; padding: .3rem .6rem .3rem .45rem; margin-left: -.45rem; border-radius: 8px;
+  background: none; box-shadow: none; color: var(--ink-soft); font-size: .84rem; font-weight: 500; line-height: 1.3;
+  animation: tk-in .24s var(--tk-ease) backwards; transition: background .15s, color .15s; }
+button.tk-sum .tk-ico { height: 15px; }
+button.tk-sum:hover, .tk-done.is-open button.tk-sum { background: var(--hover); color: var(--ink); }
+button.tk-sum:active { transform: none; }
+.tk-chev { flex: none; margin-left: -.25rem; color: var(--ink-muted); transition: transform .22s var(--tk-ease); }
+.tk-done.is-open .tk-chev { transform: rotate(90deg); }
+.tk-trace { margin: .65rem 0 .35rem; padding: .85rem 1rem .9rem; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.tk-trace[hidden] { display: none; }
+.tk-trace .tk-row { animation: tk-in .24s var(--tk-ease) backwards; animation-delay: calc(var(--i, 0) * 28ms); }
+
+/* ---------- the trace: every step, its sources, its time ---------- */
+.tk-list { --tk-gap: .55rem; display: grid; gap: var(--tk-gap); font-weight: 400; text-align: left; }
+.tk-list .tk-row { display: grid; }
+.tk-body { display: grid; gap: .3rem; min-width: 0; }
+.tk-line { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; min-width: 0; }
+.tk-list .tk-text { white-space: normal; overflow: visible; overflow-wrap: anywhere; color: var(--ink-2); }
+.tk-list .tk-row.is-kt .tk-text { color: var(--kt-strong); }
+.tk-ms { flex: none; font: 500 .7rem/22px var(--code); color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.tk-srcs { display: flex; flex-wrap: wrap; gap: .3rem; padding-bottom: .1rem; }
+.tk-src { display: inline-flex; align-items: center; gap: .35rem; min-width: 0; max-width: 100%; padding: .1rem .45rem; border: 1px solid var(--line);
+  border-radius: 6px; background: var(--surface-2); font: 500 .7rem/1.5 var(--code); color: var(--ink-soft); text-decoration: none;
+  transition: color .15s, border-color .15s; }
+.tk-src-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+a.tk-src:hover { color: var(--ink); border-color: var(--line-hover); }
+.tk-src.is-kt { color: var(--kt-strong); background: var(--kt-wash); border-color: var(--kt-line); }
+a.tk-src.is-kt:hover { color: var(--kt-strong); border-color: var(--kt-line-strong); }
+.tk-src-t { font-variant-numeric: tabular-nums; }
+button.tk-more { padding: .1rem .35rem; background: none; box-shadow: none; color: var(--ink-soft); font: 500 .7rem/1.5 var(--code); border-radius: 6px; }
+button.tk-more:hover { background: var(--hover); color: var(--ink); }
+
+/* a run's trace loaded on demand (the Agents page, "Why this?") */
+.tk-run { display: grid; gap: .7rem; }
+.tk-run-sum { font-size: .78rem; font-weight: 550; color: var(--ink-soft); }
+.tk-note { display: block; font-size: .84rem; color: var(--ink-soft); }
+.tk-loading { animation: tk-breathe 1.4s ease-in-out infinite; }
+@keyframes tk-breathe { 50% { opacity: .45; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .tk-wait, .tk-live .tk-row, .tk-live .tk-row::after, .tk-text.is-sheen::after, .tk-live.is-folding .tk-row,
+  button.tk-sum, .tk-trace .tk-row, .tk-loading { animation: none; }
+  .tk-text.is-sheen::after { display: none; }
+  .tk-chev { transition: none; }
+}

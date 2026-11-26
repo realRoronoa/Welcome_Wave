@@ -1,5 +1,5 @@
-# Direct dependencies (compatible ranges). Images install the exact versions in requirements.lock:
-#   pip install -r requirements.txt && pip freeze --exclude-editable > requirements.lock
+# Direct dependencies (compatible ranges). Images and CI install the exact versions in requirements.lock (its header says how
+# to regenerate it). A floor above a range's start is a security fix: never go below it.
 fastapi~=0.143
 uvicorn[standard]~=0.54
 pydantic[email]~=2.14
@@ -15,7 +15,8 @@ google-cloud-storage~=3.17
 google-cloud-pubsub~=2.43
 firebase-admin~=7.7
 httpx~=0.28
+agora-agents==3.0.0a4  # Agora Conversational AI Platform preview; Murf Falcon and RTC/RTM tokens
 PyJWT[crypto]~=2.15
-pypdf~=6.20
+pypdf>=6.21.4,<7  # 6.21.4 fixes 14 advisories in which a crafted PDF hangs or exhausts the parser
 python-docx~=1.2
 langsmith~=0.14

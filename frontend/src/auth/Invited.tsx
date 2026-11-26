@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ApiError, day, errorMessage, Me, post, ROLE_LABEL } from "../api";
 import { Msg, Note } from "../ui";
 import type { Fb } from ".";
+import { Agree, JOIN_DOCUMENTS } from "./Agree";
 import { Busy, EntryLayout, Identity, initials } from "./Entry";
 
 export type PendingInvitation = {
@@ -18,15 +19,20 @@ type Props = {
 const inviter = (inv: PendingInvitation) =>
   inv.invited_by_name && inv.invited_by_email ? `${inv.invited_by_name} (${inv.invited_by_email})` : inv.invited_by_email || inv.invited_by_name;
 
-/** 403 invitation_pending: the login was invited somewhere. Joining is an explicit choice, never automatic. */
+/** 403 invitation_pending: the login was invited somewhere. Joining is an explicit choice, never automatic, and it carries
+ *  the person's agreement to the terms and the privacy policy (one box above the invitations, Agree.tsx): the API records
+ *  it with the account, and without it nobody joins. */
 export default function Invited({ fb, invitations, signupEnabled, onJoined, onExpired, onCreateOwn, retry, signOut }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<Msg>(null);
+  const [agreed, setAgreed] = useState(false);
+  const [missed, setMissed] = useState(0);
 
   async function join(inv: PendingInvitation) {
+    if (!agreed) { setMsg(null); setMissed((n) => n + 1); return; }
     setBusy(inv.org_id); setMsg(null);
     try {
-      onJoined(await post<Me>("/invitations/accept", { org_id: inv.org_id }));
+      onJoined(await post<Me>("/invitations/accept", { org_id: inv.org_id, accept: JOIN_DOCUMENTS }));
     } catch (e) {
       setBusy(null);
       // 409: the account changed meanwhile (joined in another tab, invitations replaced): ask the server again
@@ -46,6 +52,7 @@ export default function Invited({ fb, invitations, signupEnabled, onJoined, onEx
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
         <span>Only join a team you recognise: check who invited you.</span>
       </p>
+      <Agree id="inv-agree" checked={agreed} onChange={setAgreed} disabled={busy !== null} missed={missed} />
       <ul className="en-invites">
         {invitations.map((inv, i) => (
           <li key={inv.org_id} className="en-invite spot" style={{ animationDelay: `${i * 70}ms` }}>

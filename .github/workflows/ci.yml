@@ -16,6 +16,8 @@ env:
   PYTHON_VERSION: "3.12" # the API image's Python (backend/Dockerfile)
   NODE_VERSION: "22" # the web image's Node (frontend/Dockerfile)
 
+# Actions are pinned to a commit, because a tag can be moved; the comment names the release. .github/dependabot.yml proposes
+# updates for them, the base images and the dependencies.
 jobs:
   backend-memory:
     name: Backend tests (in memory) and retrieval eval
@@ -24,14 +26,19 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/requirements.lock
-      - name: Install (the image's exact versions, plus pytest)
-        run: pip install -r requirements.lock pytest
+      - name: Install (the image's exact versions, plus pytest and ruff)
+        run: |
+          pip install --no-deps -r requirements.lock
+          pip check
+          pip install "$(grep '^pytest==' requirements-dev.txt)" "$(grep '^ruff==' requirements-dev.txt)"
+      - name: Lint
+        run: ruff check .
       - name: Tests
         run: python -m pytest -q
       - name: Tests left nothing in backend/
@@ -63,14 +70,17 @@ jobs:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: pip
           cache-dependency-path: backend/requirements.lock
       - name: Install
-        run: pip install -r requirements.lock pytest
+        run: |
+          pip install --no-deps -r requirements.lock
+          pip check
+          pip install "$(grep '^pytest==' requirements-dev.txt)"
       - name: Tests, the Postgres ones included
         run: |
           python -m pytest -q -rs | tee pytest.log
@@ -83,8 +93,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
@@ -100,6 +110,12 @@ jobs:
           if grep -lE "(^|[^.a-zA-Z0-9_$])eval\(|new Function\(" dist/assets/*.js; then
             echo "A bundle uses eval or new Function, which the CSP blocks."; exit 1
           fi
+          # Agora's audio SDK starts blob workers; the production policy must allow that exact source.
+          if grep -lE "new (Shared)?Worker\(" dist/assets/*.js; then
+            grep -Fq "worker-src 'self' blob:;" nginx.conf.template || {
+              echo "A bundle starts a worker, but worker-src does not allow its same-origin blob URL."; exit 1;
+            }
+          fi
           python3 - <<'EOF'
           import re, sys
           html = open("dist/index.html").read()
@@ -110,37 +126,98 @@ jobs:
           EOF
 
   dependency-audit:
-    name: Dependency audit (report only)
+    name: Dependency audit (fails on known vulnerabilities in what ships)
     runs-on: ubuntu-latest
-    # Reports known vulnerabilities without failing the build, for now.
-    # TODO(security): tighten. Triage the current findings, then remove both `continue-on-error` lines so that a known
-    # high-severity vulnerability fails CI (docs/SECURITY.md, "Dependency scanning").
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: ${{ env.NODE_VERSION }}
-      - name: Python packages (pip-audit, the image's pinned versions)
-        continue-on-error: true
-        run: pipx run pip-audit --no-deps --disable-pip -r backend/requirements.lock
-      - name: npm packages (high and critical)
+      - name: Python packages in the API image (pip-audit; any known vulnerability fails)
+        run: pipx run --spec pip-audit==2.10.1 pip-audit --no-deps --disable-pip -r backend/requirements.lock
+      - name: npm packages come from the public registry only
+        run: |
+          if grep -n '"resolved": "' frontend/package-lock.json | grep -v '"resolved": "https://registry.npmjs.org/'; then
+            echo "package-lock.json fetches the packages above from somewhere other than registry.npmjs.org."; exit 1
+          fi
+      - name: npm packages shipped to browsers (high or critical fails)
+        working-directory: frontend
+        run: |
+          npm audit --omit=dev --json > audit.json || true
+          node - <<'EOF'
+          // Advisories reviewed and accepted, each with its reason. Any other high or critical advisory fails the build.
+          const accepted = {
+            "GHSA-m9gg-hp2v-232j":
+              "@grpc/grpc-js server-side TLS auth context. grpc-js comes only with @firebase/firestore's Node build; the web app " +
+              "imports firebase/app and firebase/auth, and no grpc code is in the bundle. Every firebase release so far, 13.x " +
+              "included, pins grpc-js ~1.9. Reviewed 2026-11-17: look again when firebase moves.",
+          };
+          const report = JSON.parse(require("fs").readFileSync("audit.json", "utf8"));
+          if (report.error || !report.vulnerabilities) { console.error("npm audit failed:", report.error || report); process.exit(1); }
+          const failing = [];
+          for (const [name, v] of Object.entries(report.vulnerabilities)) {
+            for (const via of v.via) {
+              if (typeof via !== "object") continue; // depends on a vulnerable package, which is judged on its own entry
+              if (!["high", "critical"].includes(via.severity)) continue;
+              const id = String(via.url || via.source).split("/").pop();
+              if (accepted[id]) console.log(`accepted: ${id} in ${name}: ${accepted[id]}`);
+              else failing.push(`${via.severity} ${id} in ${name} ${via.range}: ${via.title}`);
+            }
+          }
+          if (failing.length) { console.error(failing.join("\n")); process.exit(1); }
+          console.log("no unreviewed high or critical advisory in the packages that ship");
+          EOF
+      - name: npm development tools (report only; the Vite dev server is never used to serve the app)
         continue-on-error: true
         working-directory: frontend
         run: npm audit --audit-level=high
 
+  kubernetes:
+    name: Kubernetes manifests and docker compose (rendered and checked, no cluster)
+    runs-on: ubuntu-latest
+    # kubectl is preinstalled on the runner; `kubectl kustomize` only reads files. The rendered objects' properties (non-root,
+    # probes, Secrets, settings that exist, schedules that match Terraform) are checked by backend/tests/test_release_k8s.py,
+    # which the backend jobs run.
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Every overlay renders (infra/k8s/overlays)
+        run: |
+          kubectl version --client
+          for overlay in infra/k8s/overlays/*/; do
+            name="$(basename "$overlay")"
+            kubectl kustomize "$overlay" > "rendered-$name.yaml"
+            echo "$name: $(grep -c '^kind:' "rendered-$name.yaml") objects"
+          done
+          test -s rendered-staging.yaml && test -s rendered-production.yaml && test -s rendered-self-hosted.yaml
+      - name: No Secret is ever rendered from the repository
+        run: |
+          if grep -l '^kind: Secret$' rendered-*.yaml; then
+            echo "An overlay renders a Secret: Secrets are created in the cluster, never kept in git."; exit 1
+          fi
+      - name: A release renders with its images set (infra/k8s/deploy.sh --render-only)
+        run: |
+          api="registry.example.com/welcome-wave-api@sha256:$(printf 'a%.0s' $(seq 64))"
+          web="registry.example.com/welcome-wave-web@sha256:$(printf 'b%.0s' $(seq 64))"
+          for overlay in staging production self-hosted; do
+            infra/k8s/deploy.sh "$overlay" --api-image "$api" --web-image "$web" --render-only > "release-$overlay.yaml"
+            if grep -qE '^ *image: welcome-wave-(api|web)$' "release-$overlay.yaml"; then echo "$overlay: an image was left unset"; exit 1; fi
+          done
+      - name: docker-compose.yml is valid
+        run: docker compose config --quiet && docker compose --profile db config --quiet
+
   docker:
-    name: Docker images build
+    name: Docker images, and the self-hosted release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: API image
         run: docker build -t ww-api:ci backend
       - name: Web image
         run: docker build -t ww-web:ci frontend
-      - name: Web image serves the app with its security headers
+      - name: Web image serves the app with its security headers, compressed, not as root
         run: |
           docker run -d --name web -e PORT=8080 -e API_URL=http://127.0.0.1:9 -p 8080:8080 ww-web:ci
           for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8080/health && break; sleep 1; done
@@ -149,10 +226,64 @@ jobs:
           grep -qi "^content-security-policy: default-src 'self'" headers.txt
           grep -qi "^strict-transport-security:" headers.txt
           grep -qi "^permissions-policy:" headers.txt
+          asset="$(docker exec web sh -c 'ls /usr/share/nginx/html/assets/*.js | head -n 1')"
+          curl -fsS -D asset.txt -o /dev/null -H "Accept-Encoding: gzip" "http://127.0.0.1:8080/assets/${asset##*/}"
+          grep -qi "^content-encoding: gzip" asset.txt
+          test "$(docker exec web id -u)" != 0
           docker rm -f web
-      - name: API image starts in demo mode
+      - name: API image starts in demo mode and stores an uploaded document
         run: |
           docker run -d --name api -e MODE=demo -p 8081:8080 ww-api:ci
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8081/health && break; sleep 1; done
           curl -fsS -D - -o /dev/null http://127.0.0.1:8081/api/config | grep -qi "^content-security-policy: default-src 'none'"
+          printf 'Payments are retried three times.\n' > note.txt
+          curl -fsS -H "X-Demo-User: u-priya" -F file=@note.txt http://127.0.0.1:8081/api/projects/proj-demo/documents
           docker rm -f api
+      - name: Self-hosted release (scripts/selfhost.sh release) with a throwaway settings file
+        env:
+          WW_ENV_FILE: ${{ runner.temp }}/selfhost.env
+        run: |
+          ./scripts/selfhost.sh setup
+          sed -i -e 's|^FIREBASE_PROJECT_ID=.*|FIREBASE_PROJECT_ID=demo-ci|' -e 's|^FIREBASE_API_KEY=.*|FIREBASE_API_KEY=ci-not-a-key|' \
+                 -e 's|^PUBLIC_URL=.*|PUBLIC_URL=https://onboarding.example.test|' \
+                 -e "s|^DATA_DIR=.*|DATA_DIR=$RUNNER_TEMP/data|" "$WW_ENV_FILE"
+          ./scripts/selfhost.sh release
+          ./scripts/selfhost.sh status
+          curl -fsS -D headers.txt -o /dev/null http://127.0.0.1:8000/login
+          grep -qi "^content-security-policy: default-src 'self'" headers.txt
+          curl -fsS http://127.0.0.1:8000/api/config | grep -q '"mode":"self_hosted"'
+          # it answers to PUBLIC_URL's host name (as the reverse proxy passes it) and localhost, and to no other name
+          curl -fsS -o /dev/null -H "Host: onboarding.example.test" http://127.0.0.1:8000/api/config
+          test "$(curl -s -o /dev/null -w '%{http_code}' -H 'Host: rebound.example' http://127.0.0.1:8000/api/config)" = 421
+      - name: The API is started again when it stops
+        run: |
+          docker exec ww-api python -c "import os, signal; os.kill(1, signal.SIGTERM)"
+          sleep 5
+          for i in $(seq 1 90); do curl -fsS -o /dev/null http://127.0.0.1:8000/health/ready && break; sleep 1; done
+          test "$(docker inspect -f '{{.RestartCount}}' ww-api)" -ge 1
+          curl -fsS http://127.0.0.1:8000/health/ready
+      - name: Back up, lose the database, files and settings, restore
+        env:
+          WW_ENV_FILE: ${{ runner.temp }}/selfhost.env
+        run: |
+          sql() { docker exec -i ww-db psql -X -q -tA -v ON_ERROR_STOP=1 -U ww_owner -d welcomewave; }
+          echo "SET ROLE ww_app; SELECT * FROM create_organization('uid-1', 'ada@example.test', 'Ada', 'Acme', 'Platform');" | sql
+          echo "a document" > "$RUNNER_TEMP/data/kept.txt"
+          ./scripts/selfhost.sh backup
+          backup="$(ls backups/welcomewave-*.tar)"
+          test "$(stat -c %a "$backup")" = 600
+          docker rm -f ww-web ww-api ww-db
+          docker volume rm ww-db-data
+          rm -rf "$RUNNER_TEMP/data" "$WW_ENV_FILE"
+          ./scripts/selfhost.sh restore "$backup"
+          ./scripts/selfhost.sh release
+          test "$(echo 'SELECT count(*) FROM organizations;' | sql)" = 1
+          test "$(cat "$RUNNER_TEMP/data/kept.txt")" = "a document"
+          test -s "$RUNNER_TEMP/data/.signing-key"
+          # the cross-organisation functions keep their owner (pg_dump has no roles; the restore creates them first)
+          test "$(echo "SELECT count(*) FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+                        WHERE n.nspname = 'public' AND p.prosecdef AND pg_get_userbyid(p.proowner) <> 'ww_definer';" | sql)" = 0
+          # a second restore over live data is refused without --replace
+          if ./scripts/selfhost.sh restore "$backup"; then echo "restore overwrote live data without --replace"; exit 1; fi
+          ./scripts/selfhost.sh restore "$backup" --replace
+          ./scripts/selfhost.sh status

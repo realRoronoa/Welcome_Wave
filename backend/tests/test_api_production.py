@@ -108,5 +108,5 @@ def test_demo_mode_cannot_run_in_prod(monkeypatch):
 
     with pytest.raises(RuntimeError, match="MODE=demo is not allowed"):
         build_container(Settings(mode="demo", env="prod"))
-    with pytest.raises(RuntimeError, match="GITHUB_WEBHOOK_SECRET"):
-        build_container(Settings(mode="gcp", env="prod", gcp_project="p", gcs_bucket="b"))
+    with pytest.raises(RuntimeError, match="GITHUB_WEBHOOK_SECRET"):  # with a GitHub App set up; without one the webhook is off
+        build_container(Settings(mode="gcp", env="prod", gcp_project="p", gcs_bucket="b", github_app_id="1"))

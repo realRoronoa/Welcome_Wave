@@ -16,7 +16,7 @@ import pytest
 
 from app.adapters.memory import LocalRepoSource, MemoryStore
 from app.adapters.postgres import PgIndex, PgStore, current_org, make_engine
-from app.agents.schemas import Chunk, KTLink, ProposedTask, ReviewResult
+from app.agents.core.schemas import Chunk, KTLink, ProposedTask, ReviewResult
 from app.ports import RepoBusy
 from app.services.embeddings import HashEmbedder
 

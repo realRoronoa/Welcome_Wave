@@ -6,9 +6,9 @@ import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
 from app.adapters.memory import InlineBus, LocalBlobStorage, LocalRepoSource, MemoryIndex, MemoryStore
-from app.agents.deps import Deps
-from app.agents.llm import FakeLLM
-from app.agents.supervisor import build_supervisor
+from app.agents.core.deps import Deps
+from app.agents.core.llm import FakeLLM
+from app.agents.supervisor.graph import build_supervisor
 from app.config import Settings, get_settings
 from app.ports import Meeting, Onboarding, Project, Repository, User
 from app.services.embeddings import HashEmbedder

@@ -1,4 +1,4 @@
-"""The agent runtime (app/agents/runtime.py) with FakeLLM scripts: tool calls and their trace, the step budget, the timeout,
+"""The agent runtime (app/agents/core/runtime.py) with FakeLLM scripts: tool calls and their trace, the step budget, the timeout,
 invalid arguments, failing tools, injection in tool results, the privacy of shared traces, NoToolUse, and the shared tools'
 permission re-check."""
 from __future__ import annotations
@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 from pydantic import BaseModel, Field
 
-from app.agents import runtime as rt
-from app.agents.llm import DATA_END, FINAL, FakeLLM, NoLLM, NoToolUse, OfflineLLM, Turn, schema_of
-from app.agents.registry import RulesLLM
+from app.agents.core import runtime as rt
+from app.agents.core.llm import DATA_END, FINAL, FakeLLM, NoLLM, NoToolUse, OfflineLLM, Turn, schema_of
+from app.agents.core.registry import RulesLLM
 from app.agents.tools import REGISTRY
 from app.ports import User
 from app.services.chunking import chunk_code
@@ -257,7 +257,7 @@ def test_schema_of_keeps_fields_named_like_schema_keywords():
     """Gemini rejects a function whose `required` lists a property the schema no longer has (a 400 found live)."""
     from pydantic import BaseModel
 
-    from app.agents.llm import schema_of
+    from app.agents.core.llm import schema_of
 
     class Item(BaseModel):
         title: str
@@ -285,7 +285,7 @@ def _gemini(fallback, outcomes):
     """A GeminiLLM whose model calls follow a script: outcomes[model] is a list of exceptions or results, used in order."""
     from types import SimpleNamespace
 
-    from app.agents.llm import GeminiLLM
+    from app.agents.core.llm import GeminiLLM
 
     llm = object.__new__(GeminiLLM)
     llm.settings = SimpleNamespace(model_fast="fast", model_smart="smart", model_fallback=fallback, llm_timeout_s=60, llm_retries=1,

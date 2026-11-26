@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, errorMessage, isManager, Task } from "../api";
+import { api, errorMessage, isManager, safeHref, Task } from "../api";
+import { isStatus } from "../lifecycle/kit";
 import { useSession } from "../session";
 import { EmptyState, Reveal, Skeleton } from "../fx";
 import { CodeBlock, Glyph, GlyphName, Pill, SectionHead, Tone } from "../dataui";
@@ -45,7 +46,7 @@ export function PRHeader({ r, title, as: H = "h1" }: { r: ReviewDetail; title?: 
       <div className="dp-pr-text">
         <H>{title ?? r.task.title}</H>
         <p className="dp-chips">
-          <a className="dp-chip" href={r.pr_url} target="_blank" rel="noreferrer">
+          <a className="dp-chip" href={safeHref(r.pr_url) ?? undefined} target="_blank" rel="noreferrer">
             <Glyph name="pr" size={12} />{repo ? `${repo}#${r.pr_number}` : `Pull request #${r.pr_number}`}<Glyph name="external" size={11} />
           </a>
           <span className="dp-chip" title="The commit the review agent read"><Glyph name="commit" size={12} />{r.head_sha.slice(0, 7)}</span>
@@ -67,7 +68,8 @@ export function Findings({ findings, prUrl, rec }: { findings: Finding[]; prUrl?
       ? <p className="dp-clean t-unknown"><Glyph name="alert" size={15} />No findings, but the agent could not judge this change. Read it yourself.</p>
       : <p className="dp-clean"><Glyph name="check" size={15} />No problems found.</p>;
   }
-  const files = prUrl ? `${prUrl.replace(/\/+$/, "")}/files` : null; // a private review has no pull request to link to
+  const safe = safeHref(prUrl);
+  const files = safe ? `${safe.replace(/\/+$/, "")}/files` : null; // a private review has no pull request to link to
   const sorted = [...findings].sort((a, b) => SEV_ORDER.indexOf(a.severity) - SEV_ORDER.indexOf(b.severity));
   return (
     <ul className="dp-findings">
@@ -94,12 +96,26 @@ export function Findings({ findings, prUrl, rec }: { findings: Finding[]; prUrl?
 export default function Review({ id }: { id: string }) {
   const { me } = useSession();
   const [r, setR] = useState<ReviewDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => { api<ReviewDetail>(`/reviews/${id}`).then((x) => { setR(x); setError(null); }).catch((e) => setError(errorMessage(e))); }, [id]);
+  const [error, setError] = useState<unknown>(null);
+  const load = useCallback(() => { api<ReviewDetail>(`/reviews/${id}`).then((x) => { setR(x); setError(null); }).catch(setError); }, [id]);
   useEffect(load, [load]);
   useLive("tasks", load); // the manager's decision, or a review of a newer commit, shows up while the page is open
 
-  if (error && !r) return <p className="error" role="alert">{error}</p>;
+  if (error && !r) {
+    const gone = isStatus(error, 403, 404);
+    return (
+      <section className="dp">
+        <a href="#/tasks" className="back">Tasks</a>
+        <h1 className="sr-only">{gone ? "This review is not available" : "This review didn’t load"}</h1>
+        <EmptyState title={gone ? "This review is not available" : "This review didn’t load"}
+                    action={gone ? <a className="dp-btn" href={isManager(me.role) ? "#/approvals" : "#/tasks"}>{isManager(me.role) ? "Open approvals" : "Open your tasks"}</a>
+                      : <button type="button" className="dp-btn" onClick={load}>Try again</button>}>
+          {gone ? "It may have been replaced by a review of a newer commit, or it belongs to another project. Your current reviews are in your tasks."
+            : errorMessage(error)}
+        </EmptyState>
+      </section>
+    );
+  }
   if (!r) {
     return (
       <section className="dp" aria-busy="true">
@@ -138,7 +154,7 @@ export default function Review({ id }: { id: string }) {
               </li>
             </ol>
             <p className="dp-card-foot">
-              <a href={r.pr_url} target="_blank" rel="noreferrer">Open pull request #{r.pr_number} on GitHub</a>
+              <a href={safeHref(r.pr_url) ?? undefined} target="_blank" rel="noreferrer">Open pull request #{r.pr_number} on GitHub</a>
               <span className="dp-meta"> · reviewed at commit <code>{r.head_sha.slice(0, 7)}</code></span>
             </p>
           </Reveal>

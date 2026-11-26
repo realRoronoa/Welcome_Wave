@@ -2,6 +2,9 @@ import { hideBoot } from "./boot"; // the intro's hand-off (src/boot.ts) and its
 import React, { Component, lazy, ReactNode, Suspense, useEffect, useRef, useState, useTransition } from "react";
 import { createRoot } from "react-dom/client";
 import { NAVIGATE, Surface, surfaceFor } from "./surface";
+import { installErrorReports, isChunkError, reportError } from "./report";
+
+installErrorReports();
 
 /* Three chunks, loaded on demand: the public site never downloads the app (firebase, the workspace), the app never
    downloads the site, and a new hire's pre-boarding page (/welcome/<token>) downloads neither. */
@@ -44,23 +47,32 @@ function Settled() {
   return null;
 }
 
-class Boundary extends Component<{ children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-  static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { if (!reloadOnce()) hideBoot(); }
-  render() { return this.state.failed ? <Unavailable /> : this.props.children; }
+/** A chunk that will not load reloads the page once (then says so); any other crash is reported and shown as one, with
+ *  the reference the report carries. A crash is never blamed on the connection, and never reloads away what was typed. */
+class Boundary extends Component<{ children: ReactNode }, { failed: "chunk" | "crash" | null; ref: string }> {
+  state = { failed: null as "chunk" | "crash" | null, ref: "" };
+  static getDerivedStateFromError(error: unknown) { return { failed: isChunkError(error) ? "chunk" as const : "crash" as const }; }
+  componentDidCatch(error: unknown, info: { componentStack?: string | null }) {
+    if (isChunkError(error)) { if (!reloadOnce()) hideBoot(); return; }
+    this.setState({ ref: reportError(error, "render", info.componentStack ?? undefined) });
+    hideBoot();
+  }
+  render() { return this.state.failed ? <Unavailable crash={this.state.failed === "crash"} reference={this.state.ref} /> : this.props.children; }
 }
 
 /** Plain on purpose: neither surface's stylesheet may have loaded. */
-function Unavailable() {
+function Unavailable({ crash, reference }: { crash: boolean; reference: string }) {
   const dark = document.documentElement.getAttribute("data-theme") === "dark";
   const ink = dark ? "#fafafa" : "#0a0a0a", field = dark ? "#0a0a0a" : "#f2f2f2";
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", padding: 24, background: field, color: ink,
                    font: '400 16px/1.5 "Geist", system-ui, sans-serif' }}>
       <div role="alert" style={{ maxWidth: 360, textAlign: "center" }}>
-        <p style={{ margin: "0 0 6px", fontWeight: 600, fontSize: 18 }}>Couldn’t load Welcome Wave</p>
-        <p style={{ margin: "0 0 20px", opacity: 0.75 }}>Check your connection, then reload the page.</p>
+        <p style={{ margin: "0 0 6px", fontWeight: 600, fontSize: 18 }}>{crash ? "Something went wrong" : "Couldn’t load Welcome Wave"}</p>
+        <p style={{ margin: "0 0 20px", opacity: 0.75 }}>
+          {crash ? "Welcome Wave hit an error it could not recover from. Reload the page to carry on." : "Check your connection, then reload the page."}
+        </p>
+        {crash && reference && <p style={{ margin: "-8px 0 20px", opacity: 0.75, font: '400 13px/1.4 "Geist Mono", ui-monospace, monospace' }}>Reference {reference}</p>}
         <button type="button" onClick={() => { try { sessionStorage.removeItem(RELOADED); } catch { /* blocked */ } location.reload(); }}
                 style={{ height: 44, padding: "0 20px", border: 0, borderRadius: 999, background: ink, color: field, font: "inherit", fontWeight: 500, cursor: "pointer" }}>
           Reload

@@ -1,8 +1,8 @@
 # Demo script (5 minutes, no keys)
 
-A walkthrough of the seeded demo organisation, in nine steps. Every step below was run against the demo API
-(`MODE=demo`, 2026-11-14) as the demo users; the values quoted are what it returned. Dates are relative to the day you run it,
-and a few counts (hours, seat numbers) move with the clock.
+A walkthrough of the seeded demo organisation, in nine steps. Every step was run against the demo API (`MODE=demo`) as the
+demo users on 2026-11-14; the landing, enrolment, the cited answer and the data controls were rechecked against the code on
+2026-11-18. Dates are relative to the day you run it, and a few counts (hours, seat numbers) move with the clock.
 
 ## Before you start (not timed)
 
@@ -34,19 +34,16 @@ Do not create a new pre-boarding link for Arjun before step 4: a new link replac
 *Say: a senior explains the code once; a week later nobody can find what was said.*
 
 1. Open http://localhost:5173/. The hero reads "Learn the codebase from the people who built it."
-2. Scroll. Six chapters play over the 3D office (three.js loads after the hero; without WebGL a drawn still shows the same
-   words):
-   - 01 *Into the screen*: "Every line remembers who explained it."
-   - 02 *The KT room*: "Explain it once." Book it on Google Calendar or Calendly.
-   - 03 *The floor*: "A program, not a pile of links." Thirty, sixty and ninety days, with a guided first pull request.
-   - 04 *Answers*: "Answers that show their sources." Then a mentor, then the owner.
-   - 05 *The lead's office*: "Leaders see ramp-up, not activity."
-   - 06 *Night*: "Knowledge that stays when people leave."
+2. Scroll. A short film in six chapters: each clip plays while its shot is on screen, then the camera pushes into the
+   monitor and the product takes over. With reduced motion, stills replace the clips.
+   - 01 *The first day*, 02 *The struggle*, 03 *The mentor*: a new engineer, lost, and the senior who explains.
+   - 04 *Knowledge, captured*: the KT session and the code it explains, then the answer and the learning path.
+   - 05 *The first contribution*, 06 *Business impact*.
 3. The page ends on "Ready for your security review." (kept for step 9). Press **Log in** in the top bar.
 
 ## 2. Admin: setup, then knowledge risk and the KT sessions (0:40)
 
-1. **Demo accounts** > **Alex (Admin)**. Home: figure **Seats 9**; next actions "Check the senior-time estimate" and
+1. **Demo accounts** > **Alex (Admin)**. Home: figure **People on projects 9**; next actions "Check the senior-time estimate" and
    "Handover for Meera (Senior) before …" (Meera is leaving in three weeks).
 2. `g u` **Setup**: five of six steps are *done* from the data (repository, teams, templates, people, first enrolment).
    Press **Done** on "Check the senior-time estimate" (15 minutes per avoided interruption).
@@ -67,10 +64,10 @@ Do not create a new pre-boarding link for Arjun before step 4: a new link replac
    tasks".
 2. ⌘K, **Enrol a new hire**. Name *Maya Rao*, email *maya@demo.dev*, GitHub *maya-dev*; template *Junior Backend Engineer*,
    a start date, team *Policy Engine*, mentor *Ravi (Senior)*, focus area *engine*. **Enrol**.
-3. "Maya Rao is enrolled": *Program started* (milestones, access requests and documents from the template), *Plan drafted*
-   ("It waits for your approval."), *Invitation sent*. Press **Review**.
-4. **Approvals** shows the plan an agent drafted: "Read and summarise the webhooks module" and "First PR: Validate privileged
-   init containers" (issue #12). Press **Assign 2 of 2 tasks**: "Plan approved".
+3. "Maya Rao is enrolled": *Plan drafted* ("A 30/60/90 plan waits for your approval."), *Program drafted* ("It starts when
+   you approve the plan."), and the invitation, created on approval. Press **Review**.
+4. **Approvals** shows the plan the Planner drafted: three phases (days 1–30, 31–60, 61–90), each with tasks and milestones.
+   Press **Assign N of N tasks**: the program starts and the invitation is created.
 5. Still in Approvals, open Vijay's waiting plan and press **Assign 2 of 2 tasks** too (his first task is used in step 5).
 6. `g t` **Team** > **Maya Rao**. The timeline has 13 milestones, with check-ins on days 30, 60 and 90. Open **First task**:
    one candidate, score 1.0, with five reasons ("In the focus area (engine).", "100% of its code was explained on a KT
@@ -91,9 +88,9 @@ Do not create a new pre-boarding link for Arjun before step 4: a new link replac
    docker".
 5. `g o` **Code tour**: 9 stops in 2 chapters, 3 explained in a KT session (about 4 minutes of recording). Open
    `validate_resource`: "Explained on KT #1: How validation works by Ravi", 0:20–0:55. Press play to watch the moment.
-6. ⌘K, type "Why does validation never raise?", choose **Ask the project**. The answer cites
-   `docs/CONTRIBUTING.md:L1-L6` and "KT #1: How validation works at 01:38", and says why: "Every sentence maps to a cited
-   source." (Without a Gemini key the answer text opens with "Offline demo answer"; the citations are real.)
+6. ⌘K, type "Why does validation never raise?", choose **Ask the project**. The answer quotes "KT #1: How validation works
+   at 01:38" (Ravi: "we never raise inside validation") and `docs/CONTRIBUTING.md` lines 1–6, each sentence with its source.
+   Without a Gemini key it is labelled **Quoted from the sources**: no model wrote it.
 
 ## 5. First contribution (0:40)
 
@@ -151,8 +148,8 @@ Do not create a new pre-boarding link for Arjun before step 4: a new link replac
    there: `kt_plan.scheduled`, `onboarding.enrolled`, `approval.task_plan.decided`, `first_task.selected`,
    `preboarding.acknowledged`, `preboarding.env_checked`, `approval.review.decided`, `question.routed`, `expert.answered`,
    `answer.verified`, `demo.clock_advanced`. **Export CSV**.
-2. Data controls: an admin downloads the whole organisation (`GET /api/org/export`, about 160 KB of JSON in the demo) or
-   deletes it after typing its name (`DELETE /api/org`). Both are audited. There is no page for them yet: show the call.
+2. Data controls: **Settings > Organisation**. An admin downloads everything the organisation has as one file, erases one
+   person's data on request, or deletes the organisation after typing its name. Each is audited.
 3. Read-only code access: the GitHub App asks only for read permissions, and the code's repository interface has no write
    methods. Close on the landing page's "Ready for your security review." grid.
 
@@ -165,14 +162,12 @@ What could not be done exactly as the storyline says, and the path used instead.
 | Step | Gap | Path used |
 |---|---|---|
 | 2 | Booking in the demo always succeeds, and **Import from Google Drive** always "finds" a recording; with the offline model the notes say "No speech was detected.", so booking does not change coverage or knowledge risk. | Show the booking and the Meet link only. |
-| 3 | The plan an agent drafts covers the first 30 days (`PLAN_HORIZON_DAYS`, two tasks in the demo); the 30/60/90 shape is in the milestones, not in the plan. The template's seven plan items are used only when no model is available. | Show the plan, then the milestones on the timeline. |
-| 3 | The enrolment page says "Invitation sent", but no email is sent (the Mailer port is planned). In the demo the invitee is listed under **Invited** on the sign-in page. | Say so. |
+| 3 | The demo sends no email: the invitation is a link to share. In the demo the invitee is listed under **Invited** on the sign-in page. | Say so. |
 | 4 | Creating a pre-boarding link for Arjun (Program > Pre-boarding, or the ⌘K action) replaces `/welcome/demo-welcome-arjun`, which then says "This link no longer works" until the backend restarts. | Do not create one before step 4. |
 | 5 | There is no demo merge. Approving the review marks the task done, which ticks *First change merged*; in production the same happens on approval, before GitHub's merge event. | Approve the work, then show the timeline. |
 | 6 | "Routes to the owner with a draft": the AI draft is stored with the escalation (in the metrics) but is not shown to the owner anywhere (inbox, Home or API). With the offline model the draft is empty anyway. | Show the routing reasons instead. |
 | 6 | Vijay's mentor and his code's owner are both Ravi, so Vijay cannot show the owner tier ("Ravi (Senior), the domain owner, already has this question."). | Arjun asks (mentor Meera, owner Ravi). |
-| 6 | After Ravi answers, the copy of the question with Meera (the mentor) stays open in her inbox. The reused answer cites the same verified answer twice (one source from answering, one from saving it). | None needed on screen. |
+| 6 | After Ravi answers, the copy of the question with Meera (the mentor) stays open in her inbox. | None needed on screen. |
 | 8 | At day 90 the completion review shows "A merged change in at least one area: No merged change yet" although Vijay's first change merged in step 5: the first-PR task made from an issue has no file paths, so the change counts towards no area. | Point at the other criteria, or open Tom's program (contribution met in *engine*). |
 | 8 | Jumping to day 90 moves every program, so the current cohort's figures fall (milestones on time 0 %, most medians "not enough data"). At day 12 the same report reads 4 hires, 12 days to the first PR, 16 days to the first merged change, 70 % milestones on time, 100 % check-ins on time, 1.0 hours saved. | Read the previous cohort's column at day 90, or open Reports once before the jump. |
 | 8 | Key-person risk is not in the leadership report, and executives cannot open Knowledge risk (403). | Priya shows Knowledge risk before switching to Elena. |
-| 9 | Organisation export and deletion have no page; they are API calls. | Show the call, or the export's size. |
