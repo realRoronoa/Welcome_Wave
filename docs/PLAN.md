@@ -173,3 +173,161 @@ A short record of the fixes that followed the independent review; details are in
 - **Housekeeping.** Verified answers saved from an expert's answer are one indexed source; the rate limiter and audit settings ignore
   `.env` in demo mode; `cloudbuild.yaml` deploys with `--update-env-vars`; the demo seed has questions, an expert request with a draft,
   a Calendly link and an audit history.
+
+## 8. Track R: the Guide's research crew (multi-agent RAG), 2026-11-17
+
+The Guide's answers depended on one search of the question as asked. Track R puts a crew in front of its writer: a Planner
+(intent, the names the question gives, its parts, rewrites), four Retrievers (code, documents, KT calls, verified answers, in
+one batched pass), Fusion, and a Judge (a lexical cross-scorer always; the model's 0–3 grades when a model can think). The
+writer, VERIFY, the retrieval gate and the citation guard are unchanged and keep the last word. The contract is
+[specs/rag-crew.md](specs/rag-crew.md). No new dependency.
+
+| Part | Owns |
+|---|---|
+| Core | `backend/app/rag/**`; `Index.search_grid` in `ports.py`, `MemoryIndex` and `PgIndex`; the crew's schemas and prompts (appended); `rag_*` settings; `tests/test_rag_core.py`, `tests/test_rag_postgres.py` |
+| Offline writer | `OfflineLLM` in `app/agents/llm.py`; `tests/test_offline_writer.py` |
+| Integration | `agents/guide.py`, `agents/qa.py`, `lifecycle/routing.py`, `agents/tools/knowledge.py`, the Guide's crew in `agents/registry.py` and `api/agents.py`; `tests/test_rag_integration.py`, `tests/test_injection.py` |
+| Evaluation | `backend/eval/rag_eval.py`, `eval/golden_demo.jsonl`, `eval/golden_self.jsonl`, `eval/README.md`, the CI gate in `eval/run_eval.py` |
+| Web app | the Ask page (`pages/Chat.tsx`, `chat-parts.tsx`), traces (`lifecycle/Trace.tsx`, `agentModel.ts`), the Guide's crew on `lifecycle/Agents.tsx` |
+
+## 9. Release round: scrolling and production readiness, 2026-11-17
+
+Scrolling felt laggy. Both the app and the landing move to native scrolling, with compositor-only polish (transform, opacity and
+clip-path). The landing stops intercepting the wheel and stops seeking video on scroll. Its clips play at natural speed while their
+shot is on screen. This follows the user's earlier call that video scrubbing and custom wheel smoothing felt laggy on a real Mac.
+The look does not change. A read-only audit across eight lenses checks release readiness: auth and tenancy, untrusted input,
+reliability, operations, frontend, end-to-end completeness, privacy, and dependencies. Every finding goes to a verifier before
+anything is fixed.
+
+| Part | Owns |
+|---|---|
+| Scroll: app | `frontend/src/**` except `frontend/src/site/**` (style and performance changes only) |
+| Scroll: landing | `frontend/src/site/**` (backup of the earlier version kept outside the repo until the user signs off) |
+| Audit | nothing (read-only); fixes are assigned after verification |
+**Status (2026-11-18): done.** The app and the landing scroll natively; landing clips play at 1x while on screen. The audit's
+findings were verified, then fixed in section 11.
+
+
+## 10. Track R, round 2: prove and harden, 2026-11-17
+
+This round checks the Guide in three ways. The first is a codebase nobody tuned on: encode/starlette, cloned outside the repo,
+with questions written by someone who never saw the ranker. The second is the real stack: Postgres, real Gemini embeddings and
+the live model. The user approved about 300 model calls; the key is loaded into each command and never printed. The third is 45
+new questions sent through the API, offline and live, each one judged by hand. An adversarial review across five lenses checks
+the whole Track R change. Fixes follow general rules: tuned on dev, accepted only when holdout and unseen don't drop, and never
+when an unanswerable question gets answered.
+
+| Part | Owns |
+|---|---|
+| Unseen corpus | `backend/eval/golden_unseen.jsonl`, the unseen corpus in `eval/rag_eval.py` |
+| Live stack | `backend/eval/live_eval.py` |
+| Fix: retrieval core | `app/rag/**`, `search_grid` in `ports.py` and both adapters, `rag_*` settings, crew schemas/prompts, `GeminiLLM` and the `LLM` protocol, crew call accounting in `runtime.py`, `tests/test_rag_core.py`, `tests/test_rag_postgres.py` |
+| Fix: answer path | `OfflineLLM`, `routing.py`, `guide.py`, `qa.py`, `tools/knowledge.py`, `registry.py`, `api/agents.py`, `seed.py`, their tests |
+| Measure | the targets in `eval/run_eval.py` |
+| Docs | `docs/specs/rag-crew.md`, `docs/AGENTS.md`, `docs/PROJECT_GUIDE.md`, `docs/DEMO_SCRIPT.md`, `backend/eval/README.md` |
+**Status (2026-11-18): done.** Unseen corpus, live stack and 45-question checks ran; nDCG held or rose on holdout and unseen. Crew nDCG
+offline: demo 0.88, self 0.58, unseen 0.70; the CI gate's targets were raised. Numbers: [specs/rag-crew.md](specs/rag-crew.md#measured).
+
+
+## 11. Release round, 2026-11-17 (afternoon)
+
+The read-only audit (section 9) confirmed 117 of 118 findings: 4 blockers, 26 high, 45 medium and 43 low, many of them the same
+issue seen through different lenses. The earlier rounds were cut off by a usage limit; this round picks them up. Everything here
+is fixed with tests. Each fixer returns a status for every finding id, and a final pass rechecks every blocker and high in the code.
+
+| Part | Owns |
+|---|---|
+| Security + config | `config.py` (not `rag_*`), `api/routes.py` (not the recording upload/import), `webhooks.py`, `auth.py`, `firebase_tokens.py`, `integrations.py`, `ratelimit.py`, `main.py` (shared), `members.py`, `api/lifecycle.py`, `api/demo.py`, `lifecycle/reporting.py`, the env examples |
+| Reliability + data | `selfhost.py`, `agents/ingestion.py`, `agents/meeting.py`, `services/embeddings.py`, `adapters/lifecycle_pg.py`, `postgres.py` connection setup, `services/scheduling.py`, `agents/supervisor.py`, `lifecycle/visibility.py`, `lifecycle/clock.py`, `services/redaction.py`, `migrate.py`, new migrations |
+| Self-host release + supply chain | `scripts/selfhost.sh`, `scripts/package.sh`, the compose files, both Dockerfiles, `frontend/nginx.conf.template`, the requirements files, `frontend/package-lock.json`, `ci.yml`, `docs/ADMIN_GUIDE.md`, `docs/INTEGRATIONS.md`, `docs/SECURITY.md` |
+| GCP | `adapters/gcp.py`, the new `api/uploads.py`, the recording upload/import, `workers/**`, `cloudbuild.yaml`, `infra/**`, `docs/DEPLOY.md` |
+| Scroll | the app's `frontend/src/**` performance, then `frontend/src/site/**` (backups kept outside the repo) |
+| Frontend production (after Scroll) | `frontend/src/**` except the landing, `pages/settings/**`, `lifecycle/Setup.tsx`, `pages/Meetings.tsx`; `index.html`; self-hosted fonts in `public/fonts` |
+| Product completeness (after Scroll) | `pages/settings/**`, `lifecycle/Setup.tsx`, `pages/Meetings.tsx` and the backend routes those findings need |
+| RAG prove/review/fix | as in section 10 |
+| Docs | the RAG docs; a "Release readiness" section in `docs/STATUS.md` |
+**Status (2026-11-18): done.** Every blocker and high finding is fixed and tested; the open mediums and lows, and the defaults to
+confirm, are in [STATUS.md](STATUS.md#release-readiness-2026-11-18-morning).
+
+
+
+## 12. Mentor round, 2026-11-18: board, audit log, handover, brand, agents layout, Docker and Kubernetes
+
+The founders' mentor reviewed the product after sign-in. Their notes, and what each became:
+
+| Mentor's note | What was built |
+|---|---|
+| Milestones configurable (15, 30, 45, 60, 90 days), editable at any time, visible to admin and hire | Board milestones per template and per hire, edited by managers and admins; both sides see them on Home and the board |
+| A Kanban board per milestone, task status (completed, in progress, moved), for user and admin | `#/board`: To do, In progress, Done per milestone; moves between milestones keep their history ("Moved from Day 15") |
+| Handover transfers all documents and knowledge, documents linked via GitHub | The live transfer set in nine sections, attachments (repository file with GitHub link, uploaded document, link), transfer, completion with typed confirmation |
+| Audit log newest first, from/to dates, column sort, 25/30/50 rows, a correct total | Server-side sort on every column, time ranges in the viewer's time zone, rows per page, "Showing 1–25 of N", a page snapshot |
+| Home reads like an ad | A product home per role: figures, the 30/60/90, the current milestone's tasks, next actions, decisions waiting, recent activity |
+| One colour; primary and secondary needed; no black-on-black forms | The **Ink + Teal** system: Ink base, Teal primary, Navy secondary for every form, dialog and popover ([brand/BRAND.md §6](brand/BRAND.md#6-colour-ink--teal)) |
+| Backend folder structure for a multi-agent system; be clear on LangGraph | `app/agents/{supervisor, specialists/<key>, core, tools}` with a one-way dependency rule, held by a test; [LANGGRAPH.md](LANGGRAPH.md) |
+| Docker incomplete; Kubernetes too | Both Dockerfiles documented and built in CI; Kustomize base with GKE, staging, production and any-cluster overlays ([KUBERNETES.md](KUBERNETES.md)) |
+
+### Tracks and what each owned
+
+| Track | Owned |
+|---|---|
+| Kanban (board) | Migration `018_board.sql` (`program_templates.phases`, `onboarding_phases`, `task_placements`, `task_moves`, each with `org_id` and forced RLS, memory adapter, demo data, export and deletion), `app/lifecycle/board.py`, `app/api/board.py`, `frontend/src/lifecycle/board/**`, template milestones in `lifecycle/templates.py` and `Templates.tsx`, `tests/test_board*.py` |
+| Audit log | `adapters/audit_store.py`, `api/audit.py`, `lifecycle/Audit.tsx`, `audit.css`, `auditActions.ts`, the audit types in `types.ts`, `tests/test_audit.py` |
+| Handover | `lifecycle/handover.py`, the handover routes in `api/lifecycle.py`, `Handovers.tsx` and its CSS, `docs/specs/handover.md`, `tests/test_handover*.py` (no migration: the plan is JSON on the existing row) |
+| Home | `lifecycle/home.py`, `lifecycle/Home.tsx`, `tests/test_home_product.py` |
+| Brand | the colour tokens and panel scope in `styles.css`, `docs/brand/**` |
+| Agents layout | `app/agents/**` (moved with plain `mv`, every import updated, no shims), `app/agents/README.md`, `docs/LANGGRAPH.md`, `tests/test_agents_layout.py` |
+| Docker and Kubernetes | both Dockerfiles, `docker-compose.yml`, `infra/k8s/**`, `docs/KUBERNETES.md`, `tests/test_release_k8s.py` |
+| Review (security, UX, release) and finish | read-only reviews with failing tests; the finisher fixed what they confirmed and wrote these docs |
+
+### Decisions
+
+- **Ink + Teal.** Black and white stay the base. Teal is the primary (buttons, links, selection, focus); a deep navy is the
+  secondary and the surface of every form, dialog and popover. Teal no longer means only "explained in a recorded session":
+  KT keeps its own teal marker plus a small **KT** badge, so that meaning survives next to the brand colour.
+- **Milestone and checkpoint.** "Milestone" on screen is the board's Day 15/30/45/60/90; the program's automatic checks
+  (first PR merged, check-ins) are "checkpoints". In the code a board milestone is a *phase* and a checkpoint is an
+  `onboarding_milestone`, so the two never mix.
+- **The board's columns are task statuses.** No separate card state: a pull request that moves a task moves its card, and
+  `PATCH /api/tasks` and the board agree. A hire's Done is "waiting for sign-off"; a manager signs it off.
+- **Nobody manages their own onboarding**, whatever their role (security review).
+- **The agents layout.** `supervisor/` (the LangGraph router: graph, state, orchestrator, tick), `specialists/<roster key>/`
+  (one package per agent, with its own helpers), `core/` (deps, llm, prompts, schemas, registry, runtime, citations; imports no
+  agent), `tools/`. Imports point one way: supervisor → specialists → core; tools → core. Prompts and schemas stay in `core`,
+  so one place shows that every prompt carries `UNTRUSTED` and every output is a validated schema.
+- **Activity is scoped by project**, not by who acted (security review): a manager sees only what happened in their projects.
+- **Audit pages hold a snapshot** (`as_of`), because every read of the log writes an entry.
+- No new dependencies: native HTML5 drag and drop, plain CSS.
+
+**Status (2026-11-18): done.** The review findings and what was fixed are in [STATUS.md](STATUS.md#mentor-round-2026-11-18).
+
+## 13. Legal round, 2026-11-19: terms, privacy, data processing, recording consent
+
+The readiness check found no terms of service, privacy policy or data-processing agreement in the product, and no record of
+recording consent. All four are now in the product. **The texts are first drafts written by an AI, not legal advice: no
+lawyer has read them.** [LEGAL.md](LEGAL.md) lists what to fill in, what to decide with a lawyer and what to check before
+selling.
+
+| Track | Built | Files |
+|---|---|---|
+| Content | Six documents as structured data, a data inventory with file pointers, Markdown mirrors | `frontend/src/legal/**`, `docs/legal/**`, `docs/LEGAL.md` |
+| Consent records | `legal_acceptances` (append-only), status and accept routes, the organisation's DPA, the `LEGAL_*` settings, `LEGAL_ENFORCE` | migration `019_legal.sql`, `app/legal.py`, `app/api/legal.py`, `docs/specs/legal-consent.md`, `tests/test_legal*.py` |
+| Recording | Consent before any recording is taken in, removal requests, self-hosted retention, deletion of the Gemini Files copy | migration `020_recording_consent.sql`, `app/services/recordings.py`, `app/api/recordings.py`, `tests/test_recording_consent*.py` |
+| Web app | The documents' pages and footer links, the agreement on the sign-up screens, the consent screen, the recording notice, Settings → Organisation → Legal | `frontend/src/site/Legal.tsx`, `legal.css`, `frontend/src/legal/paths.ts`, `frontend/src/auth/Agree.tsx`, `frontend/src/consent/**`, `frontend/src/pages/settings/Legal.tsx`, `tests/test_legal_pages.py` |
+
+### Decisions
+
+- **The operator's details are settings, never text.** An unset one reads as a neutral phrase; nothing is made up, and
+  nothing is required to start the server.
+- **One source of words.** The pages, the consent screen, the recording notice card and `docs/legal/*.md` all read
+  `frontend/src/legal/`. A version is a date, held in two places and checked by a test.
+- **Public pages say "Draft"** until `LEGAL_REVIEW.status` is set to `"reviewed"`, after a lawyer has read them.
+- **Legal pages open without the intro.** They are opened from a checkbox, a calendar invitation or a contract, to be read.
+- **Boxes are never ticked for the person,** and a missed box says so next to itself rather than disabling the button.
+- **The consent screen blocks the workspace, not the exits.** Signing out, leaving, and an admin's export and deletion stay
+  reachable on it. If the status cannot be read and `LEGAL_ENFORCE` is off, the workspace opens.
+- **The recording notice is an acknowledgement, not consent to a recording.** Consent is confirmed per session, by whoever
+  adds the recording, in the words the API records.
+- **The demo's one-click invitation carries no agreement,** so the demo shows the consent screen to a new invitee.
+- No new dependencies: the documents are rendered from structured data, with no Markdown library.
+
+**Status (2026-11-19): built; the texts await a lawyer.** What is open is in [STATUS.md](STATUS.md#legal-basics-2026-11-19) and [LEGAL.md](LEGAL.md).

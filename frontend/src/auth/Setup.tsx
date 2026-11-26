@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { ApiError, errorMessage, Me, post } from "../api";
 import { Msg, Note } from "../ui";
 import type { Fb } from ".";
+import { Agree, JOIN_DOCUMENTS } from "./Agree";
 import { Busy, EntryLayout, Identity } from "./Entry";
 
 /** 403 email_not_verified: the login works but its address is not confirmed yet. */
@@ -46,7 +47,9 @@ export function VerifyEmail({ fb, onVerified, signOut }: { fb: Fb; onVerified: (
 
 type SignupProps = { fb: Fb; enabled: boolean; onDone: (me: Me) => void; retry: () => void; signOut: () => void; onBack?: () => void };
 
-/** 403 no_account (or a person with invitations who prefers their own team): create a new organisation, if sign-up is open. */
+/** 403 no_account (or a person with invitations who prefers their own team): create a new organisation, if sign-up is open.
+ *  The request carries the person's agreement to the terms and the privacy policy (Agree.tsx), and the API records it with
+ *  the account it creates. */
 export function Signup({ fb, enabled, onDone, retry, signOut, onBack }: SignupProps) {
   const [closed, setClosed] = useState(!enabled);
   const [name, setName] = useState(fb.displayName());
@@ -54,13 +57,16 @@ export function Signup({ fb, enabled, onDone, retry, signOut, onBack }: SignupPr
   const [project, setProject] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
+  const [agreed, setAgreed] = useState(false);
+  const [missed, setMissed] = useState(0);
   const invited = <>If your manager invited you, sign in with the email they invited. This login is <strong>{fb.email()}</strong>.</>;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
+    if (!agreed) { setMsg(null); setMissed((n) => n + 1); return; }
     setBusy(true); setMsg(null);
     try {
-      onDone(await post<Me>("/signup", { name: name.trim(), org_name: org.trim(), project_name: project.trim() }));
+      onDone(await post<Me>("/signup", { name: name.trim(), org_name: org.trim(), project_name: project.trim(), accept: JOIN_DOCUMENTS }));
     } catch (err) {
       if (err instanceof ApiError && (err.status === 409 || err.code === "email_not_verified")) return retry();
       if (err instanceof ApiError && err.code === "signup_closed") setClosed(true);
@@ -108,6 +114,7 @@ export function Signup({ fb, enabled, onDone, retry, signOut, onBack }: SignupPr
           <span className="en-invalid">Name the first project; it can be renamed later.</span>
           <span id="su-project-hint" className="en-hint">One codebase and the people who work on it.</span>
         </div>
+        <Agree id="su-agree" checked={agreed} onChange={setAgreed} disabled={busy} missed={missed} />
         <button type="submit" className="en-primary" disabled={busy}><Busy busy={busy} label="Creating…">Create my team</Busy></button>
       </form>
       <Note msg={msg} />

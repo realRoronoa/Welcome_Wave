@@ -3,14 +3,21 @@
     DATABASE_URL_OWNER=postgresql://ww_owner:...@/welcomewave?host=/cloudsql/...  \
     APP_DB_PASSWORD=...  python -m app.migrate
 
-1. Applies every db/migrations/*.sql not yet recorded in schema_migrations, each in its own transaction.
-2. Creates or updates the `ww_app` login role the services use: NOBYPASSRLS, data privileges only, no temporary tables.
+1. Applies every db/migrations/*.sql not yet recorded in schema_migrations, each in its own transaction, waiting at most
+   LOCK_TIMEOUT for a table lock (a migration stuck behind a long transaction fails and the job is run again, instead of
+   queueing every later query of the site behind it). One migrator runs at a time (an advisory lock held for the whole run:
+   two deploys started together apply each file once). Each applied file's SHA-256 is recorded; an applied file whose
+   content changed afterwards stops the run, so existing databases and fresh installs never silently differ.
+2. Creates or updates the `ww_app` login role the services use: NOBYPASSRLS, data privileges only, no temporary tables, and
+   the audit log append-only (no UPDATE or DELETE on APPEND_ONLY_TABLES).
 3. Creates LangGraph's checkpoint tables (the app role cannot create tables) and grants them to ww_app.
 4. Refuses to finish if ww_app could bypass row-level security, a table is neither tenant-protected (org_id, forced row-level
-   security and a policy) nor listed in GLOBAL_TABLES, or a SECURITY DEFINER function could be pointed at a temp table.
+   security and a policy) nor listed in GLOBAL_TABLES, a SECURITY DEFINER function could be pointed at a temp table, or ww_app
+   could change or remove audit entries.
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import os
 import sys
@@ -30,26 +37,48 @@ DEFINER_FUNCTIONS = [
     "purge_audit_log(timestamptz)",
     "preboarding_lookup(text)",
     "lifecycle_orgs()",
+    "delete_org_audit(uuid)",
+    "delete_org_legal(uuid)",
+    "stored_recordings()",
 ]
+# The app may read and add rows here, never change or remove them (015_audit_append_only.sql, 019_legal.sql)
+APPEND_ONLY_TABLES = ("audit_log", "legal_acceptances")
+RUN_LOCK = 0x5757_6D69_6772  # pg_advisory_lock key: one migrator at a time ("WWmigr")
+LOCK_TIMEOUT = os.environ.get("MIGRATION_LOCK_TIMEOUT", "10s")
 
 
 def plain_url(url: str) -> str:
     return url.replace("postgresql+psycopg://", "postgresql://")
 
 
+def checksum(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
 def apply_migrations(conn: psycopg.Connection) -> list[str]:
     conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())")
+    conn.execute("ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS sha256 text")
     conn.commit()
-    done = {r[0] for r in conn.execute("SELECT version FROM schema_migrations")}
+    done = {r[0]: r[1] for r in conn.execute("SELECT version, sha256 FROM schema_migrations")}
     conn.commit()  # end the read's implicit transaction, or every file below would be a savepoint of one big transaction
+    files = sorted(MIGRATIONS.glob("*.sql"))
+    changed = [p.name for p in files if done.get(p.stem) and done[p.stem] != checksum(p)]
+    if changed:
+        raise SystemExit(f"Applied migrations were edited afterwards: {changed}. A migration that ran is never changed: put the "
+                         "change in a new numbered file, and restore these from version control.")
+    with conn.transaction():  # recorded before checksums existed: the content they have now is the one to keep
+        for p in files:
+            if p.stem in done and done[p.stem] is None:
+                conn.execute("UPDATE schema_migrations SET sha256 = %s WHERE version = %s AND sha256 IS NULL", (checksum(p), p.stem))
     applied = []
-    for path in sorted(MIGRATIONS.glob("*.sql")):
+    for path in files:
         if path.stem in done:
             continue
         log.info("applying %s", path.name)
         with conn.transaction():
+            conn.execute(sql.SQL("SET LOCAL lock_timeout = {}").format(sql.Literal(LOCK_TIMEOUT)))
             conn.execute(path.read_text())
-            conn.execute("INSERT INTO schema_migrations (version) VALUES (%s)", (path.stem,))
+            conn.execute("INSERT INTO schema_migrations (version, sha256) VALUES (%s, %s)", (path.stem, checksum(path)))
         applied.append(path.stem)
     return applied
 
@@ -88,6 +117,8 @@ def grant_app(conn: psycopg.Connection) -> None:
     conn.execute(sql.SQL("GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {}").format(role))
     conn.execute(sql.SQL("GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {}").format(role))
     conn.execute(sql.SQL("REVOKE ALL ON schema_migrations FROM {}").format(role))
+    for table in APPEND_ONLY_TABLES:  # the blanket grant above gave them back: the audit log stays append-only
+        conn.execute(sql.SQL("REVOKE UPDATE, DELETE, TRUNCATE ON {} FROM {}").format(sql.Identifier(table), role))
     for fn in DEFINER_FUNCTIONS:
         conn.execute(sql.SQL("GRANT EXECUTE ON FUNCTION {} TO {}").format(sql.SQL(fn), role))
 
@@ -104,7 +135,8 @@ def setup_checkpoints(url: str) -> None:
 # added here with a reason a reviewer can check.
 GLOBAL_TABLES = {
     "schema_migrations": "the migrator's own bookkeeping; ww_app has no access to it",
-    "outbox": "events that carry ids only, published and swept by id (004_round3.sql); the org's rows are deleted by project id",
+    "outbox": "queued events: ids, file paths and, for a pull request, its description and author; published and swept by id "
+              "(004_round3.sql); the org's rows are deleted by project id",
     "processed_events": "dedupe keys of handled events: ids only",
     "github_installation_senders": "senders allowed per GitHub installation id; emptied with the organisation's installations",
     "checkpoints": "LangGraph's checkpoint tables, keyed by thread id (app/migrate.py setup_checkpoints); an organisation's "
@@ -149,16 +181,27 @@ def verify(conn: psycopg.Connection) -> None:
         WHERE n.nspname = 'public' AND p.prosecdef AND NOT coalesce('search_path=public, pg_temp' = ANY(p.proconfig), false)""")]
     if exposed:
         raise SystemExit(f"SECURITY DEFINER functions without `SET search_path = public, pg_temp`: {exposed}")
+    writable = [f"{t}: {priv}" for t in APPEND_ONLY_TABLES for priv in ("UPDATE", "DELETE", "TRUNCATE")
+                if row and conn.execute("SELECT has_table_privilege(%s, %s, %s)", (APP_ROLE, t, priv)).fetchone()[0]]
+    if writable:
+        raise SystemExit(f"{APP_ROLE} can change or remove audit entries or legal acceptances ({writable}); refusing to continue.")
 
 
 def run(url: str, app_password: str | None) -> list[str]:
+    """The whole migration, under one advisory lock held on a connection of its own: a second migrator started at the same
+    time (two deploys a minute apart) waits for the first, then finds nothing left to apply."""
     url = plain_url(url)
-    with psycopg.connect(url, prepare_threshold=None) as conn:
-        applied = apply_migrations(conn)
-    setup_checkpoints(url)
-    with psycopg.connect(url, prepare_threshold=None) as conn:
-        ensure_app_role(conn, app_password)
-        verify(conn)
+    with psycopg.connect(url, autocommit=True, prepare_threshold=None) as lock:
+        lock.execute("SELECT pg_advisory_lock(%s)", (RUN_LOCK,))
+        try:
+            with psycopg.connect(url, prepare_threshold=None) as conn:
+                applied = apply_migrations(conn)
+            setup_checkpoints(url)
+            with psycopg.connect(url, prepare_threshold=None) as conn:
+                ensure_app_role(conn, app_password)
+                verify(conn)
+        finally:
+            lock.execute("SELECT pg_advisory_unlock(%s)", (RUN_LOCK,))
     return applied
 
 

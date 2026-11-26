@@ -1,0 +1,215 @@
+# The queue workers (backend/workers/worker.py): the API image with another command, one Deployment per Pub/Sub queue.
+#   meeting-worker    KT recording analysis (long: Gemini watches the video), one meeting per pod
+#   ingestion-worker  repository and document indexing (repository archives go to /tmp)
+#   review-worker     pull-request status and reviews, onboarding plans, invitation emails
+# Delivery is at least once and every handler is idempotent, so a pod that stops mid-event loses nothing: its lease lapses
+# and the event runs again from its last checkpoint. On SIGTERM a worker stops pulling and finishes what it holds, within
+# SHUTDOWN_GRACE_S, inside the pod's grace period.
+#
+# No replica count: one pod each until something scales them. On GKE, KEDA scales each on its queue's backlog, the meeting
+# and ingestion workers down to zero (components/gke). Ready = subscribed to the queue (/healthz on port 8081).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: meeting-worker
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: meeting-worker
+spec:
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: welcome-wave
+      app.kubernetes.io/component: meeting-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: welcome-wave
+        app.kubernetes.io/component: meeting-worker
+      annotations:
+        kubectl.kubernetes.io/default-container: worker
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false" # do not move a pod mid-video
+    spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 600 # an in-flight meeting finishes on scale-down
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: welcome-wave-api
+          command: ["python", "-m", "workers.worker"]
+          env:
+            - { name: WORKER_QUEUE, value: meetings }
+            - { name: SHUTDOWN_GRACE_S, value: "570" }
+            - { name: HOME, value: /tmp }
+            # a worker holds few connections: (3 + 2) for its own work, 2 for agent checkpoints
+            - { name: DB_POOL_SIZE, value: "3" }
+            - { name: DB_MAX_OVERFLOW, value: "2" }
+            - { name: CHECKPOINT_POOL_SIZE, value: "2" }
+          envFrom:
+            - configMapRef: { name: ww-config }
+            - secretRef: { name: ww-worker }
+          ports:
+            - { name: health, containerPort: 8081 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: health }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 1Gi }
+            limits: { memory: 2Gi, ephemeral-storage: 2Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingestion-worker
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: ingestion-worker
+spec:
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: welcome-wave
+      app.kubernetes.io/component: ingestion-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: welcome-wave
+        app.kubernetes.io/component: ingestion-worker
+      annotations:
+        kubectl.kubernetes.io/default-container: worker
+    spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 300
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: welcome-wave-api
+          command: ["python", "-m", "workers.worker"]
+          env:
+            - { name: WORKER_QUEUE, value: ingestion }
+            - { name: SHUTDOWN_GRACE_S, value: "280" }
+            - { name: HOME, value: /tmp }
+            - { name: DB_POOL_SIZE, value: "3" }
+            - { name: DB_MAX_OVERFLOW, value: "2" }
+            - { name: CHECKPOINT_POOL_SIZE, value: "2" }
+          envFrom:
+            - configMapRef: { name: ww-config }
+            - secretRef: { name: ww-worker }
+          ports:
+            - { name: health, containerPort: 8081 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: health }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 4Gi }
+            limits: { memory: 2Gi, ephemeral-storage: 5Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp } # repository archives
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 4Gi }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review-worker
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: review-worker
+spec:
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: welcome-wave
+      app.kubernetes.io/component: review-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: welcome-wave
+        app.kubernetes.io/component: review-worker
+      annotations:
+        kubectl.kubernetes.io/default-container: worker
+    spec:
+      serviceAccountName: worker
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 180
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: worker
+          image: welcome-wave-api
+          command: ["python", "-m", "workers.worker"]
+          env:
+            - { name: WORKER_QUEUE, value: reviews }
+            - { name: SHUTDOWN_GRACE_S, value: "160" }
+            - { name: HOME, value: /tmp }
+            - { name: DB_POOL_SIZE, value: "3" }
+            - { name: DB_MAX_OVERFLOW, value: "2" }
+            - { name: CHECKPOINT_POOL_SIZE, value: "2" }
+          envFrom:
+            - configMapRef: { name: ww-config }
+            - secretRef: { name: ww-worker }
+          ports:
+            - { name: health, containerPort: 8081 }
+          readinessProbe:
+            httpGet: { path: /healthz, port: health }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: health }
+            initialDelaySeconds: 30
+            periodSeconds: 30
+          resources:
+            requests: { cpu: 500m, memory: 1Gi, ephemeral-storage: 1Gi }
+            limits: { memory: 1Gi, ephemeral-storage: 2Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }

@@ -9,12 +9,12 @@
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow-xs); }
 .ktp-strip-main { min-width: 0; }
 .ktp-label { display: flex; align-items: center; gap: .45rem; margin: 0; font-size: .8rem; font-weight: 550; color: var(--ink-soft); }
-.ktp-label svg { color: var(--ink-faint); }
+.ktp-label svg { color: var(--ink-muted); }
 .ktp-big { display: flex; align-items: center; flex-wrap: wrap; gap: .25rem .7rem; margin: .45rem 0 .85rem; font-size: 2.35rem; line-height: 1;
   font-weight: 650; letter-spacing: -.035em; }
 .ktp-from { color: var(--ink-soft); }
 .ktp-to { color: var(--ink); }
-.ktp-arrow { color: var(--ink-faint); }
+.ktp-arrow { color: var(--ink-muted); }
 .ktp-big .dp-pill { align-self: center; margin-left: .15rem; letter-spacing: 0; font-variant-numeric: tabular-nums; }
 
 .ktp-bar { display: flex; gap: 3px; border-radius: 999px; overflow: hidden; background: var(--line); }
@@ -79,7 +79,7 @@
 .ktp-session-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem 1.25rem; }
 .ktp-who { display: flex; align-items: center; gap: .85rem; min-width: 0; }
 .ktp-who-text { min-width: 0; }
-.ktp-noone { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; color: var(--ink-faint);
+.ktp-noone { display: grid; place-items: center; flex: none; width: 40px; height: 40px; border-radius: 50%; color: var(--ink-muted);
   border: 1px dashed var(--line-strong); }
 .ktp-kicker { margin: 0 0 .25rem; font-size: .7rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--ink-soft); }
 .ktp-src { font-weight: 500; letter-spacing: 0; text-transform: none; font-size: .78rem; }
@@ -124,14 +124,14 @@ a.ktp-reason:hover .ktp-reason-icon { color: var(--ink); }
 .ktp-row-link { display: flex; flex-wrap: wrap; align-items: baseline; gap: .1rem .75rem; min-width: 0; color: var(--ink); }
 .ktp-row-link::after { content: ""; position: absolute; inset: 0; border-radius: inherit; }
 .ktp-row-link:focus-visible { outline: none; }
-.ktp-row-link:focus-visible::after { outline: 2px solid var(--ink); outline-offset: -2px; }
+.ktp-row-link:focus-visible::after { outline: 2px solid var(--focus); outline-offset: -2px; }
 .ktp-sym { font: 600 .88rem/1.35 var(--code); color: var(--ink); overflow-wrap: anywhere; }
 .ktp-where { font: 400 .76rem/1.35 var(--code); color: var(--ink-soft); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .ktp-lines { white-space: nowrap; }
 .ktp-agenda li:hover .ktp-sym { text-decoration: underline; text-decoration-color: var(--line-hover); text-underline-offset: 3px; }
 .ktp-stale { gap: .25rem; }
 .ktp-min { font-size: .82rem; color: var(--ink-2); white-space: nowrap; font-variant-numeric: tabular-nums; }
-.ktp-go { color: var(--ink-faint); transition: transform .2s var(--ease), color .15s; }
+.ktp-go { color: var(--ink-muted); transition: transform .2s var(--ease), color .15s; }
 .ktp-agenda li:hover .ktp-go { color: var(--ink); transform: translateX(2px); }
 .ktp-row-reasons { position: relative; z-index: 1; grid-column: 2 / -1; display: flex; flex-wrap: wrap; gap: .35rem; }
 .ktp-row-reasons .ktp-reason { padding: .22rem .55rem .22rem .3rem; font-size: .78rem; gap: .4rem; }
@@ -168,12 +168,12 @@ a.ktp-reason:hover .ktp-reason-icon { color: var(--ink); }
 /* ---------- backlog footnote ---------- */
 .ktp-backlog { display: flex; align-items: flex-start; gap: .6rem; margin: 2rem 0 0; padding: .8rem 1rem; border-radius: var(--radius-m);
   border: 1px dashed var(--line-strong); font-size: .85rem; line-height: 1.55; color: var(--ink-soft); }
-.ktp-backlog > svg { flex: none; margin-top: .2rem; color: var(--ink-faint); }
+.ktp-backlog > svg { flex: none; margin-top: .2rem; color: var(--ink-muted); }
 .ktp-backlog code { font-size: .8rem; color: var(--ink-2); }
 
 /* ---------- quiet note: the plan was written without some code searches ---------- */
 .ktp-note { display: flex; align-items: flex-start; gap: .5rem; margin: -.35rem 0 1rem; font-size: .84rem; line-height: 1.5; color: var(--ink-soft); }
-.ktp-note > svg { flex: none; margin-top: .18rem; color: var(--ink-faint); }
+.ktp-note > svg { flex: none; margin-top: .18rem; color: var(--ink-muted); }
 .ktp-note.ktp-more { margin: -.25rem 0 .9rem; }
 .ktp-action { flex-wrap: wrap; }
 .ktp-cancel { color: var(--ink-soft); }
