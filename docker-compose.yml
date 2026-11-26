@@ -1,31 +1,92 @@
-# Local development.
-#   docker compose up                  -> demo mode: in-memory data, offline LLM, sample repo (no keys)
-#   docker compose --profile db up -d db
-#   TEST_PG_ADMIN_URL=postgresql://ww:ww@localhost:5432/postgres pytest   # + the Postgres integration tests
+# Welcome Wave in containers on this machine. The two images are the production ones, built from their Dockerfiles:
+#   backend/Dockerfile   the API (the same image runs the workers, the migrations and the scheduled calls)
+#   frontend/Dockerfile  the web app, served by nginx
+#
+#   docker compose up --build                 the demo: in-memory data, offline model, the sample repo, no keys.
+#                                             http://localhost:5173, any demo account, password welcome-wave
+#   docker compose --profile db up -d db      Postgres 16 + pgvector for the integration tests (in backend/):
+#       TEST_PG_ADMIN_URL=postgresql://ww:ww@localhost:5432/postgres .venv/bin/python -m pytest
+#   docker compose down                       stop (the demo's data goes with it; the db profile keeps its volume)
+#
+# Every port is bound to 127.0.0.1: demo mode trusts the X-Demo-User header, so it must never be reachable from another
+# machine. Ports can be moved with WW_API_PORT (8080), WW_WEB_PORT (5173) and WW_DB_PORT (5432) in the environment. The demo
+# reads no settings file; GEMINI_API_KEY=... in the environment gives it real answers.
+#
+# The containers run as they do in production: not root, every capability dropped, a read-only root filesystem (writes go
+# to the tmpfs mounts), and the web app starts once the API answers.
+# For people to use, the same images run elsewhere: one server, ./scripts/selfhost.sh release (Postgres, restarts and
+# backups; docs/ADMIN_GUIDE.md); a Kubernetes cluster, infra/k8s (docs/KUBERNETES.md); Google Cloud, docs/DEPLOY.md.
+
+name: welcome-wave
+
+x-hardened: &hardened
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  logging:
+    driver: json-file
+    options: { max-size: 10m, max-file: "3" }
+
 services:
   api:
-    build: ./backend
+    <<: *hardened
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
-      MODE: ${MODE:-demo}
+      MODE: demo
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-    ports: ["8080:8080"]
+      HOME: /tmp
+    tmpfs: # Docker makes these root's unless told: the app's user owns them
+      - /tmp
+      - /app/.blobs:uid=10001,gid=10001,mode=0700 # the demo's uploaded files
+      - /app/.data:uid=10001,gid=10001,mode=0700 # the demo's generated keys
+    ports: ["127.0.0.1:${WW_API_PORT:-8080}:8080"]
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health/ready', timeout=4)"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   web:
-    build: ./frontend
+    <<: *hardened
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     environment:
       API_URL: http://api:8080
-    ports: ["5173:8080"]
-    depends_on: [api]
+    tmpfs: # owned by nginx's user (101)
+      - /etc/nginx/conf.d:uid=101,gid=101,mode=0700 # nginx's entrypoint writes the configuration here from nginx.conf.template
+      - /var/cache/nginx:uid=101,gid=101,mode=0700
+      - /run:uid=101,gid=101,mode=0700
+      - /tmp
+    ports: ["127.0.0.1:${WW_WEB_PORT:-5173}:8080"]
+    depends_on:
+      api: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
   db:
     profiles: [db]
     image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: ww
-      POSTGRES_PASSWORD: ww
-    ports: ["5432:5432"]
+      POSTGRES_PASSWORD: ww # a scratch server for tests only, on this machine only
+    ports: ["127.0.0.1:${WW_DB_PORT:-5432}:5432"]
+    shm_size: 256mb
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ww -h 127.0.0.1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
 volumes:
   pgdata:

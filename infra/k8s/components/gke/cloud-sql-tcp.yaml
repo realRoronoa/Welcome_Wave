@@ -1,0 +1,27 @@
+# The Cloud SQL Auth Proxy beside each worker, on 127.0.0.1:5432 (the workers' DATABASE_URL, ww-database-url-proxy), as in
+# infra/k8s/workers.yaml. A native sidecar: ready before the worker starts, stopped after it.
+- op: add
+  path: /spec/template/spec/initContainers
+  value:
+    - name: cloud-sql-proxy
+      image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.28.0@sha256:e0cbea7b63455c1635d354ef456696d019dd02a5db47bf1994e849823e71ae89
+      restartPolicy: Always
+      args:
+        - --structured-logs
+        - --port=5432
+        - --health-check
+        - --http-address=0.0.0.0
+        - --exit-zero-on-sigterm
+        - $(CLOUD_SQL_INSTANCE)
+      env:
+        - name: CLOUD_SQL_INSTANCE
+          valueFrom: { configMapKeyRef: { name: ww-config, key: CLOUD_SQL_INSTANCE } }
+      startupProbe: { httpGet: { path: /startup, port: 9090 }, periodSeconds: 1, failureThreshold: 60 }
+      livenessProbe: { httpGet: { path: /liveness, port: 9090 }, periodSeconds: 10, timeoutSeconds: 5, failureThreshold: 6 }
+      resources:
+        requests: { cpu: 100m, memory: 128Mi }
+        limits: { memory: 256Mi }
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: { drop: [ALL] }

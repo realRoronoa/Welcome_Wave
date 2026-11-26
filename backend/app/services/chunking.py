@@ -9,7 +9,7 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from app.agents.schemas import Chunk
+from app.agents.core.schemas import Chunk
 
 LANG_BY_EXT = {
     ".py": "python", ".go": "go", ".js": "javascript", ".jsx": "javascript", ".ts": "typescript",

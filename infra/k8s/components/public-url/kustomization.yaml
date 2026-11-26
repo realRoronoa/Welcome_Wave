@@ -1,0 +1,16 @@
+# The host name people open (PUBLIC_URL in the overlay's settings, https://<host>) becomes the Ingress's host and the name
+# on its TLS certificate, so the address is written once. Include it after the overlay's settings, before components/gke.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: ww-config
+      fieldPath: data.PUBLIC_URL
+      options: { delimiter: "/", index: 2 } # https: / "" / <host>
+    targets:
+      - select: { kind: Ingress, name: welcome-wave }
+        fieldPaths:
+          - spec.rules.*.host
+          - spec.tls.*.hosts.*

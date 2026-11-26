@@ -1,7 +1,7 @@
 # HTTP API
 
-The API the web app uses, grouped by area. It is the same API in every mode. The route list below was generated from the
-running app (`MODE=demo`, `GET /api/openapi.json`, 2026-11-14: 130 routes); the "Who" column summarises
+The API the web app uses, grouped by area. It is the same API in every mode. The route list below was checked against the
+running app (`MODE=demo`, `GET /api/openapi.json`, 2026-11-18: 162 routes, every one listed here); the "Who" column summarises
 [PERMISSIONS.md](PERMISSIONS.md), which `tests/test_permissions_matrix.py` holds the app to. Request and response fields of the
 lifecycle routes are in [specs/](specs/lifecycle.md).
 
@@ -26,7 +26,7 @@ tokens is **planned, not built**: the `api_tokens` table exists (migration 010) 
 
 Roles: `admin`, `manager`, `expert`, `new_hire`, `executive`. Admins pass every role check, except on routes about one
 person's own data. Executives are refused every non-GET request (403 "Executives have read-only access") except
-`POST /api/me/leave` and `POST /api/notifications/read`. Project routes also need project membership. A hire's data is
+`POST /api/me/leave`, `POST /api/notifications/read` and `POST /api/legal/accept`. Project routes also need project membership. A hire's data is
 visible to the hire, their mentor and the project's managers; anyone else gets 404.
 
 In the tables: **any** = any signed-in member; **members** = members of the project; **own** = only the caller's own data or
@@ -59,6 +59,7 @@ Per minute, per process (`app/ratelimit.py`; settings in [ADMIN_GUIDE.md §12](A
 | chat | `POST` `/api/chat`, `/api/ask/route`, `/api/tasks/{id}/presubmit-review` | person | 20 |
 | preboarding | `/api/preboarding/*` | address | 30 |
 | webhooks | `/webhooks/*` | address | 60 |
+| client_errors | `POST` `/api/client-errors` | address | 10 |
 | default | everything else | person (address before sign-in) | 120 |
 
 Questions also count against `CHAT_RATE_PER_MINUTE` (12 per person, chat and routing together). `/health` and
@@ -76,15 +77,16 @@ Routes marked with a flag answer 404 while `FEATURES` turns it off ([ADMIN_GUIDE
 |---|---|---|---|
 | GET | `/health` | public | Liveness |
 | GET | `/health/ready` | public | Readiness: the database answers (503 if not) |
-| GET | `/api/config` | public | What the web app needs before sign-in: mode, Firebase config, AI on, GitHub App, Google Calendar, Calendly, and `email` (true only when SMTP is set up: say "Emailed" only then) |
+| GET | `/api/config` | public | What the web app needs before sign-in: mode, Firebase config, AI on, GitHub App, Google Calendar, Calendly, `email` (true only when SMTP is set up: say "Emailed" only then), and `legal`: `{operator, address, contact_email, privacy_email, governing_law, courts, versions: {terms, privacy, dpa, recording, subprocessors}, enforced}`, where each detail is null until its `LEGAL_*` setting is set |
+| POST | `/api/client-errors` | public | A crash report from the web app (`frontend/src/report.ts`, sent with `sendBeacon`): `{id, kind: render\|error\|rejection, name, message, stack, component, page, build, at}`, nothing else. Text is cut to length; queries, emails and tokens are removed; it is written as one log line and never stored. 204; 422 for anything else; at most 16 KB and 10 a minute per address |
 | GET | `/api/lifecycle/config` | public | Feature flags, reporting floors, check-in days, link lifetime, template tracks and levels |
 
 ## Auth and account
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| POST | `/api/signup` | Firebase login | Create an organisation, its first project and its admin `{name, org_name, project_name}` |
-| POST | `/api/invitations/accept` | Firebase login | Join the organisation that invited this email `{org_id}` |
+| POST | `/api/signup` | Firebase login | Create an organisation, its first project and its admin `{name, org_name, project_name, accept: ["terms", "privacy"]}`. `accept` is the person's acceptance of the current terms and privacy policy, recorded in the same request (`"recording"` and, for the new organisation, `"dpa"` may be added); without both, 422 `legal_required` and nothing is created |
+| POST | `/api/invitations/accept` | Firebase login | Join the organisation that invited this email `{org_id, accept: ["terms", "privacy"]}`; the acceptance is recorded in the same request (`"recording"` may be added); without both, 422 `legal_required` and nobody joins |
 | GET | `/api/me` | any | The caller, their organisation and projects |
 | POST | `/api/me/leave` | any | Leave the organisation (the login is freed for another invitation) |
 
@@ -147,9 +149,15 @@ Routes marked with a flag answer 404 while `FEATURES` turns it off ([ADMIN_GUIDE
 | POST | `/api/meetings` | admin, manager, expert, new hire | Schedule a session `{project_id, title, starts_at?, duration_min?, attendees?, provider?, join_url?}` |
 | POST | `/api/meetings/{meeting_id}/schedule` | managers, the booker, attendees | Give an unscheduled session its time and place |
 | POST | `/api/meetings/{meeting_id}/cancel` | managers, the booker | Cancel (and its calendar event) |
-| POST | `/api/meetings/{meeting_id}/recording/import` | managers, experts, the booker | Import the recording from Google Drive; 202; 409 `no_recording_yet` |
-| POST | `/api/meetings/{meeting_id}/recording` | managers, experts, the booker | Upload a recording (multipart `file`, `duration_s`); 404 in demo mode |
+| POST | `/api/meetings/{meeting_id}/recording/import` | managers, experts, the booker | Import the recording from Google Drive `{consent?: true}`; 202; 409 `no_recording_yet`; 422 `consent_required` when nobody has confirmed the session's recording consent and the request does not (nothing is fetched) |
+| POST | `/api/meetings/{meeting_id}/recording/upload` | managers, experts, the booker | Step 1 of an upload: `{filename, size, duration_s, consent?: true}` → an `upload_id` and where and how to send the file (a signed Cloud Storage URL on Google Cloud; this API with an `X-Upload-Token` self-hosted). No file is stored yet. `consent: true` is the caller's confirmation that everyone in the session was told it is recorded and agreed: it is recorded on the session and audited; without it (and with none on the session) 422 `consent_required`. 404 in demo mode |
+| POST | `/api/meetings/{meeting_id}/recording` | managers, experts, the booker | Self-hosted step 2: the file as the raw body with `X-Upload-Token` (204). Without the token, the older one-request upload (multipart `file`, `duration_s`, `consent=true`; 202; 422 `consent_required` without the consent, and nothing is stored). 404 in demo mode |
+| POST | `/api/meetings/{meeting_id}/recording/complete` | the person who started the upload | Step 3 `{upload_id}`: the file has arrived; it is checked and handed to the Note-taker, as any recording. 202; 422 `consent_required` (and the file is deleted) if the session has no recording consent; 404 in demo mode |
 | GET | `/api/meetings/{meeting_id}/recording` | members | A short-lived signed link to the video |
+| POST | `/api/meetings/{meeting_id}/recording/consent` | managers, experts, the booker | `{confirm: true}`: confirm that everyone in the session was told it is recorded and agreed. Answers `{meeting, statement}`; the session's `recording_consent` is `{by, by_name, at, notice_version}` (the first confirmation is kept; `notice_version` is the recording notice's version). A Google Calendar session's recording is imported by the poller only after this. Audited as `recording.consent_confirmed`. 409 for a cancelled session |
+| POST | `/api/meetings/{meeting_id}/recording/removal-requests` | members | `{reason?}` (1,000 characters at most): ask for the session's recording to be removed. 201 `{request, created}`; the project's managers are notified and nothing is removed. One open request per person and session (`created: false` returns it). 409 `nothing_recorded`. Audited as `recording.removal_requested` (never the reason) |
+| GET | `/api/recording-removal-requests` | members | `?project_id=&meeting_id=&status=open\|removed\|declined` → `{requests: [{id, meeting_id, requested_by, requested_by_name, reason, status, decided_by, decided_by_name, decided_at, note, created_at}]}`: all of the project's for managers and admins, the caller's own for anyone else |
+| POST | `/api/meetings/{meeting_id}/recording/removal-requests/{request_id}/decline` | managers | `{note?}`: decline one open request; whoever asked is notified with the note. 409 once decided. Removing the recording (`DELETE …/recording`) closes every open request of the session as `removed` and tells whoever asked |
 | GET | `/api/meetings/{meeting_id}/notes` | members | Summary, decisions, action items, links to code; the transcript for managers only |
 | GET | `/api/meetings/{meeting_id}/followups` | admin, manager | Follow-up sessions proposed after a recorded session |
 | GET | `/api/kt-plan?project_id=&presenter=` | admin, manager, expert | The KT planner: sessions that would close the gaps, with agendas and reasons; experts see their own |
@@ -181,7 +189,7 @@ Routes marked with a flag answer 404 while `FEATURES` turns it off ([ADMIN_GUIDE
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/api/approvals?project_id=&status=` | admin, manager | What agents proposed and wait for a person: `task_plan`, `review`, `kt_followup` (new kinds `rerecord`, `doc_edit`, `template_change` are landing this round) |
+| GET | `/api/approvals?project_id=&status=` | admin, manager | What agents proposed and wait for a person: `task_plan`, `review`, `kt_followup`, and the Keeper's and Planner's proposals `rerecord`, `doc_edit`, `template_change` (admins only decide a template change) |
 | POST | `/api/approvals/{approval_id}/decide` | admin, manager | Decide. Plans: `{approve: [task ids], edits: {id: {title?, description?, due_date?}}}`. Reviews: `{decision: "approved" | "changes_requested"}`. KT follow-ups: `{approve: [session keys]}`. 409 if already decided or out of date. |
 
 ## Lifecycle
@@ -190,15 +198,15 @@ Routes marked with a flag answer 404 while `FEATURES` turns it off ([ADMIN_GUIDE
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/api/home` | any | The caller's role home: `{role, focus, figure, sections}` |
+| GET | `/api/home` | any | The caller's role home: `{role, focus: [{key, priority, text, link, why, explain?}], figure: {label, value, how}, sections}`. A new hire's sections: `program`, `phases` (the board's milestones, each `{key, title, due_day, due_date, state: done \| current \| upcoming, tasks_done, tasks_total}`), `current` (the current milestone with up to 8 tasks `{id, title, kind, status, due_date, pr_number}`), `first_task`, `questions`. A manager's: `hires`, `approvals {count, items}`, `activity`; an admin's also `setup` and the figure "People on projects". `activity` is up to 8 product events, newest first, `{id, at, action, text, link, actor: {id, name}}`: board moves and edits (`link` `/board/<onboarding id>`; a run of moves by one person on one board within 10 minutes is one line, "moved 3 tasks on Vijay's board"), enrolments, plans decided, KT sessions and recordings, check-ins, handovers started, documents and repositories. Admins get the organisation's events; a manager only events that happened in their own projects (placed by the entry's `project_id`, its onboarding or its target; an event that cannot be placed is left out). Security events (sign-ins, exports, role changes, reads of the audit log) never appear. Reading the home writes nothing. |
 | GET | `/api/setup` | admin | Setup steps and their status; minutes per avoided interruption |
 | PATCH | `/api/setup` | admin | `{step, action: complete | skip | reopen}` or `{minutes_per_interruption}` |
 | GET | `/api/teams?project_id=` | admin, manager | Teams |
 | POST | `/api/teams` | admin, manager | Create a team `{project_id, name}` |
 | PATCH | `/api/teams/{team_id}` | admin, manager | Rename `{name}` |
 | GET | `/api/programs/templates?include_inactive=` | admin, manager | Program templates (16 defaults on first read) |
-| POST | `/api/programs/templates` | admin | Create a template `{key, title, role_track, level, duration_days?, milestones?, …}` |
-| PATCH | `/api/programs/templates/{template_id}` | admin | Change a template: makes a new version |
+| POST | `/api/programs/templates` | admin | Create a template `{key, title, role_track, level, duration_days?, milestones?, phases?, …}`. `milestones` are the program's checkpoints (pre-boarding done, first PR merged …); `phases` are the board's milestones `[{key?, title, due_day}]`, at most 12, distinct days (empty: days 15, 30, 45, 60 and 90) |
+| PATCH | `/api/programs/templates/{template_id}` | admin | Change a template, `phases` included: makes a new version. A program takes its template's board milestones the first time its board is read; later changes to the template do not touch running boards |
 
 ### Enrolment and the program
 
@@ -206,10 +214,36 @@ Routes marked with a flag answer 404 while `FEATURES` turns it off ([ADMIN_GUIDE
 |---|---|---|---|
 | POST | `/api/onboardings/enrol` | admin, manager | Invitation + program + drafted plan in one step `{project_id, email, name, start_date, template_id, github_login?, team_id?, mentor_id?, focus_area?, role_title?}`; 201 `{onboarding, program, invitation, plan}` |
 | GET | `/api/onboardings/{onboarding_id}/program` | the hire, their mentor, managers | Profile, plan status, milestones, plan items, access, acknowledgements, environment checks, pre-boarding, first task |
-| PATCH | `/api/onboardings/{onboarding_id}/milestones/{key}` | admin, manager | `{status: pending | done | skipped, note?}` |
+| PATCH | `/api/onboardings/{onboarding_id}/milestones/{key}` | admin, manager (never the hire themselves, whatever their role) | A checkpoint: `{status: pending | done | skipped, note?}` |
 | GET | `/api/onboardings/{onboarding_id}/access` | the hire, their mentor, managers, item owners | The access checklist |
 | POST | `/api/onboardings/{onboarding_id}/access` | admin, manager | Request access `{system, owner_id?}` |
 | PATCH | `/api/onboardings/{onboarding_id}/access/{item_id}` | the item's owner, managers | `{status: requested | granted | not_needed}` |
+
+### The milestone board
+
+One hire's tasks by milestone (Day 15, 30, 45, 60, 90 by default) and by column (To do, In progress, Done), for the hire and
+the project's managers and admins ([specs/lifecycle.md](specs/lifecycle.md), `app/lifecycle/board.py`). The columns are the
+task's own status: To do = `approved`; In progress = `in_progress`, `changes_requested`; Done = `submitted` (waiting for
+sign-off, or in review with a pull request) and `done`. Proposed tasks wait in Approvals and are not on the board. A mentor
+gets 403; anyone unrelated, 404. A hire is never the manager of their own board, whatever their role (403). Every write
+answers with the whole board, and is audited (`board.task.moved`, `board.task.rescheduled`, `board.task.added`,
+`board.task.changed`, `board.task.removed`, `board.milestone.added`, `board.milestone.changed`, `board.milestone.removed`,
+`board.milestones.reordered`; each entry's detail names the onboarding and the project, and a task entry the task's title).
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| GET | `/api/board/hires?project_id=` | admin, manager, the hire | The hire picker `{hires: [{onboarding_id, name, role_title, day, duration_days, status, total, done, overdue, current}], can_manage}`: every active hire for managers, their own row for a hire |
+| GET | `/api/onboardings/{onboarding_id}/board` | the hire, managers | `{onboarding_id, project_id, status, hire, role_title, start_date, today, day, duration_days, columns, milestones, tasks, current, waiting_approval, can: {move, reschedule, edit}}`. Each milestone: `{key, title, due_day, due_date, from_day, position, state: complete \| overdue \| current \| past \| upcoming, total, done, awaiting, overdue, counts, checkpoints, moved_out}`. Each card: `{id, title, description, kind, status, column, badge, milestone, pinned, due_date, due_day, overdue, kt, pr_number, pr_url, acceptance_criteria, review_pending, moved, history, moves}` (`moves`: the columns this caller may move it to) |
+| POST | `/api/onboardings/{onboarding_id}/board/tasks/{task_id}/move` | the hire (own cards, columns only), managers | `{column?: todo \| in_progress \| done, milestone?: <key>, before_id?, changes_requested?, sign_off?}`. The hire's Done is `submitted` (their manager signs it off); only managers move between milestones, sign off, ask for changes and reopen a done task. 403 `manager_only`/`done`, 409 `awaiting_approval` (still in Approvals), `in_review` (a pull request decides it), `inactive`; 422 when `before_id` is not on the board |
+| POST | `/api/onboardings/{onboarding_id}/board/tasks` | admin, manager | Add a task `{title, description?, kind?: learn \| code \| meet, milestone?, due_date?}` (default: the current milestone, due on its day); 201 |
+| PATCH | `/api/onboardings/{onboarding_id}/board/tasks/{task_id}` | admin, manager | `{title?, description?, due_date?}` |
+| DELETE | `/api/onboardings/{onboarding_id}/board/tasks/{task_id}` | admin, manager | Remove it from the board (the task is rejected; its history and reviews stay). 409 `review_pending` while a review waits in Approvals |
+| POST | `/api/onboardings/{onboarding_id}/board/milestones` | admin, manager | Add a milestone `{title, due_day: 1..730}`; 201. 409 `day_taken`, `too_many` (12) |
+| PATCH | `/api/onboardings/{onboarding_id}/board/milestones/{milestone_key}` | admin, manager | Rename or re-date `{title?, due_day?}`; tasks placed by date re-flow |
+| PUT | `/api/onboardings/{onboarding_id}/board/milestones/order` | admin, manager | `{keys: [...]}`: those first, in that order, the rest after |
+| DELETE | `/api/onboardings/{onboarding_id}/board/milestones/{milestone_key}?move_to=` | admin, manager | Remove a milestone; its tasks move to `move_to` (default: the next one by day), each move recorded. 409 `last_one` |
+
+The hire and the other side are notified when a change concerns them (`/board/<onboarding id>` links).
 
 ### Pre-boarding (flag `preboarding`)
 
@@ -261,7 +295,12 @@ Unknown, replaced, expired and over-long tokens all answer the same 404.
 |---|---|---|---|---|
 | GET | `/api/handovers?project_id=` | admin, manager | Handover plans | `handover` |
 | POST | `/api/handovers` | admin, manager | Draft one `{project_id, user_id, last_day}` | `handover` |
-| PATCH | `/api/handovers/{handover_id}` | admin, manager | `{status?, done?, undone?, successor_id?, reassign?}` | `handover` |
+| PATCH | `/api/handovers/{handover_id}` | admin, manager | `{status?: draft \| in_progress, done?: [key], undone?: [key], successor_id?, reassign?}`. `done` and `undone` take item and gap keys of this handover's transfer set (`<kind>:<ref>`, or a gap's key such as `codeowners`; up to 500 each, 1,200 characters each): any other key is 422 and nothing is saved. `successor_id`, and with `reassign` the successor already stored on the plan, must be an active expert, manager or admin of the project other than the leaver (422 otherwise, before anything is written). `reassign` runs the transfer and records `handover.transferred {to, user_id, moved}` as well as `handover.updated`. `status: done` is 422: complete it instead | `handover` |
+| GET | `/api/handovers/{handover_id}/transfer` | admin, manager | The live transfer set: `{handover_id, status, last_day, days_left, person, successor, new_owner, transfer, completed, repository, sections, gaps, completeness: {total, done, moves, todo, percent}, coverage, codeowners: {login, new_login, lines: [{before, after}]}, attachable: {repository, documents}, can_complete, can_deactivate, ticked, note}`. Nine sections (code, documents, kt, sessions, people, questions, approvals, access, feedback), each `{key, title, how, count, done, moves, todo, items (first 100), more}`; an item is `{key, title, state: moves \| todo \| done, detail, href, url, owner_id, kt, gap}` | `handover` |
+| POST | `/api/handovers/{handover_id}/transfer` | admin, manager | Move what Welcome Wave holds to `{successor_id}`: mentees, hires they manage, open questions, access items and feedback. Run again, it moves what landed on them since. `{handover, moved: {mentee, managed, request, access, feedback}}`; 422 for a successor who may not take over; 409 once complete | `handover` |
+| POST | `/api/handovers/{handover_id}/attachments` | admin, manager | Attach a document the handover did not find `{kind: repo \| document \| link, ref?, url?, title?, note?, owner_id?}`: a file of the indexed repository (with its GitHub link), a document uploaded to the project, or an https link (title required). 201 `{handover, attachment}`; 409 if already listed or attached (at most 100) | `handover` |
+| DELETE | `/api/handovers/{handover_id}/attachments/{attachment_id}` | admin, manager | Remove an attachment `{handover}` | `handover` |
+| POST | `/api/handovers/{handover_id}/complete` | admin, manager; `deactivate` admins only | `{confirm: "<the leaver's name>", accept_gaps?, deactivate?}`. Re-checks the stored successor (422), moves what is still on the leaver, and records accepted gaps. 409 `open_gaps` (with `gaps`) unless `accept_gaps`; with `deactivate`, 409 for oneself, another open handover for them, the last active admin, or `held_elsewhere` (with `projects`) while they still manage or mentor an active hire, or hold open questions, access items or feedback in another project. `{handover, moved, deactivated, accepted_gaps}` | `handover` |
 | GET | `/api/onboardings/{onboarding_id}/visibility` | the hire, managers | Every data point others can read about the hire, with who reads it (`visible_to`: hire, mentor, manager, `expert`, `owner`, `admin`) and the same values: now including `requests` (questions sent to a person), `reviews`, `feedback` (their notes) and `audit` (their own actions) | |
 | GET | `/api/reports/onboarding?project_id=&team_id=` | admin, manager, executive | The leadership report: figures for this cohort and the previous one, each with how it is worked out; `teams` repeats the figures per team with the same floors; `team_id` narrows it to one team; `single_owner_critical_areas` is a count of code areas one person alone owns (no names); `surveys` is floored per team and survey day (five or more people) | `reports` |
 | GET | `/api/reports/onboarding.csv?project_id=&team_id=` | admin, manager, executive | The same as CSV, with team rows | `reports` |
@@ -277,17 +316,18 @@ Unknown, replaced, expired and over-long tokens all answer the same 404.
 | GET | `/api/live` | any | Server-sent events `{t: topic, p: project}`; re-fetch through the normal API. Pings every 20 s, closes after 15 minutes. |
 | GET | `/api/blobs/{token}` | public (signed link) | A file behind a short-lived signed link (self-hosted storage) |
 
-## Agents (landing this round)
+## Agents
 
-The multi-agent restructure (one Supervisor, eight specialists; [AGENTS.md](AGENTS.md)) adds these routes. They are not in the
-route list above and not yet in [PERMISSIONS.md](PERMISSIONS.md).
+One Supervisor and eight specialists ([AGENTS.md](AGENTS.md); the code layout in [LANGGRAPH.md](LANGGRAPH.md)).
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/api/agents` | admin, manager (landing this round) | The agents and their state |
-| GET | `/api/agents/runs` | admin, manager (landing this round) | Recent agent runs |
-| PATCH | `/api/agents/{key}` | admin (landing this round) | Set an agent's mode: `ai` or `rules` |
-| POST | `/api/agents/tick` | (landing this round) | Run the agents' scheduled work now |
+| GET | `/api/agents` | admin, manager, executive | The roster: each agent's mode, recent runs and pending proposals |
+| GET | `/api/agents/runs` | admin, manager | Recent runs; summaries never quote a hire's question or a private review |
+| GET | `/api/agents/runs/{run_id}` | own | One run and its shared trace: the asker's own run, any run of the project for its managers; a private run (pre-submit review) its own user alone |
+| PATCH | `/api/agents/{agent_key}` | admin | `{mode: ai \| rules}` for the organisation; the Supervisor and the Librarian answer 409 |
+| POST | `/api/agents/tick` | admin, manager | Demo and self-hosted: run the daily tick now (404 on Google Cloud, where Cloud Scheduler calls `/internal/lifecycle/tick`) |
+| POST | `/api/ask/free` | any except executive | A free-form request: the Supervisor picks the Guide (an answer) or proposes what the Coach, Planner or Scout would do |
 
 ## Members
 
@@ -297,13 +337,45 @@ route list above and not yet in [PERMISSIONS.md](PERMISSIONS.md).
 | PATCH | `/api/org/members/{user_id}` | admin | Change a role `{role}`; 409 `last_admin` |
 | POST | `/api/org/members/{user_id}/deactivate` | admin | Deactivate; returns `needs_reassignment` (open questions, mentees); 409 `self` or `last_admin` |
 | POST | `/api/org/members/{user_id}/reactivate` | admin | Reactivate |
+| POST | `/api/org/people/erase` | admin | `{email, confirm}` (the address typed again): replace the person's name, email and GitHub username, unbind their login, delete their chat history, questions, notifications and invitations; ids stay so the organisation's records hold together; the answer lists what is kept. Cannot be undone; 409 for oneself or the last active admin. Audited |
+| PATCH | `/api/projects/{project_id}/members/{user_id}` | admin, manager | A project member's GitHub username `{github_login}`; audited, and the person is told |
 
 ## Audit
 
 | Method | Path | Who | Purpose |
 |---|---|---|---|
-| GET | `/api/audit?action=&actor=&target=&since=&until=&limit=&offset=` | admin | One page of the log, newest first: `{items, total, limit, offset, next_offset, retention_days}`. `action` may end in `*`. Audited (`audit.viewed`). |
-| GET | `/api/audit.csv?action=&actor=&target=&since=&until=` | admin | Every matching entry as CSV (up to `AUDIT_EXPORT_MAX_ROWS`). Audited (`audit.exported`). |
+| GET | `/api/audit` | admin | One page, newest first by default. Parameters: `sort` (time, action, actor, target), `order` (desc, asc), `action` (exact, or a prefix ending in `*`), `exclude_action` (the same syntax, left out; the web app sends `audit.viewed` unless "Show views of this log" is ticked), `actor` (user id, email, or `system`), `target` (exact), `since` / `until` (ISO date or date-time; `since` includes its instant, `until` excludes its own; a date-only `until` includes that UTC day; the web app sends the viewer's own local midnights), `limit` 1–200 (default 50), `offset`, `as_of`. Response `{items, total, limit, offset, next_offset, sort, order, page, pages, as_of, retention_days}`. Audited (`audit.viewed`). |
+| GET | `/api/audit.csv` | admin | The same filters, `sort`, `order` and `as_of`, every match (up to `AUDIT_EXPORT_MAX_ROWS`) in that order; Postgres reads it from one snapshot. Audited (`audit.exported`, with the filters, and sort and order when not the default). |
+| GET | `/api/audit/facets` | admin | The filter menus: `{actions: [{action, count}], actors: [{id, name, email, count}], system, first_at, last_at, retention_days}`. Audited (`audit.viewed {facets: true}`). |
+
+- **Order.** Equal values break newest first (created_at desc, then id desc); for `sort=time` both follow the asked order. For
+  `sort=actor`, entries with no person ("System") come last both ways. Text compares case-insensitively by code point, so
+  Postgres and the in-memory store give the same pages.
+- **Snapshot.** Each read writes an `audit.viewed` entry, which would be the newest row. `as_of` in a response is the newest
+  entry's id when that page was read (before its own entry); send it back with the next pages and the CSV, and they hold only
+  entries up to it, so paging never repeats or skips a row. The web app keeps it until a filter, the order or Refresh changes.
+- **Items** `{id, created_at, actor_id, actor_name, actor_email, action, target, detail, target_kind, target_name, target_link}`.
+  `target_kind` is person, onboarding (named for the hire; a board milestone's links to `/board/<id>`), meeting, project,
+  organisation, access, handover, feedback, task (board and task moves: "<title> · <hire>'s board", linking to the board),
+  or null. Only this organisation's records are named; a failed lookup leaves the raw id.
+- **Errors.** 422 for an unknown sort or order, a malformed date, `since` not before `until`, or a negative `as_of`; 403 for
+  non-admins; 401 signed out.
+
+## Legal acceptances
+
+Who accepted which version of which document ([specs/legal-consent.md](specs/legal-consent.md)). The documents are pages of
+the web app; the API keeps their versions (`GET /api/config` → `legal.versions`) and the acceptances.
+
+| Method | Path | Who | Purpose |
+|---|---|---|---|
+| GET | `/api/legal/status` | any | `{needs: ["terms", "privacy", "recording"], accepted: [{document, version, at}], versions, required: ["terms", "privacy"], enforced}`. `needs`: the personal documents whose current version the caller has not accepted (again after every version change) |
+| POST | `/api/legal/accept` | any | `{documents: ["terms", "privacy", "recording"], versions?: {terms: "YYYY-MM-DD"}}`: record the current version of each for the caller. Answers the status plus `recorded` (the ones that were new). 422 `unknown_document`, or `dpa_is_organisation` for `"dpa"`; 409 `version_changed` when `versions` names one that is no longer current. Audited `legal.accepted` |
+| GET | `/api/org/legal` | admin | `{dpa: {version, accepted, accepted_at, accepted_by: {id, name, email}, previous: [{version, accepted_at, accepted_by}]}, versions, operator}` |
+| POST | `/api/org/legal/dpa` | admin | `{version?}`: accept the current data-processing agreement for the organisation. Answers `GET /api/org/legal` plus `recorded` (false when it was accepted already: the first acceptance stands). 409 `version_changed`. Audited `legal.dpa_accepted` |
+| GET | `/api/org/legal/dpa/record` | admin | The acceptance as a text file (`?version=`, default the newest accepted): organisation, version, time, who. 404 `dpa_not_accepted` |
+
+With `LEGAL_ENFORCE=true` (off by default), signed-in routes outside the short list in [PERMISSIONS.md](PERMISSIONS.md) answer 403
+`{code: "legal_required", message, needs, versions}` until the caller has accepted the current terms and privacy policy.
 
 ## Organisation data
 
@@ -321,6 +393,7 @@ route list above and not yet in [PERMISSIONS.md](PERMISSIONS.md).
 | POST | `/internal/outbox/flush` | Cloud Scheduler (Google OIDC) | Re-send events whose publish failed; 503 while some are still waiting |
 | POST | `/internal/recordings/poll` | Cloud Scheduler (Google OIDC) | Import ended Google sessions' recordings; mark long-silent ones ended |
 | POST | `/internal/audit/purge` | Cloud Scheduler (Google OIDC) | Delete audit entries older than `AUDIT_RETENTION_DAYS` |
+| POST | `/internal/lifecycle/tick` | Cloud Scheduler (Google OIDC) | The agents' daily tick (blockers, milestones, nudges) |
 
 The `/internal` routes accept only a Google-signed token for `OUTBOX_FLUSH_AUDIENCE` from `OUTBOX_FLUSH_INVOKER`; without those
 settings they are off.
@@ -336,6 +409,7 @@ Registered only when `MODE=demo`; production never has them.
 | POST | `/api/demo/invitations/accept` | public | Join as an invitee `{project_id, invitation_id}` |
 | POST | `/api/demo/pull-request` | new hire (own code task) | Stands in for GitHub: opens a pull request (or pushes a commit) for `{task_id}` through the real webhook handler; the Review agent reviews the demo diff |
 | POST | `/api/demo/advance` | admin, manager | The demo clock: `{days: 1..90}` moves every program forward, runs milestones and blocker rules. Flag `demo_clock`. |
+| POST | `/api/demo/reset` | admin, manager | The seeded organisation again, at day 0 |
 
 ## Example (demo)
 

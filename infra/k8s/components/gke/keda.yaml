@@ -1,0 +1,50 @@
+# KEDA scales each worker on its Pub/Sub subscription's backlog (unacknowledged messages), reading it with its own Workload
+# Identity (KEDA is installed once per cluster: infra/scripts/bootstrap-cluster.sh). The worker Deployments name no replica
+# count, so a deploy never resets what KEDA chose and never stops a meeting mid-analysis.
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: gcp-wi
+spec:
+  podIdentity: { provider: gcp }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: meeting-worker
+spec:
+  scaleTargetRef: { name: meeting-worker }
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  cooldownPeriod: 600
+  triggers:
+    - type: gcp-pubsub
+      authenticationRef: { name: gcp-wi }
+      metadata: { subscriptionName: ww-meetings-sub, mode: SubscriptionSize, value: "1" } # one pod per waiting meeting
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: ingestion-worker
+spec:
+  scaleTargetRef: { name: ingestion-worker }
+  minReplicaCount: 0
+  maxReplicaCount: 4
+  cooldownPeriod: 300
+  triggers:
+    - type: gcp-pubsub
+      authenticationRef: { name: gcp-wi }
+      metadata: { subscriptionName: ww-ingestion-sub, mode: SubscriptionSize, value: "3" }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: review-worker
+spec:
+  scaleTargetRef: { name: review-worker }
+  minReplicaCount: 1 # pull-request reviews and plans start within seconds
+  maxReplicaCount: 4
+  triggers:
+    - type: gcp-pubsub
+      authenticationRef: { name: gcp-wi }
+      metadata: { subscriptionName: ww-reviews-sub, mode: SubscriptionSize, value: "5" }

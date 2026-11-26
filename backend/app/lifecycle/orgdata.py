@@ -9,7 +9,8 @@ Deletion removes everything of the organisation, and "everything" is more than r
   * the database rows, and the outbox events of its projects (the store's delete_org, in one transaction);
   * the stored files, found by the uris its documents and call recordings hold (Cloud Storage or the data folder);
   * the LangGraph checkpoints of the runs its approvals paused (a paused run keeps its saved state until it is decided);
-  * in the demo, the Google Calendar connection and the Calendly links (they live next to the rows there).
+  * in the demo, the Google Calendar connection and the Calendly links (they live next to the rows there);
+  * outside the demo, the Google grant itself: the refresh token is revoked at Google (best effort, logged when it fails).
 The files and checkpoints are found BEFORE the rows go, because the rows are what name them."""
 from __future__ import annotations
 
@@ -36,7 +37,10 @@ def delete(c, org_id: str) -> dict[str, int]:
     logged and counted under `stored_files_failed` / `checkpoint_threads_failed`, and never undoes the rest."""
     uris = c.lifecycle.org_blob_uris(org_id)
     threads = c.lifecycle.org_thread_ids(org_id)
+    grant = _google_grant(c, org_id)
     counts = c.lifecycle.delete_org(org_id)  # the rows: one transaction, or nothing was deleted and this raises
+    if grant:  # after the rows: a deletion that failed must not leave the organisation with a dead connection
+        counts["google_grant_revoked" if _revoke_google(c, org_id, grant) else "google_grant_revoke_failed"] = 1
     files = failed = 0
     for uri in uris:
         try:
@@ -60,3 +64,31 @@ def delete(c, org_id: str) -> dict[str, int]:
     if lost:
         counts["checkpoint_threads_failed"] = lost
     return {k: n for k, n in counts.items() if n}
+
+
+def _google_grant(c, org_id: str) -> str | None:
+    """The organisation's Google refresh token, decrypted, so the grant can be revoked once its rows are gone: deleting the
+    encrypted row alone would leave Welcome Wave's Calendar and Drive access live in the customer's Google account (and
+    usable from a backup together with TOKEN_ENCRYPTION_KEY). None in the demo, with no connection, or with an unreadable token."""
+    if c.settings.is_demo:
+        return None
+    try:
+        conn = c.store.calendar_connection(org_id, "google")
+        if not conn or not conn.get("refresh_token_enc"):
+            return None
+        from app.services import scheduling
+
+        return scheduling.decrypt_token(c.settings, conn["refresh_token_enc"])
+    except Exception:  # noqa: BLE001 - never stop the deletion over this
+        log.warning("google grant not read", extra={"extra_fields": {"org_id": org_id}}, exc_info=True)
+        return None
+
+
+def _revoke_google(c, org_id: str, token: str) -> bool:
+    from app.adapters.google_calendar import revoke
+
+    ok = revoke(token, transport=c.extras.get("google_transport"))
+    if not ok:
+        log.warning("google grant not revoked: the customer can remove it in their Google account",
+                    extra={"extra_fields": {"org_id": org_id}})
+    return ok

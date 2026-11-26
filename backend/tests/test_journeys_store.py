@@ -6,7 +6,7 @@ from datetime import date
 
 from app.adapters.memory import MemoryIndex
 from app.adapters.postgres import PgIndex, PgStore
-from app.agents.schemas import Chunk, ProposedTask, QAResult
+from app.agents.core.schemas import Chunk, ProposedTask, QAResult
 from app.services.embeddings import HashEmbedder
 from tests import test_round3_store as r3
 from tests.test_round3_store import _join, _onboarding, _org, _result

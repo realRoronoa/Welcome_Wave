@@ -17,6 +17,13 @@ function nextMonday() {
   return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
 }
 
+/** #/enrol?email=…&name=…&github=…: a person already in the project (Settings > Onboarding links here), whose onboarding the
+ *  enrolment starts, or adopts when one was started without a program. */
+function prefill() {
+  const q = new URLSearchParams(location.hash.split("?")[1] ?? "");
+  return { name: q.get("name") ?? "", email: q.get("email") ?? "", github_login: q.get("github") ?? "" };
+}
+
 export default function Enrol() {
   const { project, me } = useSession();
   const templates = useApi<Template[]>("/programs/templates");
@@ -25,7 +32,7 @@ export default function Enrol() {
   const modules = useApi<{ modules: { module: string }[] }>(`/coverage?project_id=${encodeURIComponent(project.id)}`, ["sources"]);
   const act = useAction();
   const [done, setDone] = useState<{ r: Enrolled; name: string; email: string; template: Template | null } | null>(null);
-  const [f, setF] = useState({ name: "", email: "", github_login: "", start_date: nextMonday(), template_id: "", team_id: "", mentor_id: "", focus_area: "", role_title: "" });
+  const [f, setF] = useState(() => ({ ...prefill(), start_date: nextMonday(), template_id: "", team_id: "", mentor_id: "", focus_area: "", role_title: "" }));
   const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
 
   const byTrack = useMemo(() => {
