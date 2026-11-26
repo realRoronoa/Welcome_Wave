@@ -1,0 +1,95 @@
+# Render Blueprint for Welcome Wave API (Free Tier + Neon Postgres)
+# See docs/FREE_CLOUD_DEPLOY.md for Neon + Render + Vercel setup steps.
+
+services:
+  - type: web
+    name: welcome-wave-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    healthCheckPath: /health
+    dockerCommand: >-
+      sh -c 'if [ "${MODE:-demo}" = "self_hosted" ] && [ -n "${DATABASE_URL_OWNER:-}" ]; then python -m app.migrate; fi && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --proxy-headers --timeout-graceful-shutdown 20'
+    envVars:
+      # Switch MODE to "demo" (with ENV=dev) to run in-memory without Neon or Firebase.
+      - key: MODE
+        value: self_hosted
+      - key: ENV
+        value: prod
+      - key: DATA_DIR
+        value: /data
+      # Vercel rewrite + Render edge proxy append two X-Forwarded-For hops.
+      - key: RATE_LIMIT_TRUSTED_HOPS
+        value: "2"
+      # Keep pools and worker threads conservative for Render Free (512 MB RAM).
+      - key: LOCAL_WORKERS
+        value: "2"
+      - key: DB_POOL_SIZE
+        value: "3"
+      - key: DB_MAX_OVERFLOW
+        value: "3"
+      - key: CHECKPOINT_POOL_SIZE
+        value: "2"
+      - key: MODEL_FAST
+        value: gemini-3.5-flash-lite
+      - key: MODEL_SMART
+        value: gemini-3.5-flash
+      - key: MODEL_FALLBACK
+        value: gemini-3.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash
+      - key: SIGNUP_ENABLED
+        value: "true"
+
+      # --- Required when MODE=self_hosted (set in Render Dashboard) ---
+      - key: PUBLIC_URL
+        sync: false # e.g. https://welcome-wave.vercel.app
+      - key: DATABASE_URL_OWNER
+        sync: false # Neon direct owner connection string (postgresql://...) for automatic migrations
+      - key: APP_DB_PASSWORD
+        sync: false # Password that python -m app.migrate sets on the ww_app role
+      - key: DATABASE_URL
+        sync: false # postgresql+psycopg://ww_app:<APP_DB_PASSWORD>@<neon-host>/<db>?sslmode=require
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_API_KEY
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false # <firebase-project-id>.firebaseapp.com
+      - key: GEMINI_API_KEY
+        sync: false
+
+      # --- Recommended persistent secrets (so tokens/links survive container restarts) ---
+      - key: TOKEN_ENCRYPTION_KEY
+        generateValue: true
+      - key: BLOB_SIGNING_KEY
+        generateValue: true
+
+      # --- Optional integrations ---
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_ID
+        sync: false
+      - key: GOOGLE_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: AGORA_APP_ID
+        sync: false
+      - key: AGORA_APP_CERTIFICATE
+        sync: false
+      - key: AGORA_CUSTOMER_ID
+        sync: false
+      - key: AGORA_CUSTOMER_SECRET
+        sync: false
+      - key: MURF_API_KEY
+        sync: false
+      - key: VOICE_TOOL_URL
+        sync: false
