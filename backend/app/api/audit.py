@@ -1,14 +1,23 @@
 """The audit log: who did what, when, in this organisation. Admins only.
 
-    GET  /api/audit          one page, newest first; filters: action (exact, or a prefix ending in *), actor (user id or
-                             email), target, since / until (ISO date or date-time; a date-only `until` includes that day)
-    GET  /api/audit.csv      the same filters, every matching entry (at most AUDIT_EXPORT_MAX_ROWS) as a CSV download
+    GET  /api/audit          one page. Order: sort = time | action | actor | target, order = desc | asc (default: time, desc,
+                             newest first; equal values break the same way every time, see app/adapters/audit_store.py).
+                             Filters: action (exact, or a prefix ending in *), exclude_action (the same, left out), actor
+                             (user id, email, or "system" for entries no person made), target, since / until (ISO date or
+                             date-time; a date-only `until` includes that day, in UTC: the web app sends the exact instants of
+                             the viewer's own days). Paging: limit (1-200) and offset; `total` counts every match.
+                             Snapshot: the response's `as_of` is the newest entry's id when the page was read; sent back
+                             with the next pages (and the CSV), they leave out what was written since, so paging never
+                             repeats or skips a row although every read writes an entry.
+    GET  /api/audit.csv      the same filters, order and as_of, every matching entry (at most AUDIT_EXPORT_MAX_ROWS) as a CSV download
+    GET  /api/audit/facets   what the log holds, for the filter menus: each action and each person with their entry counts
     POST /internal/audit/purge   deletes entries older than AUDIT_RETENTION_DAYS in every organisation. Called by Cloud
                              Scheduler with a Google-signed OIDC token, exactly like POST /internal/outbox/flush (same
                              audience and invoker settings); off without that setup. Self-hosted mode runs it once a day.
 
-Reading the log is itself recorded (audit.viewed), as is every export (audit.exported) and purge (audit.purged).
-Nothing here edits an entry. The rows come from `store.audit(...)` calls across the API and the database functions.
+Reading the log is itself recorded (audit.viewed, the facets too), as is every export (audit.exported) and purge
+(audit.purged). Nothing here edits an entry. The rows come from `store.audit(...)` calls across the API and the database
+functions.
 """
 from __future__ import annotations
 
@@ -19,6 +28,7 @@ import logging
 import threading
 from datetime import date, datetime, time, timedelta, timezone
 from functools import lru_cache
+from typing import Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from fastapi.responses import Response
@@ -66,21 +76,136 @@ def _when(value: str | None, end: bool) -> datetime | None:
     return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
 
 
-def _filter(user: User, action, actor, target, since, until) -> AuditFilter:
+Sort = Literal["time", "action", "actor", "target"]
+Order = Literal["desc", "asc"]
+
+
+def _filter(user: User, action, actor, target, since, until, exclude_action=None, as_of: int | None = None) -> AuditFilter:
     f = AuditFilter(org_id=user.org_id, action=action or None, actor=actor or None, target=target if target else None,
-                    since=_when(since, end=False), until=_when(until, end=True))
+                    since=_when(since, end=False), until=_when(until, end=True), exclude_action=exclude_action or None,
+                    max_id=as_of)
     if f.since and f.until and f.since >= f.until:
         raise HTTPException(422, "`since` must be before `until`.")
     return f
 
 
-def _filters_used(f: AuditFilter) -> dict:
-    return {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in
-            {"action": f.action, "actor": f.actor, "target": f.target, "since": f.since, "until": f.until}.items() if v}
+def _filters_used(f: AuditFilter, sort: str = "time", order: str = "desc") -> dict:
+    """The filters a read used, for its own audit entry (the order only when it is not the default)."""
+    used = {k: (v.isoformat() if isinstance(v, datetime) else v) for k, v in
+            {"action": f.action, "exclude_action": f.exclude_action, "actor": f.actor, "target": f.target, "since": f.since,
+             "until": f.until}.items() if v}
+    if (sort, order) != ("time", "desc"):
+        used.update(sort=sort, order=order)
+    return used
+
+
+def _iso(value: datetime | None) -> str | None:
+    return value.isoformat() if value else None
 
 
 def _json(row: dict) -> dict:
-    return {**row, "created_at": row["created_at"].isoformat() if row["created_at"] else None}
+    return {**row, "created_at": _iso(row["created_at"])}
+
+
+def _retention_days() -> int:
+    return max(audit_store.MIN_RETENTION_DAYS, audit_settings().audit_retention_days)
+
+
+def _describe_lifecycle(c, org_id: str, rows: list[dict]) -> None:
+    """Name the targets that live in the lifecycle store (access items, handovers, documentation feedback), for rows the
+    core lookup left unnamed. Only this organisation's records are named; a failed lookup leaves the raw target."""
+    lc = getattr(c, "lifecycle", None)
+    if lc is None:
+        return
+    people: dict[str, str | None] = {}
+
+    def person(user_id: str | None) -> str | None:
+        if user_id and user_id not in people:
+            u = c.store.get_user(user_id)
+            people[user_id] = u.name if u and u.org_id == org_id else None
+        return people.get(user_id) if user_id else None
+
+    def project_org(project_id: str) -> str | None:
+        try:
+            return c.store.get_project(project_id).org_id
+        except Exception:  # noqa: BLE001 - unknown or malformed: not ours
+            return None
+
+    for r in rows:
+        if r.get("target_kind") or not r.get("target"):
+            continue
+        head, target = r["action"].split(".", 1)[0], r["target"]
+        try:
+            if head == "access":
+                item = lc.get_access_item(target)
+                ob = c.store.get_onboarding(item.onboarding_id) if item else None
+                if item and ob and project_org(ob.project_id) == org_id:
+                    hire = person(ob.new_hire_id)
+                    r.update(target_kind="access", target_link=f"/program/{ob.id}?tab=access",
+                             target_name=f"{item.system} access" + (f" for {hire}" if hire else ""))
+            elif head == "handover":
+                h = lc.get_handover(target)
+                if h and h.org_id == org_id:
+                    r.update(target_kind="handover", target_link="/handovers", target_name=person(h.user_id) or "A former member")
+            elif head == "feedback":
+                fb = lc.get_feedback(target)
+                if fb and project_org(fb.project_id) == org_id:
+                    r.update(target_kind="feedback", target_link=None, target_name=fb.target_kind)
+        except Exception:  # noqa: BLE001 - names are a convenience
+            continue
+
+
+BOARD_TASK_ACTIONS = ("board.task.", "task.moved")
+
+
+def _describe_board(c, org_id: str, rows: list[dict]) -> None:
+    """Board entries read as the board: a task's target is named for the task ("Task · <title>", from the entry or the task
+    itself) and links to the hire's board; a board milestone's onboarding target links to the board, not the program."""
+    postgres = audit_store.is_postgres(c.store)
+    project_org: dict[str, str | None] = {}
+
+    def org_of(project_id: str) -> str | None:
+        if project_id not in project_org:
+            try:
+                project_org[project_id] = c.store.get_project(project_id).org_id
+            except Exception:  # noqa: BLE001 - unknown: not ours
+                project_org[project_id] = None
+        return project_org[project_id]
+
+    for r in rows:
+        action, target, d = r["action"], str(r.get("target") or ""), r.get("detail") or {}
+        if action.startswith("board.") and r.get("target_kind") == "onboarding":
+            r["target_link"] = f"/board/{target.split(':', 1)[0]}"
+            continue
+        if r.get("target_kind") or not target or not action.startswith(BOARD_TASK_ACTIONS):
+            continue
+        try:
+            title, ob_id = d.get("title"), d.get("onboarding_id")
+            if not (title and ob_id) and (not postgres or audit_store._is_uuid(target)):
+                t = c.store.get_task(target)
+                title, ob_id = title or (t.title if t else None), ob_id or (t.onboarding_id if t else None)
+            ob = c.store.get_onboarding(str(ob_id)) if ob_id and (not postgres or audit_store._is_uuid(str(ob_id))) else None
+            if ob is None or org_of(ob.project_id) != org_id:
+                continue
+            hire = c.store.get_user(ob.new_hire_id)
+            r.update(target_kind="task", target_name=str(title or "A task")[:160] + (f" · {hire.name}'s board" if hire else ""),
+                     target_link=f"/board/{ob.id}")
+        except Exception:  # noqa: BLE001 - names are a convenience
+            continue
+
+
+def _describe(c, org_id: str, rows: list[dict]) -> None:
+    """Every name for a page's targets, from one database snapshot when the store is Postgres."""
+    def run():
+        audit_store.describe_targets(c.store, org_id, rows)
+        _describe_lifecycle(c, org_id, rows)
+        _describe_board(c, org_id, rows)
+
+    if audit_store.is_postgres(c.store):
+        with c.store.reading():
+            run()
+    else:
+        run()
 
 
 @router.get("/api/audit")
@@ -90,17 +215,33 @@ def list_audit(
     target: str | None = Query(None, max_length=500),
     since: str | None = Query(None, max_length=40),
     until: str | None = Query(None, max_length=40),
+    exclude_action: str | None = Query(None, max_length=120),
+    sort: Sort = Query("time"),
+    order: Order = Query("desc"),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0, le=1_000_000),
+    as_of: int | None = Query(None, ge=0, le=2**63 - 1),
     user: User = Depends(require("admin")),
     c=Depends(container),
 ):
-    f = _filter(user, action, actor, target, since, until)
-    rows, total = audit_store.page(c.store, f, limit, offset)
-    c.store.audit(user.org_id, user.id, "audit.viewed", "audit_log", {**_filters_used(f), "offset": offset, "shown": len(rows)})
+    if as_of is None:
+        as_of = audit_store.newest_id(c.store, user.org_id)  # read before this view's own entry is written
+    f = _filter(user, action, actor, target, since, until, exclude_action, as_of)
+    rows, total = audit_store.page(c.store, f, limit, offset, sort, order)
+    _describe(c, user.org_id, rows)
+    c.store.audit(user.org_id, user.id, "audit.viewed", "audit_log", {**_filters_used(f, sort, order), "offset": offset, "shown": len(rows)})
     nxt = offset + len(rows)
     return {"items": [_json(r) for r in rows], "total": total, "limit": limit, "offset": offset,
-            "next_offset": nxt if nxt < total else None, "retention_days": max(audit_store.MIN_RETENTION_DAYS, audit_settings().audit_retention_days)}
+            "next_offset": nxt if nxt < total else None, "sort": sort, "order": order, "as_of": as_of,
+            "page": offset // limit + 1, "pages": max(1, -(-total // limit)), "retention_days": _retention_days()}
+
+
+@router.get("/api/audit/facets")
+def audit_facets(user: User = Depends(require("admin")), c=Depends(container)):
+    """Each action and each person in the log with how many entries they have, and the span of time it covers."""
+    out = audit_store.facets(c.store, user.org_id)
+    c.store.audit(user.org_id, user.id, "audit.viewed", "audit_log", {"facets": True})
+    return {**out, "first_at": _iso(out["first_at"]), "last_at": _iso(out["last_at"]), "retention_days": _retention_days()}
 
 
 CSV_COLUMNS = ["id", "created_at", "actor_id", "actor_name", "actor_email", "action", "target", "detail"]
@@ -120,21 +261,25 @@ def export_audit(
     target: str | None = Query(None, max_length=500),
     since: str | None = Query(None, max_length=40),
     until: str | None = Query(None, max_length=40),
+    exclude_action: str | None = Query(None, max_length=120),
+    sort: Sort = Query("time"),
+    order: Order = Query("desc"),
+    as_of: int | None = Query(None, ge=0, le=2**63 - 1),
     user: User = Depends(require("admin")),
     c=Depends(container),
 ):
-    f = _filter(user, action, actor, target, since, until)
+    f = _filter(user, action, actor, target, since, until, exclude_action, as_of)
     cap = audit_settings().audit_export_max_rows
     out = io.StringIO()
     w = csv.writer(out)
     w.writerow(CSV_COLUMNS)
     n = 0
-    for row in audit_store.iterate(c.store, f, cap):
+    for row in audit_store.iterate(c.store, f, cap, sort=sort, order=order):
         r = _json(row)
         r["detail"] = json.dumps(r["detail"], ensure_ascii=False, sort_keys=True, default=str)
         w.writerow([_cell(r[k]) for k in CSV_COLUMNS])
         n += 1
-    c.store.audit(user.org_id, user.id, "audit.exported", "audit_log", {**_filters_used(f), "rows": n, "capped": n >= cap})
+    c.store.audit(user.org_id, user.id, "audit.exported", "audit_log", {**_filters_used(f, sort, order), "rows": n, "capped": n >= cap})
     name = f"audit-{datetime.now(timezone.utc):%Y%m%d-%H%M%S}.csv"
     return Response(out.getvalue(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": f'attachment; filename="{name}"'})
@@ -143,7 +288,7 @@ def export_audit(
 def purge_expired(c) -> dict[str, int]:
     """Delete entries past the retention period in every organisation, and record the purge in each one that lost rows.
     For the self-hosted loop and the scheduled endpoint."""
-    days = max(audit_store.MIN_RETENTION_DAYS, audit_settings().audit_retention_days)
+    days = _retention_days()
     before = datetime.now(timezone.utc) - timedelta(days=days)
     removed = audit_store.purge(c.store, before)
     for org_id, n in removed.items():

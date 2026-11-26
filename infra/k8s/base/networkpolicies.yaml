@@ -1,0 +1,99 @@
+# Network policies: nothing in this namespace accepts or opens a connection unless a rule below allows it. Policies add
+# up, so a component adds what its platform needs (components/gke: Google's load balancer, the metadata server, Cloud SQL)
+# and never has to edit these. They need a network plugin that enforces them (GKE Dataplane V2, Calico, Cilium).
+#
+#   in:  web and api on 8080 (the Ingress controller's traffic; web and the scheduled calls reach the API). Nothing else
+#        accepts a connection: the workers, the migration and the scheduled calls have no listener anyone needs.
+#   out: everyone: DNS. web: the API only. api, workers, migrate: Postgres (5432), HTTPS (443: Google APIs, GitHub,
+#        Firebase, Gemini, LangSmith), SMTP (587, 465). scheduler: the API and HTTPS (its token).
+# Kubelet probes are not affected.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny
+spec:
+  podSelector: {}
+  policyTypes: [Ingress, Egress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+    - ports: # to any address: the cluster's DNS service, or a node-local cache
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+---
+# The two front doors. Any source may reach port 8080, because the Ingress controller can be a pod in another namespace
+# or, on GKE, Google's front ends connecting to pod addresses: components/gke narrows this to those ranges.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-ingress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: web }
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: api }
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-egress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: web }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: api }
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: app-egress
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, meeting-worker, ingestion-worker, review-worker, migrate]
+  policyTypes: [Egress]
+  egress:
+    - ports:
+        - { protocol: TCP, port: 5432 }
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 587 }
+        - { protocol: TCP, port: 465 }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: scheduler-egress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: scheduler }
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: api }
+      ports: [{ protocol: TCP, port: 8080 }]
+    - ports: [{ protocol: TCP, port: 443 }]

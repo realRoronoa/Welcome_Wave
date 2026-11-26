@@ -1,0 +1,180 @@
+/* The legal documents' reading page (Legal.tsx): the site's paper and ink, a contents list beside the text on wide
+   screens, tables that stack on a phone, and a print stylesheet. Scoped under .site like site.css, classes lg-prefixed.
+   Nothing animates: this is a page to read, link to and print. Ink only; the site keeps teal for "explained in a KT call". */
+
+.site .lg { padding-bottom: var(--sec); }
+
+/* ------------------------------------------------------------------------------------------------------------ the head */
+.site .lg-head { padding-top: clamp(36px, 6vw, 104px); padding-bottom: clamp(36px, 4.5vw, 64px); }
+.site .lg-kicker { display: flex; align-items: center; gap: 12px; }
+.site .lg-draft { padding: 3px 8px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--fg-2);
+  font: 500 11px/1.3 var(--mono); letter-spacing: .06em; }
+.site .lg-h1 { margin-top: clamp(14px, 1.6vw, 24px); font-size: clamp(2.25rem, 1.2rem + 3.9vw, 4.75rem); font-weight: 600; line-height: 1.02;
+  letter-spacing: -.034em; text-wrap: balance; color: var(--fg); }
+.site .lg-lede { margin-top: clamp(16px, 1.8vw, 26px); max-width: 44ch; }
+.site .lg-meta { position: relative; display: flex; flex-wrap: wrap; gap: 6px 40px; margin-top: clamp(28px, 3.4vw, 48px); padding-top: 14px;
+  font: 500 12px/1.6 var(--mono); letter-spacing: .04em; color: var(--soft); }
+.site .lg-meta::before { content: ""; position: absolute; top: 0; left: calc(50% - 50vw); width: 100vw; height: 1px; background: var(--line); }
+.site .lg-meta div { display: flex; gap: 8px; min-width: 0; }
+.site .lg-meta dt { text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.site .lg-meta dd { color: var(--fg); }
+.site .lg-stale { margin-top: 20px; padding: 12px 16px; border-radius: 10px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line-strong);
+  font-size: 15px; line-height: 1.5; color: var(--fg); }
+
+/* links in the text: underlined, as in print */
+.site .lg .lg-a { color: var(--fg); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .2em;
+  text-decoration-color: var(--line-strong); overflow-wrap: anywhere; }
+.site .lg .lg-a:hover { text-decoration-color: currentColor; }
+.site .lg button.lg-a { display: inline; font-weight: 500; }
+
+/* ------------------------------------------------------------------------------------------------------- the contents */
+.site .lg-body { align-items: start; row-gap: 28px; }
+.site .lg-toc { position: sticky; top: 96px; max-height: calc(100vh - 128px); overflow-y: auto; overscroll-behavior: contain; padding-right: 8px;
+  scrollbar-width: thin; }
+.site .lg-toc-btn { display: none; }
+.site .lg-toc-h { margin-bottom: 14px; font: 500 12px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.site .lg-toc-list { display: grid; gap: 1px; border-left: 1px solid var(--line); }
+.site .lg-toc-list a { position: relative; display: block; padding: 7px 0 7px 16px; font-size: 14px; line-height: 1.35; color: var(--soft);
+  text-wrap: pretty; }
+.site .lg-toc-list a:hover { color: var(--fg); }
+.site .lg-toc-list a::before { content: ""; position: absolute; left: -1px; top: 4px; bottom: 4px; width: 2px; background: var(--fg);
+  transform: scaleY(0); }
+.site .lg-toc-list a[aria-current] { color: var(--fg); font-weight: 500; }
+.site .lg-toc-list a[aria-current]::before { transform: none; }
+.site .lg-print { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; margin-top: 20px; font: 500 13px/1.3 var(--sans);
+  color: var(--soft); }
+.site .lg-print:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+
+/* ----------------------------------------------------------------------------------------------------------- the text */
+.site .lg-text { font-size: var(--fs-body); line-height: 1.62; color: var(--fg-2); text-wrap: pretty; }
+.site .lg-text > section > :is(p, ul, ol, aside), .site .lg-text .lg-more { max-width: 68ch; }
+.site .lg-text > section > .lg-sec-h + * { margin-top: 0; }
+.site .lg-text :is(p, ul, ol, aside, .lg-table) + :is(p, ul, ol, aside, .lg-table) { margin-top: 1.05em; }
+.site .lg-text b { color: var(--fg); }
+
+/* "In brief": the short version, on a white sheet */
+.site .lg-brief { max-width: 68ch; padding: clamp(20px, 2.6vw, 36px); border-radius: 16px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line); }
+.site .lg-brief-h { margin-bottom: 16px; font: 500 12px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.site .lg-brief ul { display: grid; gap: 12px; counter-reset: brief; }
+.site .lg-brief li { position: relative; padding-left: 2.4em; color: var(--fg); counter-increment: brief; }
+.site .lg-brief li::before { content: counter(brief, decimal-leading-zero); position: absolute; left: 0; top: .28em; font: 500 12px/1.4 var(--mono);
+  color: var(--soft); font-variant-numeric: tabular-nums; }
+.site .lg-text > .lg-brief > :is(p, ul) { max-width: none; }
+.site .lg-brief-note { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 14px; color: var(--soft); }
+
+/* sections */
+.site .lg-sec { padding-top: clamp(40px, 4.6vw, 64px); }
+.site .lg-sec-h { display: flex; align-items: baseline; gap: .5em; margin-bottom: .7em; font-size: clamp(1.375rem, 1.2rem + .7vw, 1.75rem); line-height: 1.2; }
+.site .lg-sec-h h2 { font-weight: 600; letter-spacing: -.018em; text-wrap: balance; color: var(--fg); max-width: 30ch; }
+.site .lg-anchor { flex: none; padding: 0 .25em; font-weight: 400; color: var(--soft); opacity: 0; }
+.site .lg-sec-h:hover .lg-anchor, .site .lg-anchor:focus-visible { opacity: 1; }
+@media (hover: none) { .site .lg-anchor { opacity: .7; } }
+
+/* lists: a short rule for each point; numbers set in mono */
+.site .lg-list { display: grid; gap: .6em; }
+.site .lg-list > li { position: relative; padding-left: 1.6em; }
+.site ul.lg-list > li::before { content: ""; position: absolute; left: .1em; top: .78em; width: .7em; height: 1px; background: var(--soft); }
+.site ol.lg-list { counter-reset: item; }
+.site ol.lg-list > li { counter-increment: item; }
+.site ol.lg-list > li::before { content: counter(item) "."; position: absolute; left: 0; top: .22em; font: 500 .8em/1.62 var(--mono); color: var(--soft);
+  font-variant-numeric: tabular-nums; }
+
+/* set-apart remarks: a rule down the side; "Important" in heavier ink; words to copy on a sheet */
+.site .lg-note { padding: 2px 0 2px 18px; border-left: 1px solid var(--line-strong); }
+.site .lg-note-h { margin-bottom: 4px; font: 500 12px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.site .lg-note.is-caution { padding: 16px 20px; border-left: 3px solid var(--fg); border-radius: 0 10px 10px 0; background: var(--sheet); color: var(--fg); }
+.site .lg-note.is-caution .lg-note-h { color: var(--fg); }
+/* "On this service": what is true of the server being read on. A sheet with a brand rule: it is the one remark on the page
+   that is about this service and not about the text. */
+.site .lg-note.is-service { padding: 16px 20px; border-left: 3px solid var(--brand); border-radius: 0 10px 10px 0; background: var(--sheet); color: var(--fg); }
+.site .lg-note.is-service .lg-note-h { color: var(--fg); }
+.site .lg-service { display: grid; gap: 6px; }
+.site .lg-service > li { position: relative; padding-left: 1.4em; }
+.site .lg-service > li::before { content: ""; position: absolute; left: .1em; top: .78em; width: .7em; height: 1px; background: var(--soft); }
+.site .lg-note.is-example { padding: 16px 20px; border: 0; border-radius: 10px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--fg); }
+
+/* tables: hairlines, the first column the row's name. Under 760 px each row is a small card of "column: cell" pairs. */
+.site .lg-table { max-width: 100%; }
+.site .lg-table table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; text-align: left; }
+.site .lg-table caption { padding-bottom: 10px; text-align: left; font-size: 14px; color: var(--soft); caption-side: top; }
+.site .lg-table :is(th, td) { padding: 12px 20px 12px 0; vertical-align: top; border-top: 1px solid var(--line); font: inherit; overflow-wrap: anywhere; }
+.site .lg-table :is(th, td):last-child { padding-right: 0; }
+.site .lg-table thead th { padding-top: 0; padding-bottom: 10px; border-top: 0; font: 500 12px/1.4 var(--mono); letter-spacing: .05em; text-transform: uppercase;
+  color: var(--soft); white-space: nowrap; }
+.site .lg-table tbody th { width: 26%; min-width: 9em; font-weight: 600; color: var(--fg); overflow-wrap: break-word; }
+.site .lg-table tbody tr:last-child :is(th, td) { border-bottom: 1px solid var(--line); }
+
+/* the end of the document: the others */
+.site .lg-more { margin-top: clamp(48px, 6vw, 88px); padding-top: 14px; border-top: 1px solid var(--line-strong); }
+.site .lg-more-h { margin-bottom: 8px; font: 500 12px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--soft); }
+.site .lg-more ul { display: flex; flex-wrap: wrap; gap: 0 28px; }
+.site .lg-more a { display: inline-flex; align-items: center; min-height: 44px; font-size: 15px; font-weight: 500; color: var(--fg); }
+.site .lg-more a:hover { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+
+/* while the operator's details load: a few quiet lines where the first section will be */
+.site .lg-wait { display: grid; gap: 14px; max-width: 68ch; padding-top: clamp(40px, 4.6vw, 64px); min-height: 60vh; align-content: start; }
+.site .lg-wait i { display: block; height: 12px; border-radius: 6px; background: rgb(10 10 10 / .07); }
+.site .lg-wait i:nth-child(1) { width: 38%; height: 18px; margin-bottom: 6px; }
+.site .lg-wait i:nth-child(3) { width: 92%; }
+.site .lg-wait i:nth-child(5) { width: 64%; }
+
+/* ------------------------------------------------------------------------------------------------------ smaller screens */
+@media (max-width: 1099px) {
+  /* the contents fold under one button, above the text; they do not follow the reader down the page */
+  .site .lg-toc { position: static; max-height: none; overflow: visible; padding: 0; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--line-strong); }
+  .site .lg-toc-h { display: none; }
+  .site .lg-toc-btn { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 48px; padding: 0 16px;
+    font: 500 12px/1.4 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--fg); }
+  .site .lg-toc-list { display: none; margin: 0 16px 8px; }
+  .site .lg-toc-list.is-open { display: grid; }
+  .site .lg-toc-list a { padding-block: 11px; font-size: 15px; }
+  .site .lg-toc-list a[aria-current] { font-weight: 400; color: var(--soft); }
+  .site .lg-toc-list a[aria-current]::before { transform: scaleY(0); }
+  .site .lg-print { display: none; }
+}
+@media (max-width: 759px) {
+  .site .lg-table table, .site .lg-table tbody, .site .lg-table tr, .site .lg-table :is(th, td) { display: block; }
+  .site .lg-table caption { display: block; }
+  .site .lg-table thead { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .site .lg-table tbody { display: grid; gap: 10px; }
+  .site .lg-table tbody tr { padding: 14px 16px; border-radius: 12px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line); }
+  .site .lg-table tbody :is(th, td), .site .lg-table tbody tr:last-child :is(th, td) { width: auto; min-width: 0; padding: 0; border: 0; }
+  .site .lg-table tbody :is(th, td) + :is(th, td) { margin-top: 12px; }
+  .site .lg-table tbody :is(th, td)::before { content: attr(data-label); display: block; margin-bottom: 2px; font: 500 11px/1.4 var(--mono);
+    letter-spacing: .05em; text-transform: uppercase; color: var(--soft); }
+  .site .lg-meta { flex-direction: column; gap: 4px; }
+  .site .lg-meta div { flex-wrap: wrap; gap: 0 8px; }
+}
+
+@media (forced-colors: active) {
+  .site .lg-toc-list a::before, .site ul.lg-list > li::before { background: CanvasText; }
+}
+
+/* ---------------------------------------------------------------------------------------------------------------- print */
+@media print {
+  @page { margin: 18mm 16mm 20mm; }
+  html.is-site, html.is-site body, .site { background: #fff !important; }
+  html.is-site body { font-size: 10.5pt; }
+  .site { min-height: 0; overflow: visible; }
+  .site .s-nav, .site .s-menu, .site .s-skip, .site .s-sentinel, .site .s-footer, .site .lg-toc, .site .lg-more, .site .lg-anchor, .site .lg-stale,
+  #ww-boot { display: none !important; }
+  .site .s-grid { display: block; max-width: none; padding-inline: 0; }
+  .site .lg { padding-bottom: 0; }
+  .site .lg-head { padding: 0 0 8mm; }
+  .site .lg-h1 { font-size: 24pt; letter-spacing: -.02em; }
+  .site .lg-lede { font-size: 11.5pt; max-width: none; }
+  .site .lg-meta { margin-top: 6mm; border-top: .5pt solid #000; }
+  .site .lg-meta::before { display: none; }
+  .site .lg-text { font-size: 10.5pt; line-height: 1.5; color: #000; }
+  .site .lg-text > section > :is(p, ul, ol, aside), .site .lg-brief { max-width: none; }
+  .site .lg-brief, .site .lg-note.is-caution, .site .lg-note.is-example, .site .lg-note.is-service { background: none; box-shadow: none; border: .5pt solid #000; border-radius: 0; }
+  .site .lg-sec { padding-top: 7mm; }
+  .site .lg-sec-h { font-size: 13pt; break-after: avoid; }
+  .site .lg-sec-h h2 { max-width: none; }
+  .site .lg-brief, .site .lg-note, .site .lg-table tr, .site .lg-list > li { break-inside: avoid; }
+  .site .lg-table table { font-size: 9pt; }
+  .site .lg-table :is(th, td) { border-top: .5pt solid #000; }
+  .site .lg .lg-a { text-decoration: none; }
+  .site .lg a.lg-a[href^="mailto:"] { text-decoration: underline; }
+}

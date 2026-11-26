@@ -1,0 +1,19 @@
+# Proposes updates as pull requests; CI (.github/workflows/ci.yml) tests each one, and a person merges it.
+# The base images and the CI actions are pinned to exact digests and commits, so without this they would never move.
+version: 2
+updates:
+  - package-ecosystem: docker # python:3.12-slim
+    directory: /backend
+    schedule: { interval: weekly }
+  - package-ecosystem: docker # node:22-slim and nginx:1.30-alpine
+    directory: /frontend
+    schedule: { interval: weekly }
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly }
+  - package-ecosystem: pip # requirements.txt; requirements.lock is regenerated as its header says
+    directory: /backend
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule: { interval: weekly }
