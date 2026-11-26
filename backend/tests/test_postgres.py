@@ -21,9 +21,9 @@ from sqlalchemy import text
 
 from app.adapters.memory import InlineBus, LocalBlobStorage, LocalRepoSource
 from app.adapters.postgres import PgIndex, PgStore, current_org, make_engine
-from app.agents.deps import Deps
-from app.agents.llm import FakeLLM, read_data
-from app.agents.supervisor import build_supervisor
+from app.agents.core.deps import Deps
+from app.agents.core.llm import FakeLLM, read_data
+from app.agents.supervisor.graph import build_supervisor
 from app.config import Settings
 from app.container import ApprovalBusy, Container, EventBusy
 from app.services.embeddings import HashEmbedder
@@ -127,8 +127,7 @@ def test_one_company_never_sees_another(store, engine):
     store.create_meeting(pa.id, "KT A", alice.id)
     bob, pb = _org(store, "b")  # tenant is now B
     assert store.projects_for(bob) == [pb]
-    with pytest.raises(Exception):
-        store.get_project(pa.id)  # A's project is invisible, not just filtered by the query
+    assert store.get_project(pa.id) is None  # A's project is invisible, not just filtered by the query
     assert store.list_meetings(pa.id) == []
     with engine.begin() as c:  # even a query with no WHERE clause sees only B
         c.execute(text("SELECT set_config('app.org_id', :o, true)"), {"o": bob.org_id})
@@ -264,7 +263,7 @@ def test_golden_path_on_postgres(engine, store):
     assert store.chat_feedback(out["result"]["message_id"], admin.id, 1) is False  # only the asker rates an answer
 
     llm.responders["ReviewDraft"] = lambda p, m: {"recommendation": "looks_good", "summary": "ok", "findings": [], "questions": []}
-    from app.agents.task import short_ref
+    from app.agents.specialists.planner.task import short_ref
 
     out = c.handle({"type": "pr.opened", "project_id": pid, "full_name": repo.full_name, "pr_number": 7, "head_sha": "abc",
                     "pr_url": "https://github.com/x/y/pull/7", "branch": f"task-{short_ref(first_pr['id'])}", "body": "", "dedupe": "pr:7:abc"})
@@ -276,7 +275,7 @@ def test_golden_path_on_postgres(engine, store):
     assert store.get_task(first_pr["id"]).status == "changes_requested"
 
     # a PR that only says "Closes #12" finds the same task through its issue number
-    from app.agents.task import find_task_for_pr
+    from app.agents.specialists.planner.task import find_task_for_pr
 
     assert find_task_for_pr(store.tasks(project_id=pid), "feature/x", "Closes #12").id == first_pr["id"]
     assert ob.id in {t.onboarding_id for t in store.tasks(project_id=pid)}
@@ -326,7 +325,7 @@ def test_http_api_in_production_mode(engine, store, monkeypatch, tmp_path):
         client.app.state.container = c
         H = {k: {"Authorization": f"Bearer {k}"} for k in tokens}
 
-        me = client.post("/api/signup", json={"name": "Fatima", "org_name": f"Acme {tag}", "project_name": "Payments"}, headers=H["t-founder"]).json()
+        me = client.post("/api/signup", json={"name": "Fatima", "org_name": f"Acme {tag}", "project_name": "Payments", "accept": ["terms", "privacy"]}, headers=H["t-founder"]).json()
         pid = me["projects"][0]["id"]
         assert client.get(f"/api/projects/{pid}", headers=H["t-founder"]).status_code == 200
         assert [p["id"] for p in client.get("/api/projects", headers=H["t-founder"]).json()] == [pid]
@@ -338,7 +337,7 @@ def test_http_api_in_production_mode(engine, store, monkeypatch, tmp_path):
                                                                      "github_login": "hire-gh"}, headers=H["t-founder"]).status_code == 201
         r = client.get("/api/me", headers=H["t-hire"])
         assert r.status_code == 403 and r.json()["detail"]["code"] == "invitation_pending"
-        hire = client.post("/api/invitations/accept", json={"org_id": me["org_id"]}, headers=H["t-hire"]).json()
+        hire = client.post("/api/invitations/accept", json={"org_id": me["org_id"], "accept": ["terms", "privacy"]}, headers=H["t-hire"]).json()
         assert hire["role"] == "new_hire" and [p["id"] for p in hire["projects"]] == [pid]
 
         # GitHub: the webhook says who installed the app; only that person can bind it; then connect + index
@@ -380,7 +379,7 @@ def test_http_api_in_production_mode(engine, store, monkeypatch, tmp_path):
         assert client.get("/api/reviews/not-a-uuid", headers=H["t-founder"]).status_code == 404  # malformed id: 404, not 500
 
         # another company signs up and sees none of it
-        rival = client.post("/api/signup", json={"name": "R", "org_name": f"Rival {tag}", "project_name": "X"}, headers=H["t-rival"]).json()
+        rival = client.post("/api/signup", json={"name": "R", "org_name": f"Rival {tag}", "project_name": "X", "accept": ["terms", "privacy"]}, headers=H["t-rival"]).json()
         assert client.get(f"/api/projects/{pid}", headers=H["t-rival"]).status_code == 404
         assert client.get(f"/api/code/files?project_id={pid}", headers=H["t-rival"]).status_code == 404
         assert client.post("/api/github/callback", json={"code": "c", "installation_id": inst, "state": "x.1.y"},
@@ -417,7 +416,7 @@ def test_pg_code_chunks_matches_memory_shape(engine, store):
     """PgIndex.code_chunks: one SELECT of the non-stale code chunks, ordered like MemoryIndex (paths by code point,
     start_line as a number), content blanked on request; knowledge.code_files reads the same spans from both."""
     from app.adapters.memory import MemoryIndex
-    from app.agents.schemas import Utterance
+    from app.agents.core.schemas import Utterance
     from app.services import knowledge
     from app.services.chunking import chunk_code, chunk_document, chunk_transcript
 
@@ -465,7 +464,7 @@ def test_embedding_outage_on_postgres_degrades_risk_and_plan(engine, store):
     still answer, without the searched signals, and say partial; two failures in a row open the circuit breaker, so
     requests stop waiting on the embedder for a while; after that the next request searches again, and a reload after
     that is answered from the memo."""
-    from app.agents.schemas import QAResult
+    from app.agents.core.schemas import QAResult
     from app.services import knowledge
     from app.services.chunking import chunk_code
     from app.services.knowledge_risk import build_knowledge_risk
@@ -551,9 +550,9 @@ def _parity_world(store, index, tenant, tag: str) -> _World:
     Postgres twin). The admin create_organization always makes is the seed's admin (Alex, u-admin)."""
     from langgraph.checkpoint.memory import MemorySaver
 
-    from app.agents.llm import OfflineLLM
-    from app.agents.schemas import ActionItem, MeetingResult, Term, Utterance
-    from app.agents.supervisor import run_event
+    from app.agents.core.llm import OfflineLLM
+    from app.agents.core.schemas import ActionItem, MeetingResult, Term, Utterance
+    from app.agents.supervisor.graph import run_event
     from app.seed import DEMO_ISSUES, MOMENTS, TRANSCRIPT, VIJAY_DAY
     from app.services.chunking import chunk_transcript
     from app.services.kt_linker import link_screen_moments
@@ -622,8 +621,8 @@ def _name_tasks(w: _World) -> None:
 
 def _cohort(w: _World, tag: str) -> None:
     """Stage 2."""
-    from app.agents.schemas import Citation, QAResult
-    from app.agents.supervisor import run_event
+    from app.agents.core.schemas import Citation, QAResult
+    from app.agents.supervisor.graph import run_event
     from app.services.chunking import chunk_code
 
     s = w.store
@@ -953,7 +952,7 @@ def test_batched_reads_on_postgres(engine, store):
     one-by-one reads answer, under row-level security, and reading() runs them in one transaction on one connection."""
     from sqlalchemy import event
 
-    from app.agents.schemas import MeetingResult, QAResult
+    from app.agents.core.schemas import MeetingResult, QAResult
 
     admin, project = _org(store, "batch")
     pid = project.id

@@ -13,11 +13,12 @@
 .ring-value { stroke: var(--ink); stroke-linecap: round; stroke-dashoffset: var(--ring-off); animation: ring-in 1s var(--ease) both; }
 @keyframes ring-in { from { stroke-dashoffset: var(--ring-c); } }
 .ring-kt .ring-value { stroke: var(--kt); } /* the share of code a KT session explained */
+.ring-primary .ring-value { stroke: var(--primary-fill); } /* progress through a program: the brand teal */
 .ring-label { position: relative; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
 
 .empty-state { display: grid; justify-items: center; text-align: center; gap: .35rem; padding: 2.6rem 1rem; border: 1px dashed var(--line-strong);
   border-radius: var(--radius-l); background: var(--surface); }
-.empty-mark { color: var(--ink-faint); opacity: .7; margin-bottom: .55rem; } /* ui.tsx Logo: the strokes arrive in order (styles.css) */
+.empty-mark { color: var(--ink-muted); opacity: .7; margin-bottom: .55rem; } /* ui.tsx Logo: the strokes arrive in order (styles.css) */
 .empty-title { margin: 0; font-weight: 600; color: var(--ink); }
 .empty-text { margin: 0; max-width: 46ch; color: var(--ink-soft); font-size: .92rem; }
 .empty-action { margin-top: .7rem; }

@@ -356,17 +356,16 @@ export default function CodeTour({ params }: { params: URLSearchParams }) {
         <div className="ct-main">
           <StopPane key={s.key} paneRef={paneRef} step={step} chapterNo={chapterNo} me={me} names={names} byKey={byKey} onGo={go} />
           <footer className="ct-foot">
-            <button type="button" className="dp-btn ct-prev" onClick={() => move(-1)} disabled={step.index === 0} aria-keyshortcuts="K ArrowLeft"
-              aria-label="Previous stop">
-              <Mark name="left" size={15} /><span className="ct-btn-text">Previous</span><span className="ct-keys" aria-hidden="true"><Kbd>K</Kbd></span>
+            <button type="button" className="dp-btn ct-prev" onClick={() => move(-1)} disabled={step.index === 0} aria-keyshortcuts="K ArrowLeft">
+              <Mark name="left" size={15} /><span className="ct-btn-text">Previous<span className="sr-only"> stop</span></span><span className="ct-keys" aria-hidden="true"><Kbd>K</Kbd></span>
             </button>
             <div className="ct-progress">
               <Progress steps={steps} visited={visited} at={step.index} />
               <p><span>Stop {step.index + 1} of {steps.length}</span><span className="ct-progress-sep" aria-hidden="true"> · </span><span>{Math.round((explored / steps.length) * 100)}% explored</span></p>
             </div>
             <button type="button" className="dp-btn primary ct-next" onClick={() => move(1)} disabled={step.index === steps.length - 1}
-              aria-keyshortcuts="J ArrowRight" aria-label="Next stop">
-              <span className="ct-btn-text">Next</span><Mark name="right" size={15} /><span className="ct-keys" aria-hidden="true"><Kbd>J</Kbd></span>
+              aria-keyshortcuts="J ArrowRight">
+              <span className="ct-btn-text">Next<span className="sr-only"> stop</span></span><Mark name="right" size={15} /><span className="ct-keys" aria-hidden="true"><Kbd>J</Kbd></span>
             </button>
           </footer>
         </div>

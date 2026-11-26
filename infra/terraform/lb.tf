@@ -1,5 +1,8 @@
-# Optional custom domain: a global HTTPS load balancer with a Google-managed certificate in front of ww-web
-# (which serves the app and proxies /api and /webhooks to ww-api), protected by Cloud Armor.
+# Optional custom domain: a global HTTPS load balancer with a Google-managed certificate, protected by Cloud Armor. It sends
+# /api/*, /webhooks/* and /health/ready to ww-api and everything else to ww-web (the app). With the domain set, the Cloud
+# Build trigger deploys both services with ingress "internal-and-cloud-load-balancing" (compute.tf, cloudbuild.yaml), so
+# their run.app URLs refuse callers from the internet and nothing bypasses Cloud Armor; Cloud Scheduler's calls to ww-api
+# count as internal. Server-Sent Events streams (/api/live) go to ww-api directly and hold no slot on ww-web.
 # Set var.domain, apply, then point an A record for the domain at the `lb_ip` output.
 # The resources nothing else here references wait for the Compute API (time_sleep.apis); the rest wait through them.
 
@@ -58,6 +61,28 @@ resource "google_compute_backend_service" "web" {
   protocol              = "HTTPS"
   security_policy       = google_compute_security_policy.web[0].id
   backend { group = google_compute_region_network_endpoint_group.web[0].id }
+  log_config { # request URLs that are credentials are kept out of the logs (observability.tf, credential_urls)
+    enable      = true
+    sample_rate = 0.2
+  }
+}
+
+resource "google_compute_region_network_endpoint_group" "api" {
+  count                 = local.lb
+  name                  = "${local.prefix}-api-neg"
+  region                = var.region
+  network_endpoint_type = "SERVERLESS"
+  cloud_run { service = "ww-api" }
+  depends_on = [time_sleep.apis]
+}
+
+resource "google_compute_backend_service" "api" {
+  count                 = local.lb
+  name                  = "${local.prefix}-api-backend"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  protocol              = "HTTPS"
+  security_policy       = google_compute_security_policy.web[0].id
+  backend { group = google_compute_region_network_endpoint_group.api[0].id }
   log_config {
     enable      = true
     sample_rate = 0.2
@@ -68,6 +93,18 @@ resource "google_compute_url_map" "web" {
   count           = local.lb
   name            = "${local.prefix}-web"
   default_service = google_compute_backend_service.web[0].id
+  host_rule {
+    hosts        = ["*"]
+    path_matcher = "app"
+  }
+  path_matcher {
+    name            = "app"
+    default_service = google_compute_backend_service.web[0].id
+    path_rule {
+      paths   = ["/api/*", "/webhooks/*", "/health/ready"]
+      service = google_compute_backend_service.api[0].id
+    }
+  }
 }
 
 resource "google_compute_managed_ssl_certificate" "web" {

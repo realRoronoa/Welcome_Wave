@@ -1,0 +1,201 @@
+# Access log without secrets: pre-boarding links, signed blob links and OAuth callbacks (Google's, and GitHub's after an App
+# installation, which carries `code` and `state`) carry tokens in their URL, and the Referer of a request made from the
+# pre-boarding page repeats the token, so the log keeps the path with the token replaced and records no Referer at all.
+map $request_uri $ww_safe_uri {
+  ~^(?<ww_p>/welcome/|/api/preboarding/|/api/blobs/)[^/?]+(?<ww_r>.*)$  "${ww_p}[redacted]${ww_r}";
+  ~^(?<ww_p>/api/integrations/google/callback|/github/callback/?)\?     "${ww_p}?[redacted]";
+  default                                                              $request_uri;
+}
+# Host names this web app answers to (WEB_HOSTS: a regular expression over the request's host name, without the port). The
+# image allows any (".*"; Cloud Run sees its run.app name and the custom domain). The self-hosted release sets it to the host
+# of PUBLIC_URL, localhost and WW_WEB_HOSTS, so a page on another name (DNS rebinding) cannot reach the API through this port.
+map $host $ww_host_ok {
+  default            0;
+  "~^(${WEB_HOSTS})$" 1;
+}
+
+log_format ww_safe '$remote_addr [$time_local] "$request_method $ww_safe_uri $server_protocol" $status $body_bytes_sent '
+                   '$request_time "$http_user_agent"';
+
+# The client's address for the API's per-address rate limits: the last entry of X-Forwarded-For, which the proxy in front of
+# this container appended (Google's front end on Cloud Run; the operator's reverse proxy when self-hosted), or the connection's
+# own address when nothing is in front. Entries further left were written by the client and are dropped, so a made-up
+# X-Forwarded-For can neither dodge a limit nor use up someone else's (RATE_LIMIT_TRUSTED_HOPS, backend/app/ratelimit.py).
+map $http_x_forwarded_for $ww_client_addr {
+  ~(?<ww_last>[^,\s]+)\s*$  $ww_last;
+  default                    $remote_addr;
+}
+
+server {
+  listen ${PORT};
+  access_log /var/log/nginx/access.log ww_safe;
+  root /usr/share/nginx/html;
+  server_tokens off;
+
+  # The API's address is looked up when a request needs it (every 10 s at most), not once at start: a restarted API container
+  # (self-hosted) comes back on a new address, and nginx must follow it. NGINX_LOCAL_RESOLVERS is the container's own name
+  # server (/etc/resolv.conf), filled in by the image's entrypoint (NGINX_ENTRYPOINT_LOCAL_RESOLVERS in frontend/Dockerfile).
+  resolver ${NGINX_LOCAL_RESOLVERS} valid=10s ipv6=off;
+  set $api ${API_URL};
+
+  # Compression. The build ships a .gz copy of every text file over 1 kB (frontend/Dockerfile), sent as it is; other text is
+  # compressed as it goes out. gzip_proxied any: on Google Cloud every request comes through Google's front end with a Via
+  # header, and nginx would otherwise never compress for it. Event streams (/api/live) are not in the list: never buffered.
+  gzip_static on;
+  gzip on;
+  gzip_vary on;
+  gzip_proxied any;
+  gzip_min_length 1024;
+  gzip_types text/css application/javascript text/javascript application/json image/svg+xml text/plain;
+
+  # Content-Security-Policy for the web app (the API sets its own, stricter one on its responses). Checked against the
+  # production build: no inline scripts (index.html loads /boot-theme.js and /boot-words.js as files), no eval or
+  # new Function in the bundles. Voice's Agora SDK compiles WebAssembly, so allow only wasm-unsafe-eval, not JS eval.
+  #   script-src   Firebase Auth's Google sign-in loads apis.google.com/js/api.js; Identity Platform's reCAPTCHA protection,
+  #                when it is turned on, loads www.google.com/recaptcha and www.gstatic.com/recaptcha.
+  #   style-src    'unsafe-inline': the intro's <style> block in index.html, and style attributes the sign-in libraries set.
+  #                React's style props are applied through the CSSOM, which CSP does not govern. Fonts: Google Fonts (Geist).
+  #   connect-src  Firebase Auth's REST endpoints; Cloud Storage uploads; Agora RTC and Signaling use agora.io,
+  #                sd-rtn.com and related service domains on dynamically selected HTTPS/WSS ports.
+  #   frame-src    Firebase Auth's hidden iframe on the auth domain (<project>.firebaseapp.com or .web.app) and Google
+  #                sign-in; reCAPTCHA's challenge frame. A custom auth domain must be added here.
+  #   media-src    KT recordings: /api/blobs (self-hosted), signed Cloud Storage URLs (Google Cloud), blob: for a local preview.
+  #   worker-src   Agora's audio SDK creates workers from same-origin blob URLs. No other worker source is allowed.
+  # Google Meet and Calendly links are ordinary links that open elsewhere: nothing to allow.
+  set $csp "default-src 'self';";
+  set $csp "$csp script-src 'self' 'wasm-unsafe-eval' https://apis.google.com https://www.google.com/recaptcha/ https://www.gstatic.com/recaptcha/;";
+  set $csp "$csp style-src 'self' 'unsafe-inline';";
+  set $csp "$csp font-src 'self';";
+  set $csp "$csp img-src 'self' data: blob:;";
+  set $csp "$csp connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://storage.googleapis.com https://*.agora.io:* wss://*.agora.io:* https://*.agora.com:* wss://*.agora.com:* https://*.sd-rtn.com:* wss://*.sd-rtn.com:* https://*.rtnsvc.com:* wss://*.rtnsvc.com:* https://*.rtesvc.com:* wss://*.rtesvc.com:*;";
+  set $csp "$csp frame-src https://*.firebaseapp.com https://*.web.app https://accounts.google.com https://apis.google.com https://www.google.com/recaptcha/ https://recaptcha.google.com/recaptcha/;";
+  set $csp "$csp media-src 'self' blob: https://storage.googleapis.com;";
+  set $csp "$csp worker-src 'self' blob:;";
+  set $csp "$csp object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
+  set $permissions "accelerometer=(), bluetooth=(), browsing-topics=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), hid=(), magnetometer=(), microphone=(self), midi=(), payment=(), serial=(), usb=(), xr-spatial-tracking=()";
+
+  # 421 Misdirected Request for a host name this server is not for (WEB_HOSTS, above), before any location; after the two
+  # values above, which the headers below need on this answer too
+  if ($ww_host_ok = 0) { return 421; }
+
+  # nginx drops these in any location that has an add_header of its own, so such locations repeat the ones they need.
+  # HSTS is ignored over plain HTTP (docker compose on localhost), and kept by browsers once the site is served over HTTPS.
+  add_header Content-Security-Policy $csp always;
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+  add_header X-Content-Type-Options nosniff always;
+  add_header X-Frame-Options DENY always;
+  add_header Referrer-Policy strict-origin-when-cross-origin always;
+  add_header Permissions-Policy $permissions always;
+
+  # liveness of this container (Cloud Run reserves paths ending in "z")
+  location = /health {
+    access_log off;
+    default_type text/plain;
+    return 200 'ok';
+  }
+
+  # readiness of the API behind it, so an uptime check on the custom domain covers both
+  location = /health/ready {
+    access_log off;
+    proxy_pass $api/health/ready;
+    proxy_ssl_server_name on;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Forwarded-For $ww_client_addr;
+    proxy_read_timeout 120s;
+  }
+
+  location /api/ {
+    proxy_pass $api;
+    proxy_ssl_server_name on;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Forwarded-For $ww_client_addr;
+    proxy_read_timeout 120s;
+    client_max_body_size 26m; # document uploads (the API allows 25 MB)
+  }
+
+  # live updates (Server-Sent Events): pass every event on at once, and keep the stream open (the API ends it every 15 min)
+  location = /api/live {
+    proxy_pass $api;
+    proxy_ssl_server_name on;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Forwarded-For $ww_client_addr;
+    proxy_http_version 1.1;
+    proxy_set_header Connection "";
+    proxy_buffering off;
+    proxy_cache off;
+    proxy_read_timeout 1h;
+  }
+
+  # a KT call's recording: large, streamed to the API as it arrives (the API allows MAX_RECORDING_MB, 2 GB by default)
+  location ~ ^/api/meetings/[^/]+/recording$ {
+    proxy_pass $api;
+    proxy_ssl_server_name on;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Forwarded-For $ww_client_addr;
+    proxy_request_buffering off;
+    proxy_read_timeout 600s;
+    proxy_send_timeout 600s;
+    client_max_body_size 2100m;
+  }
+
+  # importing a KT call's recording from Google Drive streams the file into storage before it answers
+  location ~ ^/api/meetings/[^/]+/recording/import$ {
+    proxy_pass $api;
+    proxy_ssl_server_name on;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Forwarded-For $ww_client_addr;
+    proxy_read_timeout 600s;
+  }
+
+  # GitHub and the calendar providers can deliver webhooks to the web domain too
+  location /webhooks/ {
+    proxy_pass $api;
+    proxy_ssl_server_name on;
+    proxy_set_header Authorization $http_authorization;
+    proxy_set_header X-Forwarded-For $ww_client_addr;
+    proxy_read_timeout 60s;
+    client_max_body_size 26m; # GitHub sends payloads up to 25 MB
+  }
+
+  location /assets/ {
+    expires 1y;
+    add_header Cache-Control "public, immutable";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+  }
+
+  # the site's videos and brand images keep their names across deploys: kept for a day, then checked again (a 304 is cheap)
+  location ~ ^/(media|brand)/ {
+    add_header Cache-Control "public, max-age=86400";
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+  }
+
+  # the app shell must never be cached, or a deploy leaves people on old asset names
+  location = /index.html {
+    add_header Cache-Control "no-cache" always; # "always": the 404 shell (below) must not be cached either
+    add_header Content-Security-Policy $csp always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header X-Frame-Options DENY always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+    add_header Permissions-Policy $permissions always;
+  }
+
+  # client-side routes get the app shell: the site's pages (/, /about), the legal documents (/terms, /privacy, /recording,
+  # /acceptable-use, /dpa, /subprocessors), sign-in (/login, /signup), the workspace (/app, its pages live in the hash), GitHub's
+  # post-install redirect (/github/callback) and a new hire's pre-boarding page (/welcome/<token>).
+  # Keep in step with src/surface.ts, src/legal/paths.ts, public/boot-theme.js and Site.tsx.
+  location = / { rewrite ^ /index.html last; }
+  location ~ ^/(about|login|signup|github/callback)/?$ { rewrite ^ /index.html last; }
+  location ~ ^/(terms|privacy|recording|acceptable-use|dpa|subprocessors)/?$ { rewrite ^ /index.html last; }
+  location ~ ^/app(/.*)?$ { rewrite ^ /index.html last; }
+  location ~ ^/welcome/[^/]+/?$ { rewrite ^ /index.html last; }
+
+  # files as they are; any other address gets the shell too (the site shows "Nobody explained this page"), but with a 404
+  # status, so a mistyped link is never indexed or accepted as a page
+  location / {
+    try_files $uri =404;
+    error_page 404 /index.html;
+  }
+}

@@ -18,7 +18,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import Engine
 
 from app import ports
-from app.agents.schemas import Chunk, Hit, KTLink, MeetingResult, QAResult, ReviewResult
+from app.agents.core.schemas import Chunk, Hit, KTLink, MeetingResult, QAResult, ReviewResult
 from app.ports import Approval, CodeChunks, Meeting, Onboarding, Project, RepoBusy, Repository, ReviewRow, TaskRow, User
 from app.services.chunking import split_identifiers
 from app.services.embeddings import Embedder
@@ -29,8 +29,45 @@ current_org: ContextVar[str | None] = ContextVar("current_org", default=None)
 _pinned: ContextVar[tuple | None] = ContextVar("pg_reading", default=None)
 
 
-def make_engine(url: str, pool_size: int = 5, max_overflow: int = 5) -> Engine:
-    return create_engine(url, pool_size=pool_size, max_overflow=max_overflow, pool_pre_ping=True, pool_recycle=1800, pool_timeout=10)
+def session_options(settings=None) -> dict:
+    """The app's database session limits (Settings db_*; 0 turns one off): a statement, a wait for a lock and a transaction
+    left open are cancelled past them, so a slow query or a migration's ALTER cannot hold every pooled connection."""
+    if settings is None:
+        from app.config import get_settings
+
+        settings = get_settings()
+    limits = {"statement_timeout": settings.db_statement_timeout_ms, "lock_timeout": settings.db_lock_timeout_ms,
+              "idle_in_transaction_session_timeout": settings.db_idle_in_transaction_timeout_ms}
+    out: dict = {"options": " ".join(f"-c {k}={int(v)}" for k, v in limits.items() if v and v > 0)}
+    if settings.db_connect_timeout_s and settings.db_connect_timeout_s > 0:
+        out["connect_timeout"] = int(settings.db_connect_timeout_s)
+    return {k: v for k, v in out.items() if v}
+
+
+def quiet_errors(engine: Engine) -> Engine:
+    """Database errors without the values they were about. SQLAlchemy's message carries the bound parameters (hidden by
+    hide_parameters) and PostgreSQL's carries a DETAIL line that quotes the row ("Key (email)=(new.hire@example.com) already
+    exists"). Either would reach a log line, a run record or an incident notice whenever the error is printed. The error
+    keeps its type and primary message; the detail stays readable in code as `orig.diag.message_detail`."""
+    from sqlalchemy import event
+
+    @event.listens_for(engine, "handle_error")
+    def _primary_only(ctx) -> None:
+        orig = ctx.original_exception
+        primary = getattr(getattr(orig, "diag", None), "message_primary", None)
+        if not primary or not getattr(orig, "args", None) or orig.args[0] == primary:
+            return
+        orig.args = (primary,)
+        wrapped = ctx.sqlalchemy_exception
+        if wrapped is not None and len(wrapped.args) == 1:
+            wrapped.args = (f"({type(orig).__module__}.{type(orig).__name__}) {primary}",)
+
+    return engine
+
+
+def make_engine(url: str, pool_size: int = 5, max_overflow: int = 5, settings=None) -> Engine:
+    return quiet_errors(create_engine(url, pool_size=pool_size, max_overflow=max_overflow, pool_pre_ping=True, pool_recycle=1800,
+                                      pool_timeout=10, hide_parameters=True, connect_args=session_options(settings)))
 
 
 class _Db:
@@ -63,6 +100,22 @@ class _Db:
             return
         with self.engine.begin() as c:
             c.execute(text("SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY"))
+            org = current_org.get()
+            if org:
+                c.execute(text("SELECT set_config('app.org_id', :o, true)"), {"o": org})
+            token = _pinned.set((self.engine, threading.get_ident(), c))
+            try:
+                yield
+            finally:
+                _pinned.reset(token)
+
+    @contextmanager
+    def writing(self):
+        """Keep related writes on one tenant-scoped transaction, including lifecycle adapter calls."""
+        if self._pin() is not None:
+            yield
+            return
+        with self.engine.begin() as c:
             org = current_org.get()
             if org:
                 c.execute(text("SELECT set_config('app.org_id', :o, true)"), {"o": org})
@@ -130,6 +183,9 @@ def _s(row: dict) -> dict:
     return {k: (str(v) if isinstance(v, uuid.UUID) else v) for k, v in row.items()}
 
 
+SOURCE_TYPES = frozenset({"code", "doc", "meeting", "verified_answer"})  # the source_type enum (db/migrations/001_init.sql)
+
+
 class PgIndex(_Db):
     def __init__(self, engine, embedder: Embedder):
         super().__init__(engine)
@@ -162,6 +218,11 @@ class PgIndex(_Db):
     def delete_document(self, project_id, document_id):
         rows = self.rows("""DELETE FROM chunks WHERE project_id = :p AND source_type = 'doc' AND ref->>'document_id' = :d RETURNING id""",
                          p=project_id, d=str(document_id))
+        return [r["id"] for r in rows]
+
+    def delete_meeting(self, project_id, meeting_id):
+        rows = self.rows("""DELETE FROM chunks WHERE project_id = :p AND source_type = 'meeting' AND ref->>'meeting_id' = :m RETURNING id""",
+                         p=project_id, m=str(meeting_id))
         return [r["id"] for r in rows]
 
     def search(self, project_id, query, k=8, source_types=None):
@@ -199,6 +260,68 @@ class PgIndex(_Db):
         return [Hit(chunk=Chunk(**_s({k2: r[k2] for k2 in ("id", "project_id", "source_type", "symbol", "ref", "content", "stale")})),
                     score=float(r["score"]), similarity=max(0.0, float(r["sim"]))) for r in rows]
 
+    # --- search_grid: the research crew's batched retrieval (app/rag, docs/specs/rag-crew.md) ---
+    # search()'s hybrid query for one kind, reading only the candidates' rows (a join from the candidate ids, where search()
+    # joins from the whole table) and comparing source_type as the enum, so the (project_id, source_type) index serves it
+    _GRID = text("""
+        WITH v AS (
+            SELECT id, row_number() OVER (ORDER BY embedding <=> CAST(:qv AS vector)) AS r
+            FROM chunks WHERE project_id = :p AND NOT stale AND source_type = CAST(:kind AS source_type)
+            ORDER BY embedding <=> CAST(:qv AS vector) LIMIT 50),
+        kw AS (
+            SELECT c.id, row_number() OVER (ORDER BY ts_rank_cd(c.tsv, q) DESC, c.id) AS r
+            FROM chunks c, to_tsquery('simple', coalesce(CAST(:q AS text), '')) q
+            WHERE CAST(:q AS text) IS NOT NULL AND c.project_id = :p AND NOT c.stale AND c.source_type = CAST(:kind AS source_type)
+              AND c.tsv @@ q
+            ORDER BY ts_rank_cd(c.tsv, q) DESC, c.id LIMIT 50),
+        ids AS (SELECT id FROM v UNION SELECT id FROM kw)
+        SELECT c.id, c.project_id, c.source_type::text AS source_type, c.symbol, c.ref, c.content, c.stale,
+               COALESCE(1.0 / (60 + v.r), 0) + COALESCE(1.0 / (60 + kw.r), 0) AS score,
+               1 - (c.embedding <=> CAST(:anchor AS vector)) AS sim
+        FROM ids JOIN chunks c ON c.id = ids.id LEFT JOIN v ON v.id = c.id LEFT JOIN kw ON kw.id = c.id
+        WHERE NOT c.stale
+        ORDER BY score DESC, c.id LIMIT :k""")
+
+    # the keyword half alone, for search_grid(semantic=False): no vector, every similarity 0.0
+    _GRID_KW = text("""
+        SELECT c.id, c.project_id, c.source_type::text AS source_type, c.symbol, c.ref, c.content, c.stale,
+               1.0 / (60 + row_number() OVER (ORDER BY ts_rank_cd(c.tsv, q) DESC, c.id)) AS score, 0.0 AS sim
+        FROM chunks c, to_tsquery('simple', coalesce(CAST(:q AS text), '')) q
+        WHERE CAST(:q AS text) IS NOT NULL AND c.project_id = :p AND NOT c.stale AND c.source_type = CAST(:kind AS source_type)
+          AND c.tsv @@ q
+        ORDER BY ts_rank_cd(c.tsv, q) DESC, c.id LIMIT :k""")
+
+    def search_grid(self, project_id, queries, kinds, k, semantic=True):
+        """For each query, for each kind, the top k[kind] hits of the hybrid query search() runs (pgvector and the keyword
+        OR-query, fused by RRF), each with `1 - (embedding <=> anchor)` as its similarity, anchor being queries[0]'s
+        vector: the question as asked. One embedding call for every query, then every (query, kind) on one connection.
+        semantic=False: the keyword query alone, no embedding call, every similarity 0.0 (the crew's fallback when the
+        query embedding fails). A kind that is not a source type has no hits (as in MemoryIndex), never a DataError."""
+        if not queries:
+            return []
+        vecs = self.embedder.embed(list(queries), "query") if semantic else [None] * len(queries)
+        anchor = _vec(vecs[0]) if semantic else None
+        want = list(dict.fromkeys(kinds))
+        out = []
+        with self.tx() as c:
+            for query, qv in zip(queries, vecs):
+                q = keyword_query(query)
+                row = {}
+                for kind in want:
+                    n = max(0, int(k.get(kind, 8)))
+                    if n == 0 or kind not in SOURCE_TYPES:
+                        rows = []
+                    elif semantic:
+                        rows = c.execute(self._GRID, {"qv": _vec(qv), "q": q, "p": project_id, "kind": kind, "k": n,
+                                                      "anchor": anchor}).mappings().all()
+                    else:
+                        rows = [] if q is None else c.execute(self._GRID_KW, {"q": q, "p": project_id, "kind": kind, "k": n}).mappings().all()
+                    row[kind] = [Hit(chunk=Chunk(**_s({k2: r[k2] for k2 in ("id", "project_id", "source_type", "symbol", "ref", "content",
+                                                                              "stale")})),
+                                     score=float(r["score"]), similarity=max(0.0, float(r["sim"]))) for r in rows]
+                out.append(row)
+        return out
+
     def all_paths(self, project_id):
         """Sorted by code point like MemoryIndex (COLLATE "C"): coverage_map lists tied modules in this order."""
         return [r["path"] for r in self.rows("""SELECT DISTINCT path COLLATE "C" AS path FROM chunks
@@ -209,10 +332,14 @@ class PgIndex(_Db):
                         end_line=(r["ref"] or {}).get("end_line"), chunk_id=r["id"]) for r in rows]
 
     def symbols_named(self, project_id, name):
-        return self._refs(self.rows("SELECT id, path, symbol, ref FROM chunks WHERE project_id = :p AND symbol = :s", p=project_id, s=name))
+        """By path (code point), then start line: the same definitions in the same order as MemoryIndex, whatever order a
+        re-index left the rows in (the crew reads the first few)."""
+        return self._refs(self.rows("""SELECT id, path, symbol, ref FROM chunks WHERE project_id = :p AND symbol = :s
+                                       ORDER BY path COLLATE "C", (ref->>'start_line')::int, id""", p=project_id, s=name))
 
     def symbols_in(self, project_id, path):
-        return self._refs(self.rows("SELECT id, path, symbol, ref FROM chunks WHERE project_id = :p AND path = :f AND symbol IS NOT NULL", p=project_id, f=path))
+        return self._refs(self.rows("""SELECT id, path, symbol, ref FROM chunks WHERE project_id = :p AND path = :f AND symbol IS NOT NULL
+                                       ORDER BY (ref->>'start_line')::int, id""", p=project_id, f=path))
 
     def semantic_code(self, project_id, text_, k=3):
         return [(CodeRef(path=h.chunk.ref["path"], symbol=h.chunk.symbol, start_line=h.chunk.ref.get("start_line"),
@@ -266,9 +393,12 @@ class PgIndex(_Db):
 class PgStore(_Db):
     # ---- people and projects ----
     def get_project(self, project_id):
+        """None for an id no project has (or one row-level security hides); a malformed id is a LookupError. A database error
+        is raised as it is, so callers report an outage, not a missing project."""
         if not _is_uuid(project_id):
             raise LookupError(project_id)
-        return Project(**_s(self.one("SELECT id, org_id, name, description FROM projects WHERE id = :p", p=project_id)))
+        r = self.one("SELECT id, org_id, name, description FROM projects WHERE id = :p", p=project_id)
+        return Project(**_s(r)) if r else None
 
     @_ids
     def get_user(self, user_id):
@@ -342,7 +472,12 @@ class PgStore(_Db):
 
     # ---- meetings and KT links ----
     _MEETING_COLS = """id, project_id, title, room, status::text AS status, recording_uri, duration_s, started_at, summary,
-                       kt_session_key AS kt_key, created_by, provider, join_url, calendar_event_id, starts_at, ends_at, attendees"""
+                       kt_session_key AS kt_key, created_by, provider, join_url, calendar_event_id, starts_at, ends_at, attendees,
+                       CASE WHEN recording_consent_at IS NOT NULL THEN jsonb_build_object(
+                           'by', recording_consent_by, 'at', recording_consent_at, 'notice_version', recording_notice_version,
+                           'by_name', (SELECT u.name FROM users u WHERE u.id = meetings.recording_consent_by),
+                           'kind', coalesce(recording_consent_kind, 'confirmed'))
+                       END AS recording_consent, transcript_source"""  # 020, 021; consent written by adapters/recording_store.py
 
     @_ids
     def get_meeting(self, meeting_id):
@@ -375,6 +510,16 @@ class PgStore(_Db):
                               ON CONFLICT (meeting_id) DO UPDATE SET decisions = EXCLUDED.decisions, terms = EXCLUDED.terms, result = EXCLUDED.result"""),
                       {**m, "d": json.dumps(result.decisions), "t": json.dumps([t.model_dump() for t in result.terms]), "r": result.model_dump_json()})
             c.execute(text("UPDATE meetings SET status = 'ready', summary = :s WHERE id = :m"), {**m, "s": result.summary})
+
+    def erase_meeting_content(self, meeting_id):
+        if not _is_uuid(meeting_id):
+            return
+        with self.tx() as c:
+            m = {"m": meeting_id}
+            for t in ("transcript_segments", "screen_moments", "action_items", "meeting_notes", "kt_links"):
+                c.execute(text(f"DELETE FROM {t} WHERE meeting_id = CAST(:m AS uuid)"), m)
+            c.execute(text("""UPDATE meetings SET recording_uri = NULL, summary = NULL, status = 'ended', transcript_source = NULL,
+                              ended_at = coalesce(ended_at, now()) WHERE id = CAST(:m AS uuid)"""), m)
 
     def meeting_notes(self, meeting_id):
         r = self.one("SELECT result FROM meeting_notes WHERE meeting_id = :m", m=meeting_id)
@@ -516,11 +661,13 @@ class PgStore(_Db):
 
     # ---- chat and experts ----
     def save_chat(self, project_id, user_id, question, result: QAResult):
-        r = self.one("""INSERT INTO chat_messages (org_id, project_id, user_id, question, status, answer, citations, kt_clips, cited_chunk_ids, confidence)
-                        VALUES (:o, :p, :u, :q, :s, :a, CAST(:c AS jsonb), CAST(:k AS jsonb), :ids, :conf) RETURNING id""",
+        r = self.one("""INSERT INTO chat_messages (org_id, project_id, user_id, question, status, answer, citations, kt_clips, cited_chunk_ids, confidence,
+                                                   writer, crew)
+                        VALUES (:o, :p, :u, :q, :s, :a, CAST(:c AS jsonb), CAST(:k AS jsonb), :ids, :conf, :w, CAST(:cr AS jsonb)) RETURNING id""",
                      o=current_org.get(), p=project_id, u=user_id, q=question, s=result.status, a=result.answer,
                      c=json.dumps([c.model_dump() for c in result.citations]), k=json.dumps([k.model_dump() for k in result.kt_clips]),
-                     ids=[c.chunk_id for c in result.citations if c.chunk_id], conf=result.confidence)
+                     ids=[c.chunk_id for c in result.citations if c.chunk_id], conf=result.confidence, w=result.writer,
+                     cr=json.dumps(result.crew) if result.crew is not None else None)
         return str(r["id"])
 
     def mark_answers_stale(self, chunk_ids):
@@ -729,7 +876,7 @@ class PgStore(_Db):
                             WHERE m.project_id = :pr AND l.provider = :p""", pr=project_id, p=provider)
         return {str(r["user_id"]): r["url"] for r in rows}
 
-    _CHAT_COLS = "id, id AS message_id, question, status, answer, citations, kt_clips, confidence, stale, feedback, created_at"
+    _CHAT_COLS = "id, id AS message_id, question, status, answer, citations, kt_clips, confidence, writer, crew, stale, feedback, created_at"
 
     # ports.norm_question in SQL: case, runs of whitespace and closing punctuation do not count
     _NORM_Q = "rtrim(lower(btrim(regexp_replace({0}, '\\s+', ' ', 'g'))), '?.! ')"
@@ -738,8 +885,8 @@ class PgStore(_Db):
         """MemoryStore.chat_history: `expert` is the request a not-enough-information turn was handed to (or, for the same
         question asked again, the earlier one), an answered one first."""
         norm_r, norm_c = self._NORM_Q.format("r.question"), self._NORM_Q.format("c.question")
-        rows = self.rows(f"""SELECT c.id, c.id AS message_id, c.question, c.status, c.answer, c.citations, c.kt_clips, c.confidence, c.stale,
-                                    c.feedback, c.created_at, e.expert FROM chat_messages c
+        rows = self.rows(f"""SELECT c.id, c.id AS message_id, c.question, c.status, c.answer, c.citations, c.kt_clips, c.confidence, c.writer,
+                                    c.crew, c.stale, c.feedback, c.created_at, e.expert FROM chat_messages c
                              LEFT JOIN LATERAL (
                                SELECT jsonb_build_object('status', r.status, 'name', u.name, 'answer', r.answer, 'answered_at', r.answered_at) AS expert
                                FROM expert_requests r LEFT JOIN users u ON u.id = r.expert_id
@@ -812,6 +959,12 @@ class PgStore(_Db):
     def create_organization(self, uid, email, name, org_name, project_name):
         self.one("SELECT * FROM create_organization(:u, :e, :n, :o, :p)", u=uid, e=email, n=name, o=org_name, p=project_name)
         return self.user_by_firebase(uid)
+
+    def organization_exists(self):
+        """Any organisation at all, across tenants (organization_exists(), 015_signup_gate.sql): a self-hosted server lets
+        sign-up create only the first one."""
+        r = self.one("SELECT organization_exists() AS yes")
+        return bool(r and r["yes"])
 
     def org_name(self, org_id):
         r = self.one("SELECT name FROM organizations WHERE id = :o", o=org_id)
@@ -932,10 +1085,48 @@ class PgStore(_Db):
         sets = "deactivated_at = coalesce(deactivated_at, now())" if status == "deactivated" else "deactivated_at = NULL"
         return self._change_member(org_id, user_id, sets)
 
+    def find_person(self, org_id, email):
+        r = self.one(f"SELECT {USER_COLS} FROM users WHERE org_id = CAST(:o AS uuid) AND lower(email) = lower(:e)",
+                     o=org_id, e=email.strip())
+        return User(**_s(r)) if r else None
+
+    def erase_person(self, org_id, user_id):
+        """MemoryStore.erase_person, in one transaction (the row is locked first, so a sign-in cannot bind it meanwhile)."""
+        if not _is_uuid(user_id):
+            return {}
+        p = {"u": user_id, "o": org_id}
+        with self.tx() as c:
+            row = c.execute(text("SELECT lower(email) FROM users WHERE id = CAST(:u AS uuid) AND org_id = CAST(:o AS uuid) FOR UPDATE"),
+                            p).first()
+            if row is None:
+                return {}
+            counts = {}
+            for kind, sql in (("chat_messages", "DELETE FROM chat_messages WHERE user_id = CAST(:u AS uuid)"),
+                              ("expert_requests", "DELETE FROM expert_requests WHERE asked_by = CAST(:u AS uuid)"),
+                              ("notifications", "DELETE FROM notifications WHERE user_id = CAST(:u AS uuid)"),
+                              ("scheduling_links", "DELETE FROM scheduling_links WHERE user_id = CAST(:u AS uuid)"),
+                              ("invitations", "DELETE FROM invitations WHERE org_id = CAST(:o AS uuid) AND lower(email) = :e"),
+                              # their own words when asking for a recording to be removed: blanked, the rows stay
+                              ("recording_removal_reasons", "UPDATE recording_removal_requests SET reason = '' "
+                                                            "WHERE requested_by = CAST(:u AS uuid) AND reason <> ''")):
+                counts[kind] = c.execute(text(sql), {**p, "e": row[0]}).rowcount
+            c.execute(text("DELETE FROM project_members WHERE user_id = CAST(:u AS uuid)"), p)
+            c.execute(text("""UPDATE users SET name = 'Erased person', email = 'erased-' || id::text || '@erased.invalid',
+                              github_login = NULL, firebase_uid = NULL, deactivated_at = coalesce(deactivated_at, now())
+                              WHERE id = CAST(:u AS uuid)"""), p)
+        return counts
+
+    def set_github_login(self, org_id, user_id, login):
+        if not _is_uuid(user_id):
+            return None
+        r = self.one(f"""UPDATE users SET github_login = :g WHERE id = CAST(:u AS uuid) AND org_id = CAST(:o AS uuid)
+                         RETURNING {USER_COLS}""", g=login, u=user_id, o=org_id)
+        return User(**_s(r)) if r else None
+
     # ---- documents ----
     def documents(self, project_id):
-        return [_s(r) for r in self.rows("""SELECT id, project_id, title, mime_type AS mime, status, page_count, created_at FROM documents
-                                            WHERE project_id = :p ORDER BY created_at DESC""", p=project_id)]
+        return [_s(r) for r in self.rows("""SELECT id, project_id, title, mime_type AS mime, status, page_count, created_at, uploaded_by
+                                            FROM documents WHERE project_id = :p ORDER BY created_at DESC""", p=project_id)]
 
     def update_document(self, document_id, **fields):
         sets = ", ".join(f"{k} = :{k}" for k in fields)
@@ -943,8 +1134,8 @@ class PgStore(_Db):
 
     @_ids
     def get_document(self, document_id):
-        r = self.one("""SELECT id, project_id, title, gcs_uri AS uri, mime_type AS mime, status, page_count, created_at FROM documents
-                        WHERE id = CAST(:i AS uuid)""", i=document_id)
+        r = self.one("""SELECT id, project_id, title, gcs_uri AS uri, mime_type AS mime, status, page_count, created_at, uploaded_by
+                        FROM documents WHERE id = CAST(:i AS uuid)""", i=document_id)
         return _s(r) if r else None
 
     def delete_document(self, document_id):
@@ -1013,6 +1204,27 @@ class PgStore(_Db):
         self.run("INSERT INTO audit_log (org_id, actor_id, action, target, detail) VALUES (:o, :a, :ac, :t, CAST(:d AS jsonb))",
                  o=org_id, a=actor_id, ac=action, t=target, d=json.dumps(detail or {}, default=str))
 
+    # ---- legal acceptances (019_legal.sql): the app role may insert and read, never change or remove ----
+    _LEGAL_COLS = "id, org_id, user_id, document, version, method, accepted_at, ip_prefix, user_agent"
+
+    def record_legal_acceptance(self, org_id, user_id, document, version, method, ip_prefix=None, user_agent=None, at=None):
+        if not (_is_uuid(org_id) and _is_uuid(user_id)):
+            return None
+        r = self.one(f"""INSERT INTO legal_acceptances (org_id, user_id, document, version, method, ip_prefix, user_agent, accepted_at)
+                         VALUES (CAST(:o AS uuid), CAST(:u AS uuid), :d, :v, :m, :ip, :ua, coalesce(CAST(:at AS timestamptz), now()))
+                         ON CONFLICT DO NOTHING RETURNING {self._LEGAL_COLS}""",
+                     o=org_id, u=user_id, d=document, v=version, m=method, ip=ip_prefix, ua=user_agent, at=at)
+        return _s(r) if r else None
+
+    def legal_acceptances(self, org_id, user_id=None, document=None):
+        if not _is_uuid(org_id) or (user_id is not None and not _is_uuid(user_id)):
+            return []
+        rows = self.rows(f"""SELECT {self._LEGAL_COLS} FROM legal_acceptances
+                             WHERE org_id = CAST(:o AS uuid) AND (CAST(:u AS uuid) IS NULL OR user_id = CAST(:u AS uuid))
+                               AND (CAST(:d AS text) IS NULL OR document = :d)
+                             ORDER BY accepted_at DESC, id DESC""", o=org_id, u=user_id, d=document)
+        return [_s(r) for r in rows]
+
     # ---- installations and pre-tenant lookups ----
     def installation_org(self, installation_id):
         r = self.one("SELECT installation_org(:i) AS org", i=str(installation_id))
@@ -1067,6 +1279,7 @@ class PgStore(_Db):
         """Claim unsent events whose next attempt is due. Each claim moves the next attempt forward (30 s, doubling, at most an
         hour), so a concurrent flusher skips them and a failed publish is retried later."""
         self.run("DELETE FROM outbox WHERE sent_at < now() - interval '7 days'")
+        self._forget_old_events()
         rows = self.rows("""UPDATE outbox o SET attempts = o.attempts + 1,
                                   next_attempt_at = now() + least(interval '1 hour', make_interval(secs => 30 * power(2, least(o.attempts, 7))))
                               FROM (SELECT id FROM outbox WHERE sent_at IS NULL AND next_attempt_at <= now()
@@ -1084,6 +1297,21 @@ class PgStore(_Db):
     def outbox_attempts(self, outbox_id):
         r = self.one("SELECT attempts FROM outbox WHERE id = CAST(:i AS uuid)", i=outbox_id)
         return r["attempts"] if r else 0
+
+    EVENTS_KEPT_DAYS = 90
+    _events_swept: float | None = None  # time.monotonic() of this process's last sweep
+
+    def _forget_old_events(self) -> None:
+        """At most hourly (the outbox is read every few seconds): forget the dedupe keys of events handled more than
+        EVENTS_KEPT_DAYS ago; nothing redelivers an event that old. Pull request keys stay: the self-hosted watcher lists every
+        open pull request each round, and its key is what says that head was reviewed already."""
+        import time
+
+        if PgStore._events_swept is not None and time.monotonic() - PgStore._events_swept < 3600:
+            return
+        PgStore._events_swept = time.monotonic()
+        self.run("""DELETE FROM processed_events WHERE status = 'done' AND dedupe_key NOT LIKE 'pr:%'
+                    AND claimed_at < now() - make_interval(days => :d)""", d=self.EVENTS_KEPT_DAYS)
 
     def ping(self):
         return bool(self.one("SELECT 1 AS ok"))

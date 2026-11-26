@@ -1,0 +1,62 @@
+# Database migrations (backend/app/migrate.py), as the database owner, once per release and BEFORE the new API starts.
+# It applies the numbered files in backend/db/migrations, keeps the ww_app role the services use (no row-level-security
+# bypass), and refuses to finish if any table could leak across organisations. One migrator runs at a time (an advisory
+# lock), so a second run waits instead of applying a file twice.
+#
+# A Job's pod template cannot change, so every release replaces it:
+#   * infra/k8s/deploy.sh deletes the previous Job, runs this one, waits for it, and only then rolls out the API, the web
+#     app and the workers. A failed migration stops the release there, with the old version still serving.
+#   * Argo CD runs it as a PreSync hook (the annotations below) for the same order.
+# Never `kubectl apply -k` an overlay on its own: the new API could start before its tables exist.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: migrate
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 0 # a failed migration is read and fixed, not retried blindly; run the release again
+  activeDeadlineSeconds: 900
+  ttlSecondsAfterFinished: 604800 # its log stays a week
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: welcome-wave
+        app.kubernetes.io/component: migrate
+      annotations:
+        kubectl.kubernetes.io/default-container: migrate
+    spec:
+      serviceAccountName: migrate
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      containers:
+        - name: migrate
+          image: welcome-wave-api
+          command: ["python", "-m", "app.migrate"]
+          env:
+            - { name: HOME, value: /tmp }
+          envFrom:
+            - secretRef: { name: ww-migrate } # DATABASE_URL_OWNER and APP_DB_PASSWORD only: the owner's password is nowhere else
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits: { memory: 512Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 256Mi }

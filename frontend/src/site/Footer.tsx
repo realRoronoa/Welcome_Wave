@@ -5,8 +5,9 @@
    labelled "Explained in KT #1" (the terrain's explained patch, as on the sign-in page).
    Its two ways in: "Book a demo" (a mailto once DEMO_EMAIL is set; until then a short note under the buttons) and "Open the
    live demo", which hands this black panel over to the sign-in page's black brand panel (handover.ts). The footer continues
-   in black: the site's links, the stack it is built on, and a way back to the top. */
+   in black: the site's links, the legal documents (src/legal/paths.ts), the stack it is built on, and a way back to the top. */
 import { CSSProperties, MouseEvent, useEffect, useRef } from "react";
+import { LEGAL_PAGES } from "../legal/paths";
 import { Logo } from "../ui";
 import { addScene, setNight } from "./clock";
 import { SWELL } from "./demo";
@@ -133,19 +134,23 @@ export function Footer({ home, signedIn }: { home: boolean; signedIn: boolean })
   return (
     <footer ref={foot} className="s-footer" data-tone="night">
       <div className="s-grid s-foot-cols">
-        <div className="s-foot-brand" style={col("1 / 4", "1 / -1")}>
+        <div className="s-foot-brand" style={col("1 / 3", "1 / -1")}>
           <Logo size={28} />
           <p>Learn the codebase from the people who built it.</p>
         </div>
-        <nav aria-label="Site" style={col("5 / 7", "1 / 3")}>
+        <nav aria-label="Site" style={col("3 / 5", "1 / 3")}>
           <h2 className="s-foot-h">Site</h2>
           <ul>{[link("/", "Home"), link(a("product"), "Product"), link(a("security"), "Security"), link("/about", "About")]}</ul>
         </nav>
-        <nav aria-label="Features" style={col("7 / 9", "3 / 5")}>
+        <nav aria-label="Features" style={col("5 / 7", "3 / 5")}>
           <h2 className="s-foot-h">Features</h2>
           <ul>{[link(a("knowledge"), "KT-to-code linking"), link(a("mentor"), "KT sessions"), link(a("contribution"), "30/60/90 program"), link(a("knowledge"), "Cited answers"), link(a("impact"), "Leadership reporting")]}</ul>
         </nav>
-        <nav aria-label="Account" style={col("9 / 11", "5 / 7")}>
+        <nav aria-label="Legal" style={col("7 / 9", "5 / 7")}>
+          <h2 className="s-foot-h">Legal</h2>
+          <ul>{LEGAL_PAGES.map((p) => link(p.path, p.short))}</ul>
+        </nav>
+        <nav aria-label="Account" style={col("9 / 11", "1 / 3")}>
           <h2 className="s-foot-h">Account</h2>
           <ul>
             {signedIn ? (
@@ -158,7 +163,7 @@ export function Footer({ home, signedIn }: { home: boolean; signedIn: boolean })
             )}
           </ul>
         </nav>
-        <div style={col("11 / 13", "1 / -1")}>
+        <div style={col("11 / 13", "3 / 7")}>
           <h2 className="s-foot-h">Built on</h2>
           <ul className="s-foot-mono">
             {["FastAPI", "LangGraph", "Gemini", "Postgres + pgvector", "Google Calendar + Meet", "React"].map((t) => <li key={t}>{t}</li>)}
