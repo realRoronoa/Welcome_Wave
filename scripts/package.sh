@@ -5,9 +5,11 @@
 #   ./scripts/package.sh                 -> dist/welcome-wave-<date>-<time>.zip (dist/ is git-ignored)
 #   ./scripts/package.sh path/to/out.zip
 #
-# Always left out: .env and .env.* (except .env.example), selfhost.env, *.pem, and anything under .blobs, .data,
-# node_modules, .venv, dist or __pycache__, and *.tsbuildinfo. The finished zip is checked for them before the script reports
-# success.
+# Always left out: .env and .env.* (except .env.example), selfhost.env, *.pem, the data folder's keys (.token-key,
+# .signing-key), database dumps and backups (*.sql outside backend/db/migrations, *.sql.gz, *.dump, anything under backups/),
+# Terraform state and variables (*.tfstate*, *.tfvars except *.tfvars.example, anything under .terraform/), anything under
+# .blobs, .data (and the .before-restore copies a restore leaves), node_modules, .venv, dist or __pycache__, and *.tsbuildinfo.
+# The finished zip is checked for them before the script reports success.
 set -euo pipefail
 
 ROOT="$(git -C "$(dirname "$0")/.." rev-parse --show-toplevel)"
@@ -18,12 +20,14 @@ command -v zip >/dev/null || { echo "package.sh: needs the zip command" >&2; exi
 excluded() {
   local path="$1" name="${1##*/}" part
   case "$name" in
-    .env.example) ;;
-    .env | .env.* | selfhost.env | *.pem | *.tsbuildinfo | *.pyc) return 0 ;;
+    .env.example | *.tfvars.example) ;;
+    .env | .env.* | selfhost.env | *.pem | .token-key | .signing-key | *.tsbuildinfo | *.pyc) return 0 ;;
+    *.sql.gz | *.dump | *.tfstate | *.tfstate.* | *.tfvars) return 0 ;;
+    *.sql) case "$path" in backend/db/migrations/*) ;; *) return 0 ;; esac ;; # a plain dump; migrations are code
   esac
   IFS=/ read -r -a parts <<<"$path"
   for part in "${parts[@]}"; do
-    case "$part" in .blobs | .data | node_modules | .venv | dist | __pycache__) return 0 ;; esac
+    case "$part" in .blobs | .data | *.before-restore-* | backups | .terraform | node_modules | .venv | dist | __pycache__) return 0 ;; esac
   done
   return 1
 }

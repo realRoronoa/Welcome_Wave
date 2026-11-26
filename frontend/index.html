@@ -17,9 +17,8 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/brand/apple-touch-icon.png" />
     <link rel="mask-icon" href="/brand/mask-icon.svg" color="#0a0a0a" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <!-- Geist and Geist Mono (SIL OFL 1.1, public/fonts/OFL.txt), served from this origin: no third party sees a visitor -->
+    <link rel="preload" href="/fonts/Geist-Variable.woff2" as="font" type="font/woff2" crossorigin />
     <!-- The intro ("Crowd"): HTML + CSS, so it paints before any JavaScript arrives; /boot-field.js adds the light and the field.
          The idea is the mark's (docs/brand/BRAND.md): four identical strokes, each laid over the one before, a wave of knowledge
          passed person to person through a crowd. Seconds from first paint (keep public/boot-field.js's constants in step):
@@ -42,6 +41,8 @@
          the name is Geist 600 outlined at cap height 100 (public/brand/wordmark.svg's spacing). Horizontal lockup: mark box --m,
          gap .229 --m, name 4.296 --m wide (5.525 --m in all, so the mark's centre sits 2.2625 --m left of the lockup's). -->
     <style>
+      @font-face { font-family: "Geist"; src: url("/fonts/Geist-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
+      @font-face { font-family: "Geist Mono"; src: url("/fonts/GeistMono-Variable.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
       #ww-boot {
         --b-bg: #0a0a0a; --b-center: #151515; --b-ink: #fafafa; --b-teal: #2dd4bf; --b-core: #effffc;
         --b-mute: #9a9a9a; --b-faint: #5c5c5c; --b-line: #262626; --b-rule: #3a3a3a; --b-grain: .05;

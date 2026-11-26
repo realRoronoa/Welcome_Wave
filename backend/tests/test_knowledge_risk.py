@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 from fastapi.testclient import TestClient
 
-from app.agents.schemas import KTLink, QAResult
+from app.agents.core.schemas import KTLink, QAResult
 from app.api import knowledge_risk as risk_api
 from app.config import Settings, get_settings
 from app.container import build_container

@@ -1,0 +1,27 @@
+# Use Welcome Wave on this machine
+
+This walkthrough matches the self-hosted release checked on 18 November 2026. Open **http://localhost:8000/login** and choose **Continue with Google** using the existing admin account. The workspace is **Welcome wave** and its project is **welcome kit**. Demo passwords belong to the separate development demo; they do not sign in here.
+
+As of 18 November, the project has **one member, the public `VijayabaskarR-06/welcome-kit` repository indexed and Ready, no separately uploaded documents, and no enrolled hire**. The repository's Markdown guides are part of the code index. Google Calendar/Drive is connected, Gmail SMTP login was tested without sending a message, and Calendly webhooks are off. Because the server binds to localhost, another computer cannot open its app or invitation links.
+
+## First complete journey
+
+1. **Inspect the connected code.** In the left rail open **Settings → Repository**. `VijayabaskarR-06/welcome-kit` should show **Ready**. Open **Code and KT** through ⌘K to browse it. **Refresh** on the Repository tab re-indexes it if necessary. One repository can be attached to this project.
+2. **Add useful documents.** Open **Settings → Documents**, choose an architecture note or runbook, optionally name it, and press **Upload**. PDF, DOCX, Markdown and text files up to 25 MB are accepted. Wait for **Ready** before asking questions about it.
+3. **Try an answer with evidence.** Press **⌘K** (or **Ctrl+K**) and ask “Where does a completed mission get saved?”, then choose **Ask the project**. Open the numbered citations to check the supporting source. If the app says it lacks evidence, inspect the file in Code and KT or ask a person; the answer gate should not invent unsupported details.
+4. **Invite a mentor if you have one.** Open **Settings → People**, enter the expert's email, choose **Expert**, optionally add their GitHub username, and press **Invite**. This action creates an invitation; it does **not** email it. Share the displayed sign-in URL with the person. While the app remains localhost-only, they must use this same machine to open that URL and accept the invitation.
+5. **Enrol a hire.** Open **Team → Enrol**. Enter the hire's name and email, select a template and start date, and press **Enrol**. GitHub login, team, mentor, focus area and role title are optional; there is no team or expert in this project yet. The Planner creates a draft plan.
+6. **Approve the plan.** Open **Approvals**, inspect the proposed tasks, edit or untick tasks as needed, then press **Assign N of M tasks**. Approval starts the program and creates the hire's invitation. With Gmail configured, this step may send an onboarding email. Its localhost app link works only on this computer, so use an address you control while testing locally.
+7. **Follow the program.** Open **Team → the hire → Program** to review milestones, access requests, blockers, check-ins, pre-boarding and the first task. Create a pre-boarding link from the program and open it on this same machine to check the hire's document and environment steps. The hire signs in with the invited email to see **My program**, **Code tour**, **Ask** and **My tasks**.
+8. **Book and process a KT session.** After an expert joins, use **KT planner** or the expert's **My KT queue** to choose an agenda, time, invitees and **Google Meet**, then book the session. Google may send calendar invitations. After the call, use **Import from Google Drive** if a Meet recording exists, or upload a recording in **KT sessions**. Notes and links from recording moments to code appear after processing.
+9. **Complete the first contribution.** A manager selects a first task in the hire's program. The hire starts it, can run a private review of a diff or draft PR, and opens a GitHub pull request. Welcome Wave reads the PR and prepares a review; a manager approves or requests changes in **Approvals**. The app reads the repository and does not write the pull request or merge it for you.
+10. **See the outcome.** Use **Knowledge risk** and **KT planner** to spot poorly explained code; use **Reports** for onboarding progress. Experts answer routed questions in **Expert inbox** and can save verified answers for later reuse.
+
+## Know what is live
+
+- **Google Calendar and Drive:** the organisation grant and read-only API probes work. An actual booking or recording import has not yet been tested.
+- **Gmail:** SMTP login works. No test message has been sent. **Settings → People → Invite** still needs you to share the sign-in link; onboarding mail is queued after plan approval.
+- **Calendly:** a person can save their booking link in **Settings → Integrations**. Automatic booking updates need a public webhook URL, so they cannot reach this localhost installation.
+- **AI and retrieval:** code and documents must finish indexing first. Answers cite evidence and may decline when evidence is weak; verify citations before using an answer for a consequential decision. On a free-tier Gemini key, reading a large repository can use the day's embedding quota, and questions then fail until it resets ([INTEGRATIONS.md](INTEGRATIONS.md#gemini)).
+
+For every page and role, see [USER_GUIDE.md](USER_GUIDE.md). For code architecture and operations, see [PROJECT_GUIDE.md](PROJECT_GUIDE.md). The [animated example](video/welcome-wave-workflow-explainer.mp4) shows the journey with a manager, expert and hire.

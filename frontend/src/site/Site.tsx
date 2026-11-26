@@ -1,12 +1,14 @@
-/* The public site: "/" (the landing page), "/about", and a 404 for any other path that is not the app's. Its own chunk: it
-   never downloads firebase or the workspace. The landing page is a live-action film over a shared stage
+/* The public site: "/" (the landing page), "/about", the legal documents (/terms, /privacy, /recording, /acceptable-use, /dpa,
+   /subprocessors: src/legal/paths.ts names them, Legal.tsx renders them, in a chunk of its own), and a 404 for any other path
+   that is not the app's. Its own chunk: it never downloads firebase or the workspace. The landing page is a live-action film over a shared stage
    (cinematic/CinematicLandingPage.tsx): real footage, then the real product. While it shows, <html> carries .is-site
    (site.css's scope; the app's theme code leaves the page alone) and data-theme="light" (About and the 404 are paper, whatever
    the OS or the saved choice; the landing page is dark from its first paint: .s-dark), plus .motion unless the visitor
    prefers reduced motion (hidden entrance states exist only under it). Leaving undoes all of it and re-applies the saved
    theme for the app. */
-import { CSSProperties, ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CSSProperties, lazy, ReactNode, Suspense, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { hideBoot } from "../boot";
+import { LEGAL_PAGES, legalPage } from "../legal/paths";
 import { focusIn, NAVIGATE, seemsSignedIn, surfaceFor, takeArrival } from "../surface";
 import { applySavedTheme } from "../theme-core";
 import { addScene, reveal, resetNight, setNight, stopReveals } from "./clock";
@@ -18,9 +20,14 @@ import { col, Hw, Stop, Words } from "./parts";
 import "./site.css"; // before the film's own stylesheet, which builds on it
 import CinematicLandingPage from "./cinematic/CinematicLandingPage";
 
+/** The legal documents' reading page: its own chunk, so the landing page never downloads the documents' text. */
+const Legal = lazy(() => import("./Legal"));
+
+/** Every page the site has, and its tab title: a path that is not here is a 404 ("Nobody explained this page"). */
 const TITLES: Record<string, string> = {
   "/": "Welcome Wave · Learn the codebase from the people who built it",
   "/about": "About · Welcome Wave",
+  ...Object.fromEntries(LEGAL_PAGES.map((p) => [p.path, `${p.title} · Welcome Wave`])),
 };
 
 export default function Site() {
@@ -89,7 +96,8 @@ export default function Site() {
       document.head.appendChild(robots);
     } else if (known) robots?.remove();
     const target = restorePosition();
-    if (takeArrival()) {
+    // a legal document arrives with its own chunk: Legal.tsx moves focus and finds its anchor once the text is there
+    if (!legalPage(path) && takeArrival()) {
       const h1 = root.current?.querySelector<HTMLElement>("main h1");
       if (target) focusIn(target); else if (h1) focusIn(h1);
     }
@@ -98,12 +106,15 @@ export default function Site() {
 
   const home = path === "/";
   const signedIn = seemsSignedIn();
+  const legal = legalPage(path);
   return (
     <div className="site" ref={root} data-path={path} id="top">
       <a className="s-skip" href="#content">Skip to content</a>
       <Nav path={path} />
       <main id="content" tabIndex={-1}>
-        {home ? <Landing signedIn={signedIn} /> : path === "/about" ? <About /> : <NotFound />}
+        {home ? <Landing signedIn={signedIn} /> : path === "/about" ? <About />
+          : legal ? <Suspense fallback={<div style={{ minHeight: "100vh" }} aria-busy="true" />}><Legal key={legal.id} id={legal.id} /></Suspense>
+          : <NotFound />}
         {path === "/" || path === "/about" ? <Finale signedIn={signedIn} /> : null}
       </main>
       <Footer home={home} signedIn={signedIn} />
@@ -194,8 +205,8 @@ function Cover({ signedIn }: { signedIn: boolean }) {
           </p>
           <div className="s-actions s-in">
             {signedIn
-              ? <a className="s-btn s-btn-ink" href="/app" onClick={(e) => toApp(e, "/app")} {...prefetch}>Open Welcome Wave</a>
-              : <a className="s-btn s-btn-ink" href="/signup" onClick={(e) => toApp(e, "/signup")} {...prefetch}>Get started</a>}
+              ? <a className="s-btn s-btn-brand" href="/app" onClick={(e) => toApp(e, "/app")} {...prefetch}>Open Welcome Wave</a>
+              : <a className="s-btn s-btn-brand" href="/signup" onClick={(e) => toApp(e, "/signup")} {...prefetch}>Get started</a>}
             <a className="s-btn s-btn-line" href="#product">See how it works</a>
           </div>
         </div>

@@ -1,48 +1,55 @@
-import { CSSProperties, ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CSSProperties, ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { api, Config, isManager, Me, Project, ROLE_LABEL } from "./api";
 import Notifications from "./Notifications";
 import { SessionContext } from "./session";
 import { hideBoot } from "./boot";
 import { ErrorBoundary, Icon, IconName, Logo, Msg, Note, Toaster, toast } from "./ui";
-import { Kbd, modKey } from "./fx";
+import { EmptyState, Kbd, modKey } from "./fx";
 import { ThemePref, useTheme } from "./theme";
 import CommandPalette, { Command, openPalette } from "./CommandPalette";
-import Chat from "./pages/Chat";
-import Code from "./pages/Code";
-import Tasks from "./pages/Tasks";
-import Meetings from "./pages/Meetings";
-import Approvals from "./pages/Approvals";
-import Dashboard from "./pages/Dashboard";
-import Settings from "./pages/Settings";
-import { AccountPage } from "./pages/settings/Account";
-import Inbox from "./pages/Inbox";
-import Review from "./pages/Review";
-import GitHubCallback from "./pages/GitHubCallback";
 import NewProject, { NoProjects } from "./pages/NewProject";
-import KnowledgeRisk from "./pages/KnowledgeRisk";
-import KtPlanner from "./pages/KtPlanner";
-import CodeTour from "./pages/CodeTour";
-import DocumentView from "./pages/Document";
 import Home from "./lifecycle/Home";
-import Program from "./lifecycle/Program";
-import Team from "./lifecycle/Team";
-import Enrol from "./lifecycle/Enrol";
-import Setup from "./lifecycle/Setup";
-import Templates from "./lifecycle/Templates";
-import Reports, { exportReport } from "./lifecycle/Reports";
-import Handovers from "./lifecycle/Handovers";
-import PeoplePage from "./lifecycle/People";
-import Audit from "./lifecycle/Audit";
-import Visibility from "./lifecycle/Visibility";
-import FeedbackQueue from "./lifecycle/Feedback";
-import Agents from "./lifecycle/Agents";
+import Agents from "./lifecycle/Agents"; // Home and Ask use its parts, so it ships with them
+import { lazyPage, preloadPages } from "./lazyPage";
+/* Every page but Home (the first page for every role) is its own chunk, fetched when opened or, once the first page is up,
+   while the browser is idle (lazyPage.ts). */
+const Chat = lazyPage(() => import("./pages/Chat"));
+const Voice = lazyPage(() => import("./pages/Voice"));
+const Code = lazyPage(() => import("./pages/Code"));
+const Tasks = lazyPage(() => import("./pages/Tasks"));
+const Meetings = lazyPage(() => import("./pages/Meetings"));
+const Approvals = lazyPage(() => import("./pages/Approvals"));
+const Dashboard = lazyPage(() => import("./pages/Dashboard"));
+const Settings = lazyPage(() => import("./pages/Settings"));
+const Inbox = lazyPage(() => import("./pages/Inbox"));
+const Review = lazyPage(() => import("./pages/Review"));
+const GitHubCallback = lazyPage(() => import("./pages/GitHubCallback"));
+const KnowledgeRisk = lazyPage(() => import("./pages/KnowledgeRisk"));
+const KtPlanner = lazyPage(() => import("./pages/KtPlanner"));
+const CodeTour = lazyPage(() => import("./pages/CodeTour"));
+const DocumentView = lazyPage(() => import("./pages/Document"));
+const Program = lazyPage(() => import("./lifecycle/Program"));
+const Board = lazyPage(() => import("./lifecycle/board/Board"));
+const Team = lazyPage(() => import("./lifecycle/Team"));
+const Enrol = lazyPage(() => import("./lifecycle/Enrol"));
+const Setup = lazyPage(() => import("./lifecycle/Setup"));
+const Templates = lazyPage(() => import("./lifecycle/Templates"));
+const Reports = lazyPage(() => import("./lifecycle/Reports"));
+const Handovers = lazyPage(() => import("./lifecycle/Handovers"));
+const PeoplePage = lazyPage(() => import("./lifecycle/People"));
+const Audit = lazyPage(() => import("./lifecycle/Audit"));
+const Visibility = lazyPage(() => import("./lifecycle/Visibility"));
+const FeedbackQueue = lazyPage(() => import("./lifecycle/Feedback"));
+const AccountPage = lazyPage(() => import("./pages/settings/Account").then((m) => ({ default: m.AccountPage })));
 import { KIND_LABEL, agentName } from "./lifecycle/agentModel";
 import DemoClock, { useDemoClock } from "./lifecycle/DemoClock";
 import { NavIcon, NavIconName } from "./lifecycle/icons";
 import { CrumbContext, LoadError, LcSkeleton, useApi } from "./lifecycle/kit";
 import type { HireHome } from "./lifecycle/types";
 import { replaceRoute, ROUTE_EVENT } from "./route";
+import DpaPrompt from "./consent/DpaPrompt";
 import { startLive, stopLive, useLive, useLiveStatus } from "./live";
+import { useAppScroll, useRouteScroll } from "./scroll";
 
 function useHash() {
   const [hash, setHash] = useState(location.hash || "#/home");
@@ -130,8 +137,8 @@ type Group = { label: string; items: Item[] };
 /** Every page's name, for the rail, the breadcrumb and the palette. */
 const PAGE: Record<string, string> = {
   "/home": "Home", "/team": "Team", "/enrol": "Enrol a new hire", "/program": "Program", "/setup": "Setup", "/templates": "Templates",
-  "/reports": "Reports", "/handovers": "Handovers", "/people": "People", "/audit": "Audit log", "/me": "What your manager sees",
-  "/feedback": "Feedback", "/chat": "Ask the project", "/code-tour": "Code tour", "/code": "Code and KT", "/meetings": "KT sessions",
+  "/board": "Board", "/reports": "Reports", "/handovers": "Handovers", "/people": "People", "/audit": "Audit log", "/me": "What your manager sees",
+  "/feedback": "Feedback", "/chat": "Ask the project", "/voice": "Voice operations", "/code-tour": "Code tour", "/code": "Code and KT", "/meetings": "KT sessions",
   "/tasks": "Tasks", "/inbox": "Expert inbox", "/experts": "Expert inbox", "/approvals": "Approvals", "/dashboard": "KT coverage",
   "/knowledge-risk": "Knowledge risk", "/kt-planner": "KT planner", "/settings": "Settings", "/reviews": "Pull request review",
   "/projects": "New project", "/documents": "Document", "/agents": "Agents",
@@ -198,6 +205,15 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
   const [announce, setAnnounce] = useState("");
 
   useEffect(hideBoot, []);
+  useEffect(() => { // the other pages' code, once the intro has gone (its exit stays smooth) and the browser is idle
+    let t = 0;
+    const go = () => { t = window.setTimeout(preloadPages, 1200); };
+    if (document.getElementById("ww-boot")) addEventListener("ww-boot-done", go, { once: true }); else go();
+    return () => { removeEventListener("ww-boot-done", go); clearTimeout(t); };
+  }, []);
+  // native scrolling; a new page starts at the top, back/forward returns to where a page was left (src/scroll.ts)
+  useAppScroll();
+  useRouteScroll(`${project?.id ?? ""}|${callback !== null ? "callback" : path}`);
   useEffect(() => { startLive(); return stopLive; }, []);
   const liveStatus = useLiveStatus();
   // added to (or removed from) a project, a project renamed: the project list follows without a reload
@@ -268,14 +284,27 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
     dispatchEvent(new HashChangeEvent("hashchange"));
   }
 
-  const deny = <section className="page-head"><h1>Not available</h1><p>Your role does not include this page.</p></section>;
+  const deny = (
+    <section className="page-missing">
+      <h1 className="sr-only">Not available</h1>
+      <EmptyState title="Not available" action={<a className="dp-btn" href="#/home">Go to Home</a>}>Your role does not include this page.</EmptyState>
+    </section>
+  );
+  const notFound = (
+    <section className="page-missing">
+      <h1 className="sr-only">Page not found</h1>
+      <EmptyState title="Page not found" action={<a className="dp-btn" href="#/home">Go to Home</a>}>
+        This link is out of date or mistyped. Everything you can open is in the menu, or press {modKey} K to search.
+      </EmptyState>
+    </section>
+  );
   let page: ReactNode;
   if (callback !== null) page = manager ? <GitHubCallback search={callback} onDone={leaveCallback} /> : deny;
   else if (section === "/projects" && manager) page = <NewProject onCreated={created} />;
   else if (!project) page = <NoProjects me={me} onCreated={created} />;
   // executives are read-only and organisation-level: their home, the report, and their account
   else if (exec) page = section === "/reports" ? <Reports /> : section === "/agents" ? <Agents params={params} /> : section === "/settings" ? <AccountPage />
-    : section === "/home" || !KNOWN.has(section) ? <Home /> : deny;
+    : section === "/home" || section === "/" ? <Home /> : KNOWN.has(section) ? deny : notFound;
   else if (section === "/home") page = <Home />;
   else if (section === "/program") page = id ? <Program key={id} id={id} params={params} /> : hire ? <OwnProgram params={params} /> : manager ? <Team /> : <Home />;
   else if (section === "/team") page = manager ? <Team /> : deny;
@@ -292,6 +321,7 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
   else if (section === "/meetings") page = <Meetings id={id} at={Number(params.get("t")) || 0} focus={params.get("call")} />;
   else if (section === "/documents" && id) page = <DocumentView id={id} page={Number(params.get("page")) || null} />;
   else if (section === "/tasks") page = <Tasks />;
+  else if (section === "/board") page = hire || manager ? <Board key={id ?? "own"} id={id} params={params} /> : deny;
   else if (section === "/reviews" && id) page = <Review id={id} />;
   else if (section === "/inbox" || section === "/experts") page = expert ? <Inbox focus={params.get("message")} /> : deny;
   else if (section === "/approvals") page = manager ? <Approvals focus={id} kind={params.get("kind")} agent={params.get("agent")} /> : deny;
@@ -303,14 +333,16 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
   // experts add the documents the chat answers from, so they get Settings too (documents and account only)
   else if (section === "/settings") page = expert ? <Settings /> : reloadAccount ? <AccountPage /> : deny;
   else if (section === "/chat") page = <Chat q={params.get("q")} focus={params.get("message")} />;
-  else page = <Home />;
+  else if (section === "/voice") page = hire ? <Voice /> : deny;
+  else if (section === "/" || section === "/projects") page = section === "/" ? <Home /> : deny;
+  else page = notFound;
 
   /* The rail, per role, in a few short groups (docs/PLAN.md, Track D). Keys: "g" then the letter. Pages a role may open
      but that are not in its rail (a manager's code tour, a hire's visibility page) are in the palette. */
   const A = (href: string, key: string, icon: NavIconName, label = PAGE[href.slice(1)] ?? href): Item => ({ href, label, icon, key });
   const groups: Group[] = !project ? [] : hire ? [
-    { label: "Workspace", items: [A("#/home", "h", "home"), A("#/chat", "c", "chat", "Ask"), A("#/code-tour", "o", "route"), A("#/code", "k", "code"),
-      A("#/meetings", "m", "video"), A("#/tasks", "t", "tasks", "My tasks")] },
+    { label: "Workspace", items: [A("#/home", "h", "home"), A("#/chat", "c", "chat", "Ask"), A("#/voice", "v", "video", "Voice"), A("#/code-tour", "o", "route"), A("#/code", "k", "code"),
+      A("#/meetings", "m", "video"), A("#/tasks", "t", "tasks", "My tasks"), A("#/board", "b", "board", "My board")] },
     ...(reloadAccount ? [{ label: "Account", items: [A("#/settings", "s", "settings")] }] : []),
   ] : exec ? [
     { label: "Workspace", items: [A("#/home", "h", "home"), A("#/reports", "r", "chart"), A("#/agents", "n", "agents")] },
@@ -320,7 +352,7 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
       A("#/feedback", "f", "feedback")] },
     { label: "Project", items: [A("#/settings", "s", "settings")] },
   ] : [
-    { label: "Workspace", items: [A("#/home", "h", "home"), A("#/team", "t", "team"), A("#/approvals", "a", "approve")] },
+    { label: "Workspace", items: [A("#/home", "h", "home"), A("#/team", "t", "team"), A("#/board", "b", "board"), A("#/approvals", "a", "approve")] },
     ...(admin ? [{ label: "People", items: [A("#/people", "e", "people"), A("#/handovers", "v", "handover"), A("#/templates", "l", "layers")] }] : []),
     { label: "Insight", items: [A("#/kt-planner", "p", "calendar", "KT planner"), A("#/knowledge-risk", "k", "radar"), A("#/reports", "r", "chart"),
       A("#/agents", "n", "agents")] },
@@ -432,7 +464,7 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
         keywords: "agents tick daily check blockers nudges coach", run: () => go("#/agents?tick=1") });
     }
     if (manager || exec) list.push({ id: "export-report", label: "Export report (CSV)", group: "Actions", glyph: <NavIcon name="download" size={16} />,
-      keywords: "report csv download onboarding figures", run: () => { void exportReport(me.role, project?.id ?? ""); } });
+      keywords: "report csv download onboarding figures", run: () => { void import("./lifecycle/Reports").then((m) => m.exportReport(me.role, project?.id ?? "")); } });
     if (clock.ready && clock.day !== null) {
       const d = clock.day, who = clock.focus?.name ?? "the hire";
       const step = (days: number, label: string) => list.push({ id: `clock-${label}`, label, group: "Demo clock", glyph: <NavIcon name="clock" size={16} />,
@@ -599,16 +631,18 @@ export default function Workspace({ config, me, setMe, signOut, reloadAccount }:
           <main key={project?.id ?? "none"} id="main" ref={mainRef} tabIndex={-1}>
             <SessionContext.Provider value={project ? { config, me, project, demo, reloadAccount: reloadAccount ?? null, signOut: signOut ?? null } : null}>
               <Note msg={notice} />
+              {admin && <DpaPrompt />}
               {config.ai === false && manager && (
                 <div className="ai-off" role="note">
                   <Icon name="alert" size={16} />
-                  <p><strong>The AI is off on this server.</strong> Chat, onboarding plans, repository indexing and KT session notes need it.
+                  <p><strong>The AI is off on this server.</strong> Written answers on Ask, repository indexing and KT session notes need it;
+                    until then questions go to a person and onboarding plans start from your templates.
                     Add a Gemini API key (<code>GEMINI_API_KEY</code> in <code>backend/selfhost.env</code>) and restart Welcome Wave.</p>
                 </div>
               )}
               <CrumbContext.Provider value={setCrumb}>
                 <div className="page-enter" key={`${path}:${tick}`}>
-                  <ErrorBoundary key={path}>{page}</ErrorBoundary>
+                  <ErrorBoundary key={path}><Suspense fallback={<LcSkeleton />}>{page}</Suspense></ErrorBoundary>
                 </div>
               </CrumbContext.Provider>
             </SessionContext.Provider>
