@@ -1,0 +1,66 @@
+/* Accordions (src/accordion.tsx): one section open at a time. Monochrome: the open section lifts with a stronger edge;
+   teal stays reserved for KT meaning inside the bodies. */
+.acc { display: grid; gap: .65rem; }
+.acc-item { position: relative; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-l);
+  box-shadow: var(--shadow-xs); scroll-margin-top: 84px; transition: border-color .25s var(--ease), box-shadow .25s var(--ease); }
+.acc-item:hover { border-color: var(--line-hover); }
+.acc-item.open { border-color: var(--line-strong); box-shadow: var(--shadow-s); }
+
+.acc-head { display: flex; align-items: center; gap: .5rem; }
+.acc-h, .acc .acc-h { flex: 1; min-width: 0; margin: 0; font: inherit; font-weight: 400; letter-spacing: normal; text-transform: none; }
+.acc-trigger { width: 100%; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; column-gap: .75rem;
+  padding: .9rem 1.1rem; background: none; border: 0; border-radius: var(--radius-l); color: var(--ink); font: inherit;
+  text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.acc-trigger:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+.acc-chev { color: var(--ink-faint); transition: transform .28s var(--ease-out), color .2s var(--ease); }
+.acc-trigger:hover .acc-chev, .acc-item.open > .acc-head .acc-chev { color: var(--ink); }
+.acc-item.open > .acc-head .acc-chev { transform: rotate(90deg); }
+.acc-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-m); color: var(--ink-2);
+  background: var(--surface-2); border: 1px solid var(--line); }
+.acc-icon:empty { display: none; }
+.acc-trigger:not(:has(.acc-icon)) { grid-template-columns: auto 1fr auto; }
+.acc-text { min-width: 0; display: grid; gap: .15rem; }
+.acc-eyebrow { font-size: .72rem; font-weight: 550; color: var(--ink-soft); letter-spacing: .01em; }
+.acc-title { display: inline-flex; align-items: center; flex-wrap: wrap; gap: .5rem; font-size: 1rem; font-weight: 600; line-height: 1.35;
+  overflow-wrap: anywhere; }
+.acc-sub { font-size: .84rem; font-weight: 400; color: var(--ink-soft); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acc-item.open > .acc-head .acc-sub { white-space: normal; }
+.acc-meta { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .4rem; }
+.acc-actions { display: flex; align-items: center; gap: .4rem; padding-right: 1rem; flex: none; }
+
+/* the fold: rows 0fr -> 1fr animates to the content's own height; hidden from focus and screen readers while folded */
+.acc-panel { display: grid; grid-template-rows: 0fr; visibility: hidden;
+  transition: grid-template-rows .3s var(--ease-out), visibility 0s linear .3s; }
+.acc-item.open > .acc-panel { grid-template-rows: 1fr; visibility: visible; transition: grid-template-rows .3s var(--ease-out), visibility 0s; }
+.acc-clip { min-height: 0; overflow: hidden; }
+.acc-body { padding: .35rem 1.25rem 1.4rem 3.05rem; opacity: 0; transform: translateY(-4px);
+  transition: opacity .2s var(--ease), transform .3s var(--ease-out); }
+.acc-item.open > .acc-panel > .acc-clip > .acc-body { opacity: 1; transform: none; transition-delay: .06s; }
+.acc-item.has-icon > .acc-panel > .acc-clip > .acc-body { padding-left: 1.25rem; }
+.acc-body > :first-child { margin-top: 0; }
+.acc-body > :last-child { margin-bottom: 0; }
+
+/* bodies with their own sections: a hairline between header and body */
+.acc-item.ruled.open > .acc-panel > .acc-clip > .acc-body { border-top: 1px solid var(--line); padding-top: 1.1rem; }
+
+@media (max-width: 640px) {
+  .acc-trigger, .acc-trigger:not(:has(.acc-icon)) { grid-template-columns: auto 1fr; padding: .85rem .9rem; column-gap: .6rem; }
+  .acc-icon { display: none; }
+  .acc-meta { grid-column: 2; justify-content: flex-start; margin-top: .45rem; }
+  .acc-body, .acc-item.has-icon > .acc-panel > .acc-clip > .acc-body { padding: .1rem .9rem 1rem; }
+  .acc-head { flex-wrap: wrap; }
+  .acc-actions { padding: 0 .9rem .85rem 2.4rem; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .acc-panel, .acc-item.open > .acc-panel, .acc-body, .acc-chev { transition: none; }
+}
+
+/* cards that become accordion bodies drop their own frame */
+.acc-body > .dp-approval { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+.acc-body > .dp-approval:hover { box-shadow: none; }
+.acc-body > .dp-approval.done { padding: 1rem 1.1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-m); }
+.acc-body > .kt-review > .dp-approval-foot, .acc-body > .dp-approval .dp-approval-foot { margin-top: .2rem; }
+.dp-plan-lede { margin: 0 0 .8rem; }
+.kt-notes { margin-top: 1.4rem; }
+.acc-item.is-booked .acc-title { color: var(--ink-2); }

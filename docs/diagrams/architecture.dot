@@ -1,0 +1,41 @@
+digraph G {
+  graph [rankdir=TB, fontname="Carlito", fontsize=13, nodesep=0.3, ranksep=0.45, pad=0.2, newrank=true];
+  node  [shape=box, style="rounded,filled", fillcolor="white", color="#9aa6c2", fontname="Carlito", fontsize=12, margin="0.14,0.07", fontcolor="#1d2742"];
+  edge  [color="#55607a", fontname="Carlito", fontsize=10, fontcolor="#55607a", arrowsize=0.7];
+
+  users [label="New hire, manager,\nsenior engineer", fillcolor="#edf0f5"];
+  github [label="GitHub\nrepo, PRs,\nwebhooks", fillcolor="#edf0f5"];
+  calendar [label="Google Calendar + Meet, Calendly:\nKT sessions; recordings from\nGoogle Drive or uploaded", fillcolor="#edf0f5"];
+
+  subgraph cluster_gcp {
+    label="Google Cloud project, asia-south1"; fontsize=13; color="#1d2742"; style="rounded"; fontcolor="#1d2742";
+    subgraph cluster_run { label="Cloud Run"; color="#9aa6c2"; style="rounded,dashed";
+      web [label="ww-web\nReact + nginx"];
+      api [label="ww-api (FastAPI)\nauth, chat, approvals,\nwebhooks, Supervisor\n(chat uses Vertex AI)", color="#0b7a75", penwidth=1.6];
+    }
+    pubsub [label="Pub/Sub\n3 queues +\ndead letters"];
+    subgraph cluster_gke { label="GKE Autopilot + KEDA"; color="#9aa6c2"; style="rounded,dashed";
+      mw [label="meeting-worker"]; iw [label="ingestion-worker\n(GitHub App, read-only)"]; rw [label="review-worker"];
+    }
+    sql [label="Cloud SQL Postgres 16\n+ pgvector, RLS,\nLangGraph checkpoints", shape=cylinder, fillcolor="#e3f2f0", color="#0b7a75"];
+    vertex [label="Vertex AI\nGemini + embeddings", fillcolor="#e3f2f0", color="#0b7a75"];
+    gcs [label="Cloud Storage\nrecordings, docs", shape=cylinder];
+    ops [label="Identity Platform, Secret Manager,\nLogging, Monitoring, Cloud Build,\nArtifact Registry, Sensitive Data Protection", fillcolor="#edf0f5", color="#d6dce6"];
+  }
+  ls [label="LangSmith\ntraces + evals", fillcolor="#edf0f5"];
+
+  {rank=same; users; github; calendar}
+  {rank=same; mw; iw; rw}
+  {rank=same; sql; vertex; gcs}
+
+  users -> web -> api;
+  github -> api;
+  calendar -> api;
+  api -> pubsub [label="events"];
+  pubsub -> mw; pubsub -> iw; pubsub -> rw;
+  mw -> gcs; mw -> vertex; mw -> sql;
+  iw -> sql; iw -> vertex; rw -> vertex; rw -> sql;
+  vertex -> ls [style=invis]; sql -> ls [label="every agent run traced", style=dotted, arrowhead=none];
+  api -> ops [style=invis];
+  api -> sql [label="app data"];
+}

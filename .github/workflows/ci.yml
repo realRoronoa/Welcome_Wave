@@ -1,0 +1,158 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12" # the API image's Python (backend/Dockerfile)
+  NODE_VERSION: "22" # the web image's Node (frontend/Dockerfile)
+
+jobs:
+  backend-memory:
+    name: Backend tests (in memory) and retrieval eval
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Install (the image's exact versions, plus pytest)
+        run: pip install -r requirements.lock pytest
+      - name: Tests
+        run: python -m pytest -q
+      - name: Tests left nothing in backend/
+        run: test ! -e .blobs && test ! -e .data
+      - name: Retrieval eval (fails below its targets)
+        env:
+          MODE: demo
+        run: python -m eval.run_eval
+
+  backend-postgres:
+    name: Backend tests (Postgres 16 + pgvector)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: ww
+          POSTGRES_PASSWORD: ww
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ww"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      # a superuser URL to a scratch server: each test module creates and drops its own database and roles
+      TEST_PG_ADMIN_URL: postgresql://ww:ww@localhost:5432/postgres
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Install
+        run: pip install -r requirements.lock pytest
+      - name: Tests, the Postgres ones included
+        run: |
+          python -m pytest -q -rs | tee pytest.log
+          if grep -q "TEST_PG_ADMIN_URL" pytest.log; then echo "Postgres tests were skipped; here they must run."; exit 1; fi
+
+  frontend:
+    name: Frontend type-check and build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit -p .
+      - name: Build
+        run: npx vite build
+      - name: The build fits the CSP (frontend/nginx.conf.template)
+        run: |
+          # script-src has no 'unsafe-eval' and no 'unsafe-inline'
+          if grep -lE "(^|[^.a-zA-Z0-9_$])eval\(|new Function\(" dist/assets/*.js; then
+            echo "A bundle uses eval or new Function, which the CSP blocks."; exit 1
+          fi
+          python3 - <<'EOF'
+          import re, sys
+          html = open("dist/index.html").read()
+          inline = [m.group(0)[:80] for m in re.finditer(r"<script\b(?![^>]*\bsrc=)[^>]*>", html)]
+          handlers = re.findall(r"\son[a-z]+\s*=", html)
+          if inline or handlers:
+              sys.exit(f"index.html has inline scripts or handlers, which the CSP blocks: {inline + handlers}")
+          EOF
+
+  dependency-audit:
+    name: Dependency audit (report only)
+    runs-on: ubuntu-latest
+    # Reports known vulnerabilities without failing the build, for now.
+    # TODO(security): tighten. Triage the current findings, then remove both `continue-on-error` lines so that a known
+    # high-severity vulnerability fails CI (docs/SECURITY.md, "Dependency scanning").
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Python packages (pip-audit, the image's pinned versions)
+        continue-on-error: true
+        run: pipx run pip-audit --no-deps --disable-pip -r backend/requirements.lock
+      - name: npm packages (high and critical)
+        continue-on-error: true
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+  docker:
+    name: Docker images build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: API image
+        run: docker build -t ww-api:ci backend
+      - name: Web image
+        run: docker build -t ww-web:ci frontend
+      - name: Web image serves the app with its security headers
+        run: |
+          docker run -d --name web -e PORT=8080 -e API_URL=http://127.0.0.1:9 -p 8080:8080 ww-web:ci
+          for i in $(seq 1 30); do curl -fsS -o /dev/null http://127.0.0.1:8080/health && break; sleep 1; done
+          curl -fsS -D headers.txt -o /dev/null http://127.0.0.1:8080/
+          cat headers.txt
+          grep -qi "^content-security-policy: default-src 'self'" headers.txt
+          grep -qi "^strict-transport-security:" headers.txt
+          grep -qi "^permissions-policy:" headers.txt
+          docker rm -f web
+      - name: API image starts in demo mode
+        run: |
+          docker run -d --name api -e MODE=demo -p 8081:8080 ww-api:ci
+          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:8081/health && break; sleep 1; done
+          curl -fsS -D - -o /dev/null http://127.0.0.1:8081/api/config | grep -qi "^content-security-policy: default-src 'none'"
+          docker rm -f api

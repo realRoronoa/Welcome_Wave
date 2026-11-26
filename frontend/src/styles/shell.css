@@ -1,0 +1,306 @@
+/* The workspace chrome: rail, top bar and drawer, page header and transitions, notifications, toasts, theme switch.
+   Tokens only (styles.css defines both themes), so everything here is correct in light and dark. */
+
+/* ---------- theme switch: no transitions for the frame the tokens flip ---------- */
+.theme-switching *, .theme-switching *::before, .theme-switching *::after { transition: none !important; }
+
+/* ---------- global details ---------- */
+/* not on the public site (html.is-site): this stylesheet also loads there when "Log in" prefetches the app, and must not
+   change the landing page's scrollbar (or its width) under the visitor's pointer */
+:where(html:not(.is-site)) * { scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+:where(html:not(.is-site)) ::-webkit-scrollbar { width: 10px; height: 10px; }
+:where(html:not(.is-site)) ::-webkit-scrollbar-track { background: transparent; }
+:where(html:not(.is-site)) ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
+:where(html:not(.is-site)) ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-hover); }
+.rail, .rail * { scrollbar-color: var(--rail-line) transparent; }
+
+button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
+button.link:active:not(:disabled) { transform: none; }
+main a:not([class]) { text-decoration-color: color-mix(in srgb, currentColor 35%, transparent); text-decoration-thickness: 1px;
+  transition: color .15s, text-decoration-color .15s; }
+main a:not([class]):hover { text-decoration-color: currentColor; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
+
+/* ---------- layout ---------- */
+.shell { grid-template-columns: 240px minmax(0, 1fr); }
+.shell > .rail { grid-column: 1; grid-row: 1; }
+.shell > .stage { grid-column: 2; grid-row: 1; }
+.topbar, .scrim { display: none; }
+.stage { position: relative; min-width: 0; isolation: isolate; }
+
+/* ---------- desktop top bar: where you are (project / page), search, notifications ---------- */
+.stage-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 1rem; height: 52px; padding: 0 clamp(1.25rem, 3.5vw, 2.75rem);
+  background: color-mix(in srgb, var(--steel) 82%, transparent); border-bottom: 1px solid var(--line);
+  -webkit-backdrop-filter: saturate(1.4) blur(10px); backdrop-filter: saturate(1.4) blur(10px); }
+.crumbs { min-width: 0; }
+.crumbs ol { display: flex; align-items: center; gap: .5rem; margin: 0; padding: 0; list-style: none; font-size: .84rem; white-space: nowrap; }
+.crumbs li { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; }
+.crumbs li + li::before { content: "/"; margin-right: .5rem; color: var(--line-strong); }
+.crumbs li[aria-current="page"] { color: var(--ink); font-weight: 550; }
+.stage-bar-end { margin-left: auto; display: flex; align-items: center; gap: .5rem; }
+.demo-tag { font: 500 .68rem/1 var(--code); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: .3rem .5rem;
+  border: 1px solid var(--ink-soft); background: transparent; border-radius: 999px; cursor: default; } /* an ink outline, not a colour */
+button.bar-search { display: inline-flex; align-items: center; gap: .5rem; width: 240px; height: 32px; padding: 0 .35rem 0 .65rem; background: var(--surface);
+  color: var(--ink-faint); box-shadow: inset 0 0 0 1px var(--line); font-size: .82rem; font-weight: 450; text-align: left; transition: box-shadow .15s, color .15s; }
+button.bar-search:hover { background: var(--surface); color: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line-strong); }
+button.bar-search:active:not(:disabled) { transform: none; }
+.bar-search span:not(.bar-search-keys) { flex: 1; }
+.bar-search-keys { display: inline-flex; gap: 2px; }
+.stage-bar .bell { color: var(--ink-soft); width: 32px; height: 32px; display: grid; place-items: center; padding: 0; }
+.stage-bar .bell:hover { color: var(--ink); background: var(--hover); }
+.stage-bar .badge { top: 1px; right: 0; box-shadow: 0 0 0 2px var(--steel); background: var(--btn); color: var(--btn-ink); }
+.stage-bar .badge::after { border-color: var(--btn); }
+.stage-bar .notif-panel { top: 3.5rem; left: auto; right: clamp(1rem, 3vw, 2.25rem); transform-origin: 90% 0; }
+@media (max-width: 1100px) { button.bar-search { width: auto; } .bar-search span:not(.bar-search-keys) { display: none; } }
+
+/* the page fades and lifts in on every route change (backwards fill: no transform lingers to trap fixed children) */
+.page-enter { animation: page-enter .42s var(--ease-out) backwards; }
+@keyframes page-enter { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------- page header: title, one line, actions on the right ---------- */
+.page-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 1.5rem; align-items: end; max-width: none; margin-bottom: 1.75rem; }
+.page-head > * { grid-column: 1; max-width: 72ch; }
+.page-head h1 { font-size: 1.5rem; letter-spacing: -.024em; font-weight: 650; margin: 0; }
+.page-head > p { margin: .35rem 0 0; color: var(--ink-soft); font-size: .9rem; line-height: 1.55; }
+.page-head > .back { justify-self: start; }
+/* the project name above every page title, so the H1 sits at the same height on every route */
+.page-eyebrow { display: inline-flex; align-items: center; gap: .45rem; margin: 0 0 .4rem; font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-soft); }
+.page-head > .page-eyebrow { justify-self: start; }
+/* on desktop the top bar's breadcrumb already names the project, so the project-name eyebrow above each title steps aside */
+@media (min-width: 900px) { .page-head > .page-eyebrow, .dp-head > div > .dp-eyebrow:first-child { display: none; } }
+
+/* ---------- skip link and the focus target after a route change ---------- */
+.skip-link { position: fixed; z-index: 1200; left: .75rem; top: .75rem; padding: .55rem .9rem; border-radius: var(--radius-s); font-size: .88rem; font-weight: 600;
+  color: var(--btn-ink); background: var(--btn); text-decoration: none; transform: translateY(calc(-100% - 1rem)); }
+.skip-link:focus, .skip-link:focus-visible { transform: none; color: var(--btn-ink); outline-color: var(--ink); box-shadow: var(--shadow-m); }
+main:focus { outline: none; }
+main h1:focus { outline: none; }
+.page-head > .page-actions { grid-column: 2; grid-row: 1 / span 3; align-self: end; display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; max-width: none; }
+.page-head .page-actions button.small { margin-left: 0; }
+
+/* ---------- rail ---------- */
+.rail { padding: .95rem .6rem .8rem; gap: 0; overflow-x: hidden; } /* nothing in the rail may scroll it sideways */
+.rail .brand { border-radius: var(--radius-s); transition: opacity .15s; }
+.rail .brand:hover { opacity: .85; }
+.rail .brand:hover .logo-s, .topbar .brand:hover .logo-s { animation-name: logo-wave; animation-duration: .56s; animation-timing-function: var(--ease-out); } /* styles.css */
+
+.rail-search { display: flex; align-items: center; gap: .55rem; width: 100%; margin: 0 0 .6rem; padding: .48rem .45rem .48rem .7rem;
+  background: transparent; color: var(--rail-mute); border: 1px solid var(--rail-line); border-radius: var(--radius-s); box-shadow: none;
+  font-size: .92rem; font-weight: 450; text-align: left; transition: border-color .15s, color .15s, background .15s; }
+.rail-search:hover { background: var(--rail-hover); border-color: var(--rail-faint); color: var(--rail-text); }
+.rail-search span:not(.rail-search-keys) { flex: 1; }
+.rail-search svg { flex: none; }
+.rail-search-keys { display: inline-flex; }
+.rail .kbd { background: var(--rail-2); color: var(--rail-mute); border-color: var(--rail-line); }
+
+/* one column no wider than the rail: a long label shortens with an ellipsis instead of pushing its hint out of sight */
+.rail-nav { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; }
+.rail-nav ul { gap: 2px; grid-template-columns: minmax(0, 1fr); }
+.rail li a, .rail .rail-link { position: relative; z-index: 1; }
+/* the badge or hint sits a little closer to the label than the icon does, so "Onboarding health" keeps its hint in 240px */
+.rail li a .rail-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: -.3rem; }
+.rail li a svg { transition: opacity .15s, color .15s, transform .25s var(--ease-out); }
+.rail li a:hover svg { opacity: 1; }
+.rail li a:active svg { transform: scale(.9); }
+.rail li a[aria-current="page"]:hover { background: transparent; }
+
+/* one highlight that glides between items */
+.rail-mark { position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 0; pointer-events: none; opacity: 0; border-radius: var(--radius-s);
+  background: var(--rail-active); }
+.rail-mark::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 2px; border-radius: 2px; background: var(--rail-bright); }
+.rail-mark.on { opacity: 1; }
+.rail-mark.ready { transition: transform .38s var(--ease-out), height .38s var(--ease-out), opacity .2s; }
+
+/* the newest views carry a quiet "New" tag until hover shows the shortcut instead */
+.rail-new { margin-left: auto; padding: .05rem .42rem; border-radius: 999px; font: 600 .62rem/1.5 var(--ui); letter-spacing: .04em; text-transform: uppercase;
+  color: var(--rail-bright); border: 1px solid var(--rail-line); background: var(--rail-2); }
+/* the badge and the shortcut hint share one slot: the hint takes no room until hover, focus or G swaps it in */
+.rail-new + .rail-key { display: none; }
+.rail li a:hover .rail-new, .rail li a:focus-visible .rail-new, .rail.keys-armed .rail-new { display: none; }
+.rail li a:hover .rail-new + .rail-key, .rail li a:focus-visible .rail-new + .rail-key, .rail.keys-armed .rail-new + .rail-key { display: inline-flex; }
+
+/* "G then a letter": hints show on hover, and all at once while G is held down */
+.rail-key { display: inline-flex; gap: 1px; margin-left: auto; opacity: 0; transition: opacity .15s; }
+.rail-key kbd { font: 500 .64rem/1 var(--code); min-width: 1rem; height: 1.2rem; display: inline-grid; place-items: center; padding: 0 .16rem;
+  color: var(--rail-mute); background: var(--rail-2); border: 1px solid var(--rail-line); border-radius: 4px; }
+.rail li a:hover .rail-key, .rail li a:focus-visible .rail-key { opacity: 1; }
+.rail.keys-armed .rail-key { opacity: 1; }
+.rail.keys-armed .rail-key kbd:first-child { opacity: .45; }
+.rail.keys-armed .rail-key kbd:last-child { color: var(--rail-accent); border-color: var(--rail-ring); }
+@media (hover: none) { .rail-key, .rail li a:hover .rail-new + .rail-key { display: none; } }
+
+.rail .rail-link { margin-top: .45rem; }
+.rail .rail-link:hover svg { opacity: 1; }
+.rail-foot { padding-top: .8rem; gap: .55rem; }
+
+/* demo: "Switch account" signs out to the sign-in page, where every demo account is one click */
+.rail-switch { display: flex; align-items: center; gap: .6rem; width: 100%; padding: .42rem .55rem; background: transparent; box-shadow: none;
+  color: var(--rail-mute); border: 1px solid var(--rail-line); border-radius: var(--radius-s); font-size: .86rem; font-weight: 500; text-align: left;
+  transition: background .15s, color .15s, border-color .15s; }
+.rail-switch:hover { background: var(--rail-hover); color: var(--rail-bright); border-color: var(--rail-faint); }
+.rail-switch svg { flex: none; opacity: .8; }
+
+/* short screens (a 768px laptop, a phone's drawer): the same type with a little less air, so the whole rail and the
+   account at its foot stay in view; shorter still, the rail scrolls */
+@media (max-height: 860px) {
+  .rail li a, .rail .rail-link { padding-top: .36rem; padding-bottom: .36rem; }
+  .rail-label { margin-top: .85rem; }
+  .rail-project { margin: .7rem 0 .75rem; }
+  .rail-foot { padding-top: .65rem; gap: .45rem; }
+}
+
+/* light / system / dark */
+.theme-switch { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 3px;
+  background: var(--rail-2); border: 1px solid var(--rail-line); border-radius: 8px; }
+.theme-thumb { position: absolute; top: 3px; bottom: 3px; left: 3px; width: calc((100% - 6px) / 3); border-radius: 5px;
+  background: var(--rail-hover-2); box-shadow: inset 0 0 0 1px var(--rail-line), var(--shadow-xs);
+  transform: translateX(calc(var(--at, 0) * 100%)); transition: transform .32s var(--ease-out); }
+.theme-switch button { position: relative; z-index: 1; display: grid; place-items: center; padding: .34rem 0; background: none; box-shadow: none;
+  color: var(--rail-faint); border-radius: 5px; line-height: 0; }
+.theme-switch button:hover { background: none; color: var(--rail-text); }
+.theme-switch button[aria-pressed="true"] { color: var(--rail-bright); }
+.theme-switch button[aria-pressed="true"] svg { color: var(--rail-accent); }
+.theme-switch button:active:not(:disabled) { transform: scale(.92); }
+
+/* ---------- notifications ---------- */
+.bell { transition: color .15s, background .15s; }
+.bell.has-unread svg { transform-origin: 50% 2px; animation: bell-nudge 5s ease-in-out 1.2s 2; }
+@keyframes bell-nudge { 0%, 88%, 100% { transform: none; } 91% { transform: rotate(12deg); } 94% { transform: rotate(-10deg); } 97% { transform: rotate(5deg); } }
+.badge::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--rail-accent); opacity: 0;
+  animation: badge-ping 2.6s var(--ease-out) infinite; }
+@keyframes badge-ping { 0% { transform: scale(1); opacity: .7; } 60%, 100% { transform: scale(2); opacity: 0; } }
+
+.notif-panel { width: min(400px, calc(100vw - 1.5rem)); max-height: min(72vh, 580px); padding: .5rem; transform-origin: 12% 0;
+  box-shadow: var(--shadow-l), 0 0 0 1px var(--line); border-color: transparent; animation: notif-in .24s var(--ease-out); }
+@keyframes notif-in { from { opacity: 0; transform: translateY(-6px) scale(.97); } }
+.notif-head { align-items: center; padding: .35rem .5rem .6rem; }
+.notif-head h2 { display: flex; align-items: center; gap: .5rem; }
+.notif-count { font-size: .68rem; font-weight: 600; color: var(--ink-2); background: var(--surface-2); border: 1px solid var(--line-strong);
+  border-radius: 999px; padding: .05rem .45rem; letter-spacing: 0; }
+.notif-head .link { font-size: .8rem; text-decoration: none; }
+.notif-head .link:hover { text-decoration: underline; }
+.notif-group { margin: .55rem .6rem .25rem; font-size: .66rem; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--ink-soft); }
+.notif-panel li { animation: notif-row .32s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 28ms + 50ms); }
+@keyframes notif-row { from { opacity: 0; transform: translateY(4px); } }
+.notif-panel li button.notif-item, .notif-panel li button.notif-item.unread { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: .7rem;
+  align-items: start; position: relative; padding: .6rem .65rem; box-shadow: none; background: none; font-weight: 400; color: var(--ink-2);
+  transition: background .15s; }
+.notif-panel li button.notif-item:hover, .notif-panel li button.notif-item:focus-visible { background: var(--surface-2); }
+.notif-panel li button.notif-item.unread { color: var(--ink); }
+.notif-panel li button.notif-item.unread .notif-text { font-weight: 550; }
+.notif-icon { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; background: var(--surface-2); border: 1px solid var(--line); color: var(--ink-soft); }
+.notif-item.unread .notif-icon { color: var(--ink); background: var(--surface-2); border-color: var(--line-strong); }
+.notif-item.k-incident .notif-icon { color: var(--rec); background: var(--rec-wash); border-color: var(--rec-line); }
+.notif-text { line-height: 1.42; padding-top: .28rem; overflow-wrap: anywhere; }
+.notif-panel .notif-item .when { padding-top: .32rem; font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.notif-dot { position: absolute; right: .78rem; bottom: .8rem; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
+.notif-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--ink); animation: dot-ping 2.2s var(--ease-out) infinite; }
+@keyframes dot-ping { 0% { transform: scale(1); opacity: .6; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
+.notif-empty { display: grid; justify-items: center; gap: .35rem; padding: 1.6rem 1rem 1.4rem; text-align: center; }
+.notif-empty-mark { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-soft); background: var(--line);
+  box-shadow: 0 0 0 6px var(--surface-2); }
+.notif-empty .muted { margin: .35rem 0 0; font-size: .9rem; }
+
+/* ---------- toasts ---------- */
+.toasts { position: fixed; z-index: 1100; left: 50%; bottom: max(1.25rem, env(safe-area-inset-bottom)); transform: translateX(-50%);
+  display: grid; gap: .5rem; justify-items: center; pointer-events: none; width: max-content; max-width: calc(100vw - 2rem); }
+.toast { display: inline-flex; align-items: center; gap: .55rem; padding: .5rem .95rem .5rem .55rem; border-radius: 999px;
+  background: var(--btn); color: var(--btn-ink); font-size: .86rem; font-weight: 500; box-shadow: var(--shadow-l);
+  animation: toast-in .38s var(--ease-out); }
+.toast-icon { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--btn-ink); color: var(--btn); }
+.toast-error .toast-icon { background: var(--rec); color: var(--btn); }
+.toast.leaving { animation: toast-out .3s var(--ease) forwards; }
+@keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(.96); } }
+@keyframes toast-out { to { opacity: 0; transform: translateY(6px) scale(.98); } }
+
+/* ---------- below 900px: top bar + off-canvas drawer ---------- */
+@media (max-width: 899px) {
+  .shell { display: block; }
+  .topbar { display: flex; align-items: center; gap: .35rem; position: sticky; top: 0; z-index: 25; height: 56px; padding: 0 .6rem;
+    background: var(--rail); color: var(--rail-bright); border-bottom: 1px solid var(--rail-line); }
+  .topbar .brand { display: inline-flex; align-items: center; gap: .55rem; color: var(--rail-bright); font-weight: 650; font-size: .98rem;
+    letter-spacing: -.015em; text-decoration: none; padding: .25rem; border-radius: var(--radius-s); }
+  .topbar :focus-visible { outline-color: var(--rail-accent); }
+  .topbar-end { margin-left: auto; display: flex; align-items: center; gap: .15rem; }
+  /* 40px touch targets; the outer two pull out so the bar keeps its visual alignment */
+  .topbar-btn, .topbar .bell { width: 40px; height: 40px; display: inline-grid; place-items: center; padding: 0; color: var(--rail-text); }
+  .topbar > .topbar-btn:first-child { margin-left: -.2rem; }
+  .topbar-end > :last-child { margin-right: -.2rem; }
+  .topbar .badge { top: 3px; right: 3px; }
+  .topbar-btn:hover { background: var(--rail-hover-2); color: var(--rail-bright); }
+
+  .rail { position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); height: 100vh; height: 100dvh; z-index: 40;
+    transform: translateX(-102%); visibility: hidden; transition: transform .32s var(--ease-out), visibility 0s linear .32s; }
+  .drawer-open .rail { transform: none; visibility: visible; transition: transform .32s var(--ease-out); box-shadow: var(--shadow-l); }
+  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: var(--overlay); opacity: 0; pointer-events: none;
+    transition: opacity .28s var(--ease); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  .drawer-open .scrim { opacity: 1; pointer-events: auto; }
+  .rail-foot { margin-top: auto; }
+
+  /* iOS zooms the page when a field under 16px takes focus: keep every field at 16px on phones and tablets */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]), select, textarea { font-size: 16px !important; }
+  main { padding-top: 1.4rem; }
+  .notif-panel { top: 3.9rem; left: auto; right: .75rem; transform-origin: 90% 0; }
+}
+@media (max-width: 640px) {
+  .page-head { grid-template-columns: minmax(0, 1fr); }
+  .page-head > .page-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; margin-top: .9rem; }
+  .page-head h1 { font-size: 1.45rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter, .notif-panel, .notif-panel li, .toast, .bell svg, .badge::after, .notif-dot::after { animation: none !important; }
+  .rail-mark.ready, .theme-thumb, .rail, .scrim { transition: none !important; }
+}
+
+/* live updates paused (src/live.ts): shown only while reconnecting, so a quiet bar means the page is current */
+.live-off { display: inline-flex; align-items: center; gap: .4rem; font-size: .76rem; color: var(--ink-soft); white-space: nowrap; }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-soft); animation: live-blink 1.2s var(--ease) infinite alternate; }
+@keyframes live-blink { from { opacity: .35; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
+
+/* self-hosted without a Gemini key: managers are told once, at the top of every page, what is off and how to turn it on */
+.ai-off { display: flex; gap: .7rem; align-items: flex-start; margin: 0 0 1.2rem; padding: .85rem 1rem; border: 1px solid var(--line-strong);
+  border-radius: var(--radius-m); background: var(--surface-2); color: var(--ink-2); font-size: .88rem; line-height: 1.5; }
+.ai-off svg { flex: none; margin-top: .15rem; color: var(--warn); }
+.ai-off p { margin: 0; }
+.ai-off code { font: 500 .8rem var(--code); }
+
+/* ---------- rail groups and breadcrumb links (lifecycle shell) ---------- */
+.rail-group:first-child .rail-label { margin-top: .35rem; }
+.crumbs a { color: var(--ink-soft); text-decoration: none; transition: color .15s; }
+.crumbs a:hover { color: var(--ink); }
+
+/* ---------- the demo clock (lifecycle/DemoClock.tsx): demo mode, managers and admins ---------- */
+.demo-clock { position: relative; }
+button.demo-clock-btn { display: inline-flex; align-items: center; gap: .4rem; height: 28px; padding: 0 .65rem 0 .55rem; border-radius: 999px;
+  background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--line-strong); font: 600 .76rem var(--ui); font-variant-numeric: tabular-nums; }
+button.demo-clock-btn:hover, button.demo-clock-btn[aria-expanded="true"] { background: var(--surface-2); }
+button.demo-clock-btn:active:not(:disabled) { transform: none; }
+button.demo-clock-btn svg { color: var(--ink-soft); }
+.demo-clock-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; width: 286px; display: grid; gap: .85rem; padding: 1rem 1rem .95rem;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: var(--radius-l); box-shadow: var(--shadow-l);
+  animation: notif-in .2s var(--ease-out); }
+.demo-clock-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.demo-clock-top select { max-width: 150px; padding: .3rem 1.8rem .3rem .55rem; font-size: .8rem; color: var(--ink); background-position: right .5rem center; }
+.demo-clock-k { margin: 0; font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.demo-clock-day { margin: 0; display: flex; align-items: baseline; gap: .4rem; }
+.demo-clock-day strong { font-size: 1.65rem; line-height: 1; font-weight: 650; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
+.demo-clock-day span { font-size: .86rem; color: var(--ink-soft); }
+.demo-clock-bar { position: relative; height: 4px; border-radius: 999px; background: var(--line); }
+.demo-clock-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--ink); transition: width .5s var(--ease-out); }
+.demo-clock-bar b { position: absolute; top: -3px; width: 1px; height: 10px; background: var(--ink-faint); }
+.demo-clock-grid { display: grid; gap: .4rem; }
+.demo-clock-grid.g2 { grid-template-columns: repeat(2, 1fr); }
+.demo-clock-grid.g3 { grid-template-columns: repeat(3, 1fr); }
+.demo-clock-jump { display: grid; gap: .45rem; }
+.demo-clock-note { margin: 0; font-size: .76rem; color: var(--ink-soft); }
+.demo-clock-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.demo-clock-foot .dp-btn { margin: 0; flex: none; }
+/* phones: the same control in the black top bar */
+.topbar .demo-clock { margin-right: .15rem; }
+.topbar button.demo-clock-btn { background: transparent; color: var(--rail-bright); box-shadow: inset 0 0 0 1px var(--rail-line); }
+.topbar button.demo-clock-btn svg { color: var(--rail-mute); }
+.topbar .demo-clock-pop { position: fixed; top: 62px; right: .75rem; }
+@media (prefers-reduced-motion: reduce) { .demo-clock-pop { animation: none; } .demo-clock-bar i { transition: none; } }
