@@ -1,6 +1,6 @@
 /* Demo sign-in (auth/DemoSignIn.tsx): what the demo adds to the shared entry form (entry.css): the Google button that is
    off with a tooltip, a quiet note, and the demo accounts and invitations, one row each. Tokens only, so light and dark
-   both follow styles.css; monochrome, since teal only ever means "explained in a KT call". */
+   both follow styles.css; the form side is the navy panel (styles.css), the primary action teal. */
 
 /* ---------- Continue with Google, off in the demo ---------- */
 .si-google { position: relative; }
@@ -44,7 +44,7 @@
 .si-acct-text span { font: 400 .74rem var(--code); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .si-role { font-size: .72rem; font-weight: 550; padding: .14rem .5rem; border-radius: 999px; color: var(--ink-2);
   background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; }
-.si-acct-go { color: var(--ink-faint); transition: transform .2s var(--ease), color .2s; }
+.si-acct-go { color: var(--ink-muted); transition: transform .2s var(--ease), color .2s; }
 .si-acct:hover:not(:disabled) .si-acct-go, .si-acct:focus-visible .si-acct-go { color: var(--ink); transform: translateX(2px); }
 .si-accept { font-size: .76rem; font-weight: 600; padding: .22rem .6rem; border-radius: var(--radius-s); color: var(--btn-ink); background: var(--btn); white-space: nowrap; }
 .si-acct:hover:not(:disabled) .si-accept { background: var(--btn-hover); }

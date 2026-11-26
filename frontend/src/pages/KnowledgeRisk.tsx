@@ -395,7 +395,8 @@ function FileRow({ f, index, dim, orphan }: { f: FileRisk; index: number; dim: b
           </span>
         </div>
 
-        <div className="rk-bar" role="img" aria-label={barLabel}>
+        <span className="sr-only">{barLabel}</span>
+        <div className="rk-bar" aria-hidden="true">
           {f.symbols.map((s) => {
             const title = `${s.symbol} · ${lineRange(s.start_line, s.end_line)} · ${STATE_LABEL[s.state]}${s.clip ? ` (${s.clip.meeting} at ${ts(s.clip.at_s)})` : ""}`;
             const href = s.clip ? meetingHref(s.clip.meeting_id, s.clip.at_s) : codeHref(f.path, s.start_line);

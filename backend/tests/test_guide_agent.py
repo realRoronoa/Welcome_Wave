@@ -1,5 +1,5 @@
-"""The agentic Guide (app/agents/guide.py) on the demo, with FakeLLM scripts: a multi-hop answer, VERIFY and the one repair,
-the insufficient-evidence route decision through the capped path, the NoToolUse fallback, the guards on who a question may
+"""The agentic Guide (app/agents/specialists/guide/agent.py) on the demo, with FakeLLM scripts: a multi-hop answer, VERIFY
+and the one repair, the insufficient-evidence route decision through the capped path, the NoToolUse fallback, the guards on who a question may
 go to, the run record and GET /api/agents/runs/{run_id}, live steps on topic agent:<run_id>, and ask.free."""
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
-from app.agents.llm import FakeLLM, read_data
+from app.agents.core.llm import FakeLLM, read_data
 from app.config import get_settings
 from app.main import create_app
 
@@ -83,8 +83,10 @@ def test_a_multi_hop_answer_is_cited_checked_and_traced(client):
     assert out["answer"].endswith("[1].") and out["check"]["ok"] and out["retrieval"]["ok"]
     assert out["kt_clips"], "the KT call that explained engine/validate.py comes with the answer"
     kinds = [s["kind"] for s in out["steps"]]
-    assert kinds == ["tool", "think", "tool", "tool", "verify", "final"]
-    assert out["steps"][3]["text"] == "Reading engine/validate.py · L20–22" and out["steps"][-1]["text"].startswith("✓ Sources checked")
+    # the research crew's plan, search and rank open the trace; then the loop (a thought, its search, its read), VERIFY, the end
+    assert kinds == ["think", "tool", "verify", "think", "tool", "tool", "verify", "final"]
+    assert [s["tool"] for s in out["steps"][:3]] == ["plan_search", "search_knowledge", "rank_evidence"]
+    assert out["steps"][5]["text"] == "Reading engine/validate.py · L20–22" and out["steps"][-1]["text"].startswith("✓ Sources checked")
     assert any("found in 3 search and read steps" in w for w in out["why"]) and out["explain"]["ai"] is True
     assert len(llm.agent_calls) == 4  # three loop turns and the VERIFY turn
     assert "xylophone" in llm.agent_calls[0]["messages"][0]["text"].split("<<DATA>>")[1]  # the question only inside the data block
@@ -92,7 +94,7 @@ def test_a_multi_hop_answer_is_cited_checked_and_traced(client):
     run = client.get(f"/api/agents/runs/{rid}", headers=HIRE).json()
     assert run["run"]["id"] == rid and run["run"]["agentic"] and run["run"]["mine"] and run["run"]["stopped"] == "done"
     assert isinstance(run["run"]["ms"], int) and run["run"]["ms"] >= sum(s["ms"] for s in run["steps"]) - 5
-    assert run["run"]["visibility"] == "shared" and "KT calls" not in json.dumps(out["steps"])
+    assert run["run"]["visibility"] == "shared" and out["steps"][4]["text"].startswith("Searching code:")  # the loop's search named only code
     assert [s["kind"] for s in run["steps"]] == kinds and all(s["args"] is None for s in run["steps"])
     stored = json.dumps([r["detail"] for r in _c(client).store.runs], default=str)
     assert "xylophone" not in stored and "Find the label check" not in stored
@@ -179,8 +181,10 @@ def test_the_mentor_still_comes_first_and_a_deactivated_suggestion_falls_back(cl
 def test_without_an_agent_loop_the_deterministic_path_answers_with_steps(client):
     out = ask(client, "Where does check_labels report missing labels?")  # the demo's offline model: NoToolUse
     assert out["tier"] == 1 and out["status"] == "answered" and out["run_id"]
-    assert [s["kind"] for s in out["steps"]] == ["tool", "verify", "final"]
-    assert out["steps"][0]["text"].startswith("Searching code, documents and KT sessions")
+    assert [s["kind"] for s in out["steps"]] == ["think", "tool", "verify", "verify", "final"]
+    assert [s["tool"] for s in out["steps"][:3]] == ["plan_search", "search_knowledge", "rank_evidence"]
+    assert out["steps"][1]["text"].startswith("Searched code, documents, KT calls and verified answers")
+    assert out["steps"][3]["text"].startswith("Quoted the sources and checked every sentence")  # the offline writer
     run = client.get(f"/api/agents/runs/{out['run_id']}", headers=HIRE).json()
     assert run["run"]["agentic"] is False and run["run"]["summary"].startswith("Routed a question: tier 1")
     assert isinstance(run["run"]["ms"], int) and run["run"]["ms"] >= 0
@@ -273,8 +277,8 @@ def test_ask_free_is_a_model_decision_with_its_proposal_checked(client):
 
 
 def test_names_take_the_sources_letter_case_and_unknown_names_stay_refused():
-    from app.agents.guide import exact_names
-    from app.agents.schemas import Chunk
+    from app.agents.core.schemas import Chunk
+    from app.agents.specialists.guide.agent import exact_names
     from app.lifecycle import routing
 
     src = Chunk(id="c1", project_id="p", source_type="code", ref={"path": "solve.py", "start_line": 1, "end_line": 3},
@@ -302,3 +306,40 @@ def test_an_opened_file_is_refused_when_verify_disagrees_or_cannot_run(client):
     assert ask(client, WAIVED_Q)["status"] != "answered"
     scripted(client, read_validate, final_on_read(WAIVED_A))  # no VERIFY script: the check cannot run
     assert ask(client, WAIVED_Q)["status"] != "answered"
+
+
+def test_the_why_says_opened_only_for_a_file_the_guide_opened(client):
+    """An answer whose sources are below the retrieval gate, cited from the first results without opening anything, is not
+    described as files the Guide opened: the checks are what confirmed it."""
+    def cite_first_result(messages):
+        task = read_data(messages[0]["text"]) if messages and messages[0].get("text") else {}
+        rows = task.get("first_results") or []
+        n = next(r["n"] for r in rows if r["source"].endswith("(check_labels)"))
+        return {"final": {"answer": f"{WAIVED_A} [{n}].", "cited": [n], "sufficient": True, "confidence": 0.8}}
+
+    scripted(client, cite_first_result, verify=[{"sentence": 1, "supported": True, "source": 1}])
+    out = ask(client, WAIVED_Q)
+    assert out["status"] == "answered" and out["retrieval"]["rule"] == "read"
+    assert not any("opened these files" in w for w in out["why"]) and any("model's check and the citation check" in w for w in out["why"])
+
+
+def test_a_loop_that_timed_out_before_any_tool_falls_back_to_the_one_call_writer(client, monkeypatch):
+    """Slow turns (free-tier read timeouts) can use up the loop before it calls a tool: the crew's evidence is still there,
+    so the deterministic writer answers from it under the same gates instead of "the Guide ran out of time"."""
+    from app.agents.core import runtime as rt
+    from app.agents.specialists.guide import agent as guide
+
+    real = rt.run_agent
+
+    def timed_out(tctx, **kw):
+        if kw.get("agent") == "guide" and kw.get("max_steps"):
+            return rt.AgentOutcome(output=None, steps=[], sources=[], stopped="timeout", tool_calls=0)
+        return real(tctx, **kw)
+
+    monkeypatch.setattr(guide.rt, "run_agent", timed_out)
+    _c(client).deps.llm = FakeLLM({"QADraft": lambda p, m: {
+        "answer": f"{CHECK} [{next(x['n'] for x in read_data(p)['context'] if x['label'].endswith('(check_labels)'))}].",
+        "cited": [next(x["n"] for x in read_data(p)["context"] if x["label"].endswith("(check_labels)"))],
+        "confidence": 0.8, "sufficient": True}})
+    out = ask(client, "Where does check_labels report missing labels?")
+    assert out["status"] == "answered" and out["writer"] == "model" and out["check"]["ok"]

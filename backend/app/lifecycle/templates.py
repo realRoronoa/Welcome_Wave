@@ -3,11 +3,15 @@ says what a program contains: milestones, documents to acknowledge, access to re
 model is set up. Its days are days of a 90-day program; a template of another length scales them, so the 30/60/90
 check-ins of a 120-day program fall on days 40/80/120.
 
+A template also names the board's milestones (`phases`, app/lifecycle/board.py): days 15, 30, 45, 60 and 90 by default, each
+with the tasks due by it. An admin sets them in exact days of the template's length; a template without its own gets the
+defaults, scaled to its length.
+
 An organisation with no templates at all gets the default set the first time templates are listed, so a new
 organisation can enrol someone without writing one first."""
 from __future__ import annotations
 
-from app.agents.schemas import ProposedTask
+from app.agents.core.schemas import ProposedTask
 from app.ports import Acknowledgement, AccessItem, Milestone, ProgramTemplate
 
 TRACKS = ("Backend", "Frontend", "SRE", "Data")
@@ -92,6 +96,32 @@ _TRACK_PLAN = {
 }
 
 
+# The board's milestones (app/lifecycle/board.py): what a hire should have reached by each day, in plain words
+DEFAULT_PHASES = [
+    {"key": "settle_in", "title": "Settled in", "due_day": 15},
+    {"key": "first_change", "title": "First change shipped", "due_day": 30},
+    {"key": "on_your_own", "title": "Working on your own", "due_day": 45},
+    {"key": "own_an_area", "title": "Owning an area", "due_day": 60},
+    {"key": "fully_on_board", "title": "Fully on board", "due_day": 90},
+]
+MAX_PHASES = 12
+
+
+def default_phases(duration_days: int) -> list[dict]:
+    """The default milestones scaled to a program's length (a 120-day program: days 20, 40, 60, 80, 120)."""
+    out, last = [], 0
+    for p in DEFAULT_PHASES:
+        day = max(last + 1, min(duration_days, scale(p["due_day"], duration_days)))
+        out.append({**p, "due_day": day})
+        last = day
+    return out
+
+
+def phases_of(t: ProgramTemplate | None, duration_days: int) -> list[dict]:
+    """A template's own board milestones, or the defaults for this length."""
+    return [dict(p) for p in t.phases] if t and t.phases else default_phases(duration_days)
+
+
 def default_templates(org_id: str) -> list[ProgramTemplate]:
     out = []
     for track in TRACKS:
@@ -100,7 +130,8 @@ def default_templates(org_id: str) -> list[ProgramTemplate]:
             out.append(ProgramTemplate(
                 id="", org_id=org_id, key=f"{track.lower()}-{level.lower()}", title=f"{level} {track} Engineer", role_track=track,
                 level=level, duration_days=BASE_DAYS, milestones=milestones, acknowledgements=_ACKS + _TRACK_ACKS.get(track, []),
-                access_items=_ACCESS + _TRACK_ACCESS[track], plan_items=sorted(_PLAN + [_TRACK_PLAN[track]], key=lambda p: p["due_day"])))
+                access_items=_ACCESS + _TRACK_ACCESS[track], plan_items=sorted(_PLAN + [_TRACK_PLAN[track]], key=lambda p: p["due_day"]),
+                phases=default_phases(BASE_DAYS)))
     return out
 
 
@@ -109,7 +140,9 @@ def list_for(lc, org_id: str, include_inactive: bool = False) -> list[ProgramTem
     if not lc.templates(org_id, include_inactive=True):
         for t in default_templates(org_id):
             lc.create_template(t)
-    return lc.templates(org_id, include_inactive)
+    # a template from before board milestones existed shows the defaults it uses; saving it makes them its own
+    return [t if t.phases else t.model_copy(update={"phases": default_phases(t.duration_days)})
+            for t in lc.templates(org_id, include_inactive)]
 
 
 def scale(day: int, duration_days: int) -> int:

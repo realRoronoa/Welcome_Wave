@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.adapters.memory import MemoryIndex, MemoryStore
-from app.agents.schemas import KTLink, QAResult
+from app.agents.core.schemas import KTLink, QAResult
 from app.config import Settings, get_settings
 from app.container import build_container
 from app.main import create_app

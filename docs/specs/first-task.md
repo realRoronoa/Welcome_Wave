@@ -1,6 +1,6 @@
 # The first task and the private pre-submit review
 
-The Scout (`app/agents/scout.py`) runs both routes as the `scout` node of the Supervisor's chat graph; the pre-submit review is
+The Scout (`app/agents/specialists/scout/agent.py`) runs both routes as the `scout` node of the Supervisor's chat graph; the pre-submit review is
 the Reviewer's, privately (`presubmit.requested`).
 
 **Problem.** A first task picked by hand often lands in code nobody explained, with no tests, owned by one busy person.
@@ -39,7 +39,7 @@ pre-submit panel with findings.
 
 **Edge cases.** A candidate not on the shortlist → 422. Non-code task → 409. No diff and no PR → 422. Someone else's task → 404.
 
-**The agent.** The Scout thinks (`app/agents/thinking.py`; docs/AGENTS.md, "The thinking specialists"). For a shortlist it
+**The agent.** The Scout thinks (`app/agents/core/thinking.py`; docs/AGENTS.md, "The thinking specialists"). For a shortlist it
 reads `first_task_candidates` (the candidates and factors above, and the excluded ones), explores the promising ones
 (read_file, tests_for, kt_moments, kt_coverage, recent_changes, code_owners, program, issues, search_knowledge) and picks at
 most 3, each with its reason (`agent_reason`), its files and the sources it read. Code keeps only real candidates (an open

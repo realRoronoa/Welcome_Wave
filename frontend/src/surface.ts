@@ -1,8 +1,10 @@
-/** One single-page app, three surfaces: the public site (the landing page, About, and a 404 for any other path), the app
+/** One single-page app, three surfaces: the public site (the landing page, About, the legal documents at /terms, /privacy,
+ *  /recording, /acceptable-use, /dpa and /subprocessors, listed in src/legal/paths.ts, and a 404 for any other path), the app
  *  (sign-in at /login and /signup, the workspace at /app#/..., GitHub's /github/callback) and a new hire's pre-boarding page
  *  (/welcome/<link token>: no sign-in, the link is the permission). main.tsx renders one of them and loads each in its own
- *  chunk. public/boot-theme.js repeats surfaceFor() before any script loads, and frontend/nginx.conf.template serves the
- *  shell for these paths: keep all three in sync. */
+ *  chunk. public/boot-theme.js repeats surfaceFor() before any script loads (and lists the legal paths, which open without
+ *  the intro), and frontend/nginx.conf.template serves the shell for these paths: keep all three in sync. A new site page
+ *  needs a line in Site.tsx's TITLES and in nginx's list, or it answers 404. */
 export type Surface = "site" | "app" | "portal";
 
 /** The pre-boarding page's address: /welcome/<token>. */

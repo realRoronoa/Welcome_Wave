@@ -1,0 +1,14 @@
+# The Ingress, served by GKE's own controller. GKE reads the class from this annotation (spec.ingressClassName does not
+# select it). The static address must exist before the first deploy:
+#   gcloud compute addresses create ww-k8s-web-ip --global --project <project>
+# then point the host's DNS A record at it (gcloud compute addresses describe ww-k8s-web-ip --global --format 'value(address)').
+# The Google-managed certificate replaces the base's ww-tls Secret (its tls block is removed in kustomization.yaml).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: welcome-wave
+  annotations:
+    kubernetes.io/ingress.class: gce
+    kubernetes.io/ingress.global-static-ip-name: ww-k8s-web-ip
+    networking.gke.io/managed-certificates: ww-web
+    networking.gke.io/v1beta1.FrontendConfig: ww-web
