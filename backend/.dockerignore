@@ -1,13 +1,27 @@
-.venv
-.blobs
-.pytest_cache
-**/__pycache__
+# What never enters the API image's build context. The Dockerfile copies only requirements.lock, app/, workers/, db/,
+# eval/, scripts/ and sample_repo/; this keeps the rest (and anything secret) from being sent to the builder at all.
+
+# secrets and local settings
 .env
+.env.*
+selfhost.env
+*.pem
+*.key
+*.p12
+# local runtime data: demo files and keys, self-hosted documents and recordings
+.blobs
+.data
+# development leftovers
+.venv
+**/__pycache__
+**/*.pyc
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+htmlcov
+*.log
+**/.DS_Store
+# not part of the running app
 tests
 load
-# secrets and local data never enter the build context (the Dockerfile copies only app/, workers/, db/, eval/, scripts/, sample_repo/)
-selfhost.env
-.env.*
-*.pem
-.data
-.ruff_cache

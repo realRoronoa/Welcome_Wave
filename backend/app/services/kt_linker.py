@@ -13,7 +13,7 @@ import re
 from dataclasses import dataclass
 from typing import Protocol
 
-from app.agents.schemas import KTLink, ScreenMoment, Utterance
+from app.agents.core.schemas import KTLink, ScreenMoment, Utterance
 
 DEFAULT_SPAN_S = 90.0
 CONTEXT_S = 30.0

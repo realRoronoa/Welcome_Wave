@@ -9,7 +9,7 @@ import time
 
 import httpx
 
-from app.services.chunking import should_index
+from app.services.chunking import MAX_FILE_BYTES, should_index
 
 API = "https://api.github.com"
 MAX_TARBALL_BYTES = 500 * 1024 * 1024
@@ -32,9 +32,21 @@ def oauth_user(client_id: str, client_secret: str, code: str, http: httpx.Client
     return {"id": int(r.json()["id"]), "login": r.json()["login"], "token": access}
 
 
-def read_tarball(http: httpx.Client, url: str, headers: dict, full_name: str) -> dict[str, str]:
-    """The indexable text files of a repository tarball, streamed to disk (not memory): {path: text}."""
-    out = {}
+def read_tarball(http: httpx.Client, url: str, headers: dict, full_name: str, limits: tuple[int, int] | None = None) -> dict[str, str]:
+    """The indexable text files of a repository tarball, streamed to disk (not memory): {path: text}.
+
+    What is kept in memory is bounded while reading: past twice INDEX_MAX_FILES files or twice INDEX_MAX_MB of text (`limits`,
+    (files, MB), from the settings by default; 0 = none) it stops with SourceTooLarge. Twice: the exact limits count only what
+    is indexed (ingestion._plan, which also leaves out large data files), so a repository within them is never refused here."""
+    from app.config import get_settings
+    from app.ports import SourceTooLarge
+
+    if limits is None:
+        s = get_settings()
+        limits = (s.index_max_files, s.index_max_mb)
+    max_files, max_bytes = 2 * limits[0], 2 * limits[1] * 1024 * 1024
+    out: dict[str, str] = {}
+    held = 0
     with tempfile.TemporaryFile() as tmp:
         size = 0
         with http.stream("GET", url, headers=headers, timeout=300) as r:
@@ -50,7 +62,14 @@ def read_tarball(http: httpx.Client, url: str, headers: dict, full_name: str) ->
                 if not m.isfile():
                     continue
                 rel = m.name.split("/", 1)[1] if "/" in m.name else m.name  # strip "<owner>-<repo>-<sha>/"
-                if should_index(rel, m.size) or rel.endswith("CODEOWNERS"):
+                if should_index(rel, m.size) or (rel.endswith("CODEOWNERS") and m.size <= MAX_FILE_BYTES):
+                    held += m.size
+                    if max_files and len(out) >= max_files:
+                        raise SourceTooLarge(f"{full_name} has more than {len(out):,} files to index; the limit is "
+                                             f"{limits[0]:,} (INDEX_MAX_FILES).")
+                    if max_bytes and held > max_bytes:
+                        raise SourceTooLarge(f"{full_name} has more than {max_bytes // 1048576:,} MB of text to index; the limit "
+                                             f"is {limits[1]:,} MB (INDEX_MAX_MB).")
                     out[rel] = tar.extractfile(m).read().decode("utf-8", errors="replace")
     return out
 

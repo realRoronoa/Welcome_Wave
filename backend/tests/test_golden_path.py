@@ -1,6 +1,6 @@
 """The demo, as a test: repo -> KT call -> notes + KT links -> plan (approve) -> chat -> PR -> review (decide)."""
-from app.agents.llm import read_data
-from app.agents.supervisor import resume, run_event
+from app.agents.core.llm import read_data
+from app.agents.supervisor.graph import resume, run_event
 
 
 def test_golden_path_through_the_supervisor(world, graph):
@@ -89,7 +89,7 @@ def test_golden_path_through_the_supervisor(world, graph):
 
 def test_model_outage_in_chat_degrades_to_a_human(world, graph):
     # no QADraft responder -> the model call fails -> the new hire gets an honest answer and a person gets the question
-    from app.agents import ingestion
+    from app.agents.specialists.librarian import agent as ingestion
     ingestion.ingest_repo(world, world.store.get_repo("r1"), "main")
     out = run_event(graph, {"type": "chat.question", "project_id": "p1", "user_id": "u-hire", "question": "How does check_labels work?"}, "chat:err")
     assert out["result"]["status"] == "not_enough_information" and out["result"]["routed_to"]
@@ -98,7 +98,7 @@ def test_model_outage_in_chat_degrades_to_a_human(world, graph):
 
 def test_failing_background_agent_is_escalated_to_a_human(world, graph):
     # no SegmentAnalysis responder -> the Meeting agent fails every retry -> Supervisor escalates instead of crashing
-    from app.agents import ingestion
+    from app.agents.specialists.librarian import agent as ingestion
     ingestion.ingest_repo(world, world.store.get_repo("r1"), "main")
     out = run_event(graph, {"type": "meeting.recording_ready", "project_id": "p1", "meeting_id": "m1",
                             "recording_uri": "gs://b/r.mp4", "duration_s": 60}, "rec:err")

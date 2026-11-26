@@ -5,17 +5,17 @@
 .pal { position: relative; width: min(640px, 100%); max-height: min(560px, 76vh); display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 16px;
   box-shadow: var(--shadow-l), 0 2px 8px -2px color-mix(in srgb, var(--ink) 12%, transparent); transform-origin: 50% 0; }
-/* a hairline of ink along the top edge (teal is only for what a KT session explained) */
+/* a hairline of the brand teal along the top edge */
 .pal::before { content: ""; position: absolute; top: 0; left: 14%; right: 14%; height: 1px; pointer-events: none;
-  background: linear-gradient(90deg, transparent, var(--ink-soft) 30%, var(--ink-soft) 70%, transparent); opacity: .5; }
+  background: linear-gradient(90deg, transparent, var(--primary-fill) 30%, var(--primary-fill) 70%, transparent); opacity: .7; }
 
 /* ---------- the field ---------- */
 .pal-field { display: flex; align-items: center; gap: 12px; height: 58px; padding: 0 12px 0 18px; border-bottom: 1px solid var(--line); flex: none; }
-.pal-search { flex: none; color: var(--ink-faint); transition: color .15s; }
+.pal-search { flex: none; color: var(--ink-muted); transition: color .15s; }
 .pal-field:has(.pal-input:not(:placeholder-shown)) .pal-search { color: var(--ink); }
 .pal .pal-input, .pal .pal-input:hover, .pal .pal-input:focus { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent;
   box-shadow: none; outline: none; color: var(--ink); font: 450 1.05rem/1.3 var(--ui); letter-spacing: -.008em; }
-.pal-input::placeholder { color: var(--ink-faint); }
+.pal-input::placeholder { color: var(--ink-muted); }
 .pal-input::-webkit-search-cancel-button { display: none; }
 .pal button.pal-esc { flex: none; display: inline-flex; align-items: center; padding: 4px; margin: 0; background: none; box-shadow: none; color: var(--ink-soft);
   border-radius: var(--radius-s); font: 550 .86rem/1 var(--ui); }
@@ -33,11 +33,11 @@
 /* one highlight that glides between rows instead of each row flashing on and off */
 .pal-glide { position: absolute; top: 0; left: 8px; right: 8px; border-radius: 10px; pointer-events: none; z-index: 0;
   background: color-mix(in srgb, var(--ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 4%, transparent); }
-.pal-glide::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 0 2px 2px 0; background: var(--ink); }
+.pal-glide::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 0 2px 2px 0; background: var(--primary-fill); }
 .pal-glide.anim { transition: transform .14s var(--ease-out), height .14s var(--ease-out); }
 
 .pal-group + .pal-group { margin-top: 2px; }
-.pal-label { padding: 12px 10px 6px; font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); user-select: none; }
+.pal-label { padding: 12px 10px 6px; font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-muted); user-select: none; }
 .pal-group-ask .pal-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .pal-group-ask { padding: 4px 0; }
 .pal-group-ask:not(:last-child) { border-bottom: 1px solid var(--line); margin: 0 -8px 2px; padding: 4px 8px; }
@@ -62,7 +62,7 @@
 .pal-item.ask:not(.on) .pal-hint { opacity: .55; }
 
 .pal-empty { display: grid; justify-items: center; gap: 4px; padding: 30px 16px 26px; text-align: center; }
-.pal-empty-mark { margin-bottom: 10px; color: var(--ink-faint); opacity: .7; } /* ui.tsx Logo, still: the list changes with every key */
+.pal-empty-mark { margin-bottom: 10px; color: var(--ink-muted); opacity: .7; } /* ui.tsx Logo, still: the list changes with every key */
 .pal-empty-title { margin: 0; font-weight: 600; color: var(--ink); font-size: .95rem; }
 .pal-empty-text { margin: 0; color: var(--ink-soft); font-size: .86rem; }
 

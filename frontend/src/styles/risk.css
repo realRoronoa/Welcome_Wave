@@ -12,7 +12,7 @@
 /* ---------- header: the team's KT pace, which every handover estimate uses ---------- */
 .rk-pace { display: flex; align-items: center; gap: .65rem; padding: .55rem 1rem .55rem .8rem; border-radius: 999px; background: var(--surface);
   border: 1px solid var(--line); box-shadow: var(--shadow-xs); color: var(--ink-2); font-size: .86rem; }
-.rk-pace > svg { color: var(--ink-faint); flex: none; }
+.rk-pace > svg { color: var(--ink-muted); flex: none; }
 .rk-pace p { margin: 0; display: grid; line-height: 1.3; }
 .rk-pace strong { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
 .rk-pace .dp-meta { font-size: .74rem; }
@@ -114,7 +114,7 @@
 .rk-facts-line strong { color: var(--ink); font-weight: 600; }
 .rk-voice { display: inline-flex; align-items: center; gap: .3rem; color: var(--ink-2); font-weight: 550; text-decoration: underline;
   text-decoration-color: color-mix(in srgb, currentColor 30%, transparent); text-underline-offset: 3px; border-radius: 4px; }
-.rk-voice svg { flex: none; color: var(--ink-faint); }
+.rk-voice svg { flex: none; color: var(--ink-muted); }
 .rk-voice:hover { color: var(--ink); text-decoration-color: currentColor; }
 
 .rk-chiprow { display: grid; grid-template-columns: 6.4rem minmax(0, 1fr); gap: .5rem; align-items: start; margin-top: .65rem; }
@@ -145,7 +145,7 @@ a.rk-demand:hover { color: var(--ink); border-color: var(--line-hover); }
 .rk-factor.total { padding-left: .1rem; }
 .b-critical .rk-factor.total .rk-factor-v { color: var(--rec); }
 .b-high .rk-factor.total .rk-factor-v { color: var(--ink); }
-.rk-op { padding-bottom: 1.05rem; color: var(--ink-faint); font-size: 1rem; line-height: 1; }
+.rk-op { padding-bottom: 1.05rem; color: var(--ink-muted); font-size: 1rem; line-height: 1; }
 .rk-why-note { margin: .65rem 0 0; font-size: .78rem; line-height: 1.5; color: var(--ink-soft); }
 
 /* ---------- simulation: everything the person does not hold alone steps back ---------- */
@@ -168,7 +168,7 @@ a.rk-demand:hover { color: var(--ink); border-color: var(--line-hover); }
 .rk-person-facts { list-style: none; margin: .85rem 0 0; padding: .8rem 0 0; display: grid; gap: .45rem; border-top: 1px solid var(--line); font-size: .84rem; color: var(--ink-2); }
 .rk-person-facts li { display: flex; align-items: center; gap: .55rem; min-width: 0; }
 .rk-person-facts li.dim { color: var(--ink-soft); }
-.rk-person-facts svg { flex: none; color: var(--ink-faint); }
+.rk-person-facts svg { flex: none; color: var(--ink-muted); }
 .rk-person-facts a { color: var(--ink); font-weight: 550; }
 
 .rk-sim-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-top: .85rem; padding-top: .8rem;
@@ -195,7 +195,7 @@ a.rk-demand:hover { color: var(--ink); border-color: var(--line-hover); }
 
 .rk-people-empty { display: flex; gap: .65rem; align-items: flex-start; padding: .9rem 1rem; border-radius: var(--radius-l); border: 1px dashed var(--line-strong);
   font-size: .86rem; color: var(--ink-soft); }
-.rk-people-empty svg { flex: none; margin-top: .1rem; color: var(--ink-faint); }
+.rk-people-empty svg { flex: none; margin-top: .1rem; color: var(--ink-muted); }
 .rk-people-empty p { margin: 0; }
 
 /* ---------- narrow screens ---------- */
@@ -220,4 +220,4 @@ a.rk-demand:hover { color: var(--ink); border-color: var(--line-hover); }
 }
 .rk .dp-section-head { flex-wrap: wrap; row-gap: .5rem; }
 .rk-more { margin: .75rem 0 0; font-size: .84rem; color: var(--ink-soft); }
-.rk-sym-more { color: var(--ink-faint); }
+.rk-sym-more { color: var(--ink-muted); }

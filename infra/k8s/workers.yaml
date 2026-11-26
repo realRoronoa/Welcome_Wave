@@ -1,0 +1,206 @@
+# GKE Autopilot: three worker deployments from one image, scaled by KEDA on Pub/Sub backlog (to zero when idle).
+# Cloud Build substitutes the __PLACEHOLDERS__ and applies this file (cloudbuild.yaml, step deploy-workers).
+# This is the Cloud Run layout's part on GKE. To run the whole product on Kubernetes (API, web app, workers, scheduled
+# calls, migrations), use the Kustomize overlays next to it instead: infra/k8s/overlays, docs/KUBERNETES.md.
+#
+# * Secrets are read from Secret Manager at start-up with Workload Identity (GSM_SECRETS) - no Kubernetes Secrets.
+# * Cloud SQL is reached through the Auth Proxy as a native sidecar on 127.0.0.1:5432 (IAM-authorised, TLS). Its image is
+#   pinned by digest; to update it, take the new release's digest from gcr.io/cloud-sql-connectors/cloud-sql-proxy.
+# * The Deployments name no `replicas`: KEDA (bottom of this file) owns the count, and a value here would reset it on every
+#   deploy, stopping a meeting mid-analysis.
+# * Email: the review worker sends invitation emails (`mail.invitation`) with the same SMTP settings as the API
+#   (cloudbuild.yaml _SMTP_*, password in the ww-smtp-password secret) and PUBLIC_URL for the sign-in link.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: welcome-wave
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker
+  namespace: welcome-wave
+  annotations:
+    iam.gke.io/gcp-service-account: ww-worker@__PROJECT_ID__.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: worker-config
+  namespace: welcome-wave
+data:
+  MODE: gcp
+  ENV: __ENV__
+  GCP_PROJECT: __PROJECT_ID__
+  GCP_REGION: __REGION__
+  VERTEX_LOCATION: __VERTEX_LOCATION__
+  GCS_BUCKET: __PROJECT_ID__-ww-data
+  PUBSUB_PREFIX: ww
+  MODEL_FAST: __MODEL_FAST__
+  MODEL_SMART: __MODEL_SMART__
+  MODEL_FALLBACK: __MODEL_FALLBACK__
+  GITHUB_APP_ID: "__GITHUB_APP_ID__"
+  LANGSMITH_TRACING: "__LANGSMITH_TRACING__"
+  LANGSMITH_ENDPOINT: __LANGSMITH_ENDPOINT__
+  LANGSMITH_PROJECT: welcome-wave-__ENV__
+  PUBLIC_URL: "__PUBLIC_URL__"
+  SMTP_HOST: "__SMTP_HOST__"
+  SMTP_PORT: "__SMTP_PORT__"
+  SMTP_USER: "__SMTP_USER__"
+  SMTP_FROM: "__SMTP_FROM__"
+  GSM_SECRETS: DATABASE_URL=ww-database-url-proxy,GITHUB_PRIVATE_KEY=ww-github-app-private-key,LANGSMITH_API_KEY=ww-langsmith-api-key,SMTP_PASSWORD=ww-smtp-password
+  HOME: /tmp # read-only root filesystem: libraries that cache under $HOME write to the emptyDir
+  DB_POOL_SIZE: "3"
+  DB_MAX_OVERFLOW: "2"
+  CHECKPOINT_POOL_SIZE: "2"
+---
+# ---------------- meetings (heavy: Gemini watches the recording) ----------------
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: meeting-worker, namespace: welcome-wave, labels: { app: meeting-worker } }
+spec:
+  selector: { matchLabels: { app: meeting-worker } }
+  template:
+    metadata:
+      labels: { app: meeting-worker }
+      annotations:
+        cluster-autoscaler.kubernetes.io/safe-to-evict: "false" # do not move a pod mid-video
+    spec:
+      serviceAccountName: worker
+      terminationGracePeriodSeconds: 600 # let an in-flight meeting finish on scale-down
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      initContainers:
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.28.0@sha256:e0cbea7b63455c1635d354ef456696d019dd02a5db47bf1994e849823e71ae89
+          restartPolicy: Always # native sidecar: starts before the worker, stops after it
+          args: ["--structured-logs", "--port=5432", "--health-check", "--http-address=0.0.0.0", "__DB_CONNECTION__"]
+          startupProbe: { httpGet: { path: /startup, port: 9090 }, periodSeconds: 1, failureThreshold: 60 }
+          securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 100m, memory: 128Mi } }
+      containers:
+        - name: worker
+          image: __IMAGE__
+          command: ["python", "-m", "workers.worker"]
+          env: [{ name: WORKER_QUEUE, value: meetings }]
+          envFrom: [{ configMapRef: { name: worker-config } }]
+          ports: [{ name: health, containerPort: 8081 }]
+          livenessProbe: { httpGet: { path: /healthz, port: health }, initialDelaySeconds: 30, periodSeconds: 30, failureThreshold: 3 }
+          readinessProbe: { httpGet: { path: /healthz, port: health }, initialDelaySeconds: 5, periodSeconds: 10, failureThreshold: 3 } # ready = subscribed
+          securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 1Gi }, limits: { memory: 2Gi } }
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+# ---------------- ingestion (repo + document indexing) ----------------
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: ingestion-worker, namespace: welcome-wave, labels: { app: ingestion-worker } }
+spec:
+  selector: { matchLabels: { app: ingestion-worker } }
+  template:
+    metadata: { labels: { app: ingestion-worker } }
+    spec:
+      serviceAccountName: worker
+      terminationGracePeriodSeconds: 300
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      initContainers:
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.28.0@sha256:e0cbea7b63455c1635d354ef456696d019dd02a5db47bf1994e849823e71ae89
+          restartPolicy: Always # native sidecar: starts before the worker, stops after it
+          args: ["--structured-logs", "--port=5432", "--health-check", "--http-address=0.0.0.0", "__DB_CONNECTION__"]
+          startupProbe: { httpGet: { path: /startup, port: 9090 }, periodSeconds: 1, failureThreshold: 60 }
+          securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 100m, memory: 128Mi } }
+      containers:
+        - name: worker
+          image: __IMAGE__
+          command: ["python", "-m", "workers.worker"]
+          env: [{ name: WORKER_QUEUE, value: ingestion }, { name: SHUTDOWN_GRACE_S, value: "280" }]
+          envFrom: [{ configMapRef: { name: worker-config } }]
+          ports: [{ name: health, containerPort: 8081 }]
+          livenessProbe: { httpGet: { path: /healthz, port: health }, initialDelaySeconds: 30, periodSeconds: 30, failureThreshold: 3 }
+          readinessProbe: { httpGet: { path: /healthz, port: health }, initialDelaySeconds: 5, periodSeconds: 10, failureThreshold: 3 } # ready = subscribed
+          securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 4Gi }, limits: { memory: 2Gi } } # repo tarballs go to /tmp
+      volumes: [{ name: tmp, emptyDir: { sizeLimit: 4Gi } }]
+---
+# ---------------- reviews (PR status, reviews, onboarding plans) ----------------
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: review-worker, namespace: welcome-wave, labels: { app: review-worker } }
+spec:
+  selector: { matchLabels: { app: review-worker } }
+  template:
+    metadata: { labels: { app: review-worker } }
+    spec:
+      serviceAccountName: worker
+      terminationGracePeriodSeconds: 180
+      securityContext: { runAsNonRoot: true, seccompProfile: { type: RuntimeDefault } }
+      initContainers:
+        - name: cloud-sql-proxy
+          image: gcr.io/cloud-sql-connectors/cloud-sql-proxy:2.28.0@sha256:e0cbea7b63455c1635d354ef456696d019dd02a5db47bf1994e849823e71ae89
+          restartPolicy: Always # native sidecar: starts before the worker, stops after it
+          args: ["--structured-logs", "--port=5432", "--health-check", "--http-address=0.0.0.0", "__DB_CONNECTION__"]
+          startupProbe: { httpGet: { path: /startup, port: 9090 }, periodSeconds: 1, failureThreshold: 60 }
+          securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, capabilities: { drop: [ALL] } }
+          resources: { requests: { cpu: 100m, memory: 128Mi } }
+      containers:
+        - name: worker
+          image: __IMAGE__
+          command: ["python", "-m", "workers.worker"]
+          env: [{ name: WORKER_QUEUE, value: reviews }, { name: SHUTDOWN_GRACE_S, value: "160" }]
+          envFrom: [{ configMapRef: { name: worker-config } }]
+          ports: [{ name: health, containerPort: 8081 }]
+          livenessProbe: { httpGet: { path: /healthz, port: health }, initialDelaySeconds: 30, periodSeconds: 30, failureThreshold: 3 }
+          readinessProbe: { httpGet: { path: /healthz, port: health }, initialDelaySeconds: 5, periodSeconds: 10, failureThreshold: 3 } # ready = subscribed
+          securityContext: { runAsNonRoot: true, allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: [ALL] } }
+          volumeMounts: [{ name: tmp, mountPath: /tmp }]
+          resources: { requests: { cpu: 500m, memory: 1Gi }, limits: { memory: 1Gi } }
+      volumes: [{ name: tmp, emptyDir: {} }]
+---
+# ---------------- KEDA: scale on unacknowledged messages ----------------
+# KEDA itself is installed once per cluster: infra/scripts/bootstrap-cluster.sh
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata: { name: gcp-wi, namespace: welcome-wave }
+spec:
+  podIdentity: { provider: gcp }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: meeting-worker, namespace: welcome-wave }
+spec:
+  scaleTargetRef: { name: meeting-worker }
+  minReplicaCount: 0
+  maxReplicaCount: 5
+  cooldownPeriod: 600
+  triggers:
+    - type: gcp-pubsub
+      authenticationRef: { name: gcp-wi }
+      metadata: { subscriptionName: ww-meetings-sub, mode: SubscriptionSize, value: "1" } # one pod per waiting meeting
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: ingestion-worker, namespace: welcome-wave }
+spec:
+  scaleTargetRef: { name: ingestion-worker }
+  minReplicaCount: 0
+  maxReplicaCount: 4
+  cooldownPeriod: 300
+  triggers:
+    - type: gcp-pubsub
+      authenticationRef: { name: gcp-wi }
+      metadata: { subscriptionName: ww-ingestion-sub, mode: SubscriptionSize, value: "3" }
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata: { name: review-worker, namespace: welcome-wave }
+spec:
+  scaleTargetRef: { name: review-worker }
+  minReplicaCount: 1 # PR reviews and plans should start within seconds
+  maxReplicaCount: 4
+  triggers:
+    - type: gcp-pubsub
+      authenticationRef: { name: gcp-wi }
+      metadata: { subscriptionName: ww-reviews-sub, mode: SubscriptionSize, value: "5" }

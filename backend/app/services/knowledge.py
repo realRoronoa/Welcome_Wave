@@ -44,7 +44,7 @@ from datetime import date, datetime
 from typing import Callable, Iterable, Literal, NamedTuple
 
 from app import ports
-from app.agents.schemas import Chunk, Hit, KTLink, MeetingResult, Utterance
+from app.agents.core.schemas import Chunk, Hit, KTLink, MeetingResult, Utterance
 from app.ports import Index, Meeting, Onboarding, Store, TaskRow, User
 from app.services.chunking import module_of
 from app.services.codeowners import parse_codeowners, rule_for

@@ -21,11 +21,11 @@ function toHash(url: URL): string | null {
       const call = url.searchParams.get("call"); // a booked KT session: the list, with that call picked out
       return id ? `#/meetings/${encodeURIComponent(id)}` : call ? `#/meetings?call=${encodeURIComponent(call)}` : "#/meetings";
     }
-    case "approvals": return "#/approvals";
+    case "approvals": return id ? `#/approvals/${encodeURIComponent(id)}` : "#/approvals"; // that one, picked out
     case "tasks": return "#/tasks";
     case "experts": return message ? `#/inbox?message=${encodeURIComponent(message)}` : "#/inbox";
     case "chat": return message ? `#/chat?message=${encodeURIComponent(message)}` : "#/chat"; // the turn an expert answered
-    case "runs": return "#/dashboard";
+    case "runs": return "#/agents"; // an incident: the agents page, where the runs and their failures are
     // lifecycle links (/program/<id>?tab=…, /feedback, /handovers, /setup, /reports): the same path as a hash route
     case "program": case "feedback": case "handovers": case "setup": case "reports": case "home": case "team": {
       const q = new URLSearchParams(url.search);
@@ -119,8 +119,10 @@ export default function Notifications({ onOpen }: { onOpen: (hash: string | null
     <div className="notif" ref={box} onKeyDown={arrows}>
       <button ref={toggle} className={`bell${unread ? " has-unread" : ""}`} aria-expanded={open} aria-controls="notif-panel" onClick={() => setOpen(!open)}
               aria-label={`Notifications${unread ? `, ${unread} unread` : ""}`} title="Notifications">
-        <Icon name="bell" />
-        {unread > 0 && <span className="badge" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
+        {/* the nudge moves this wrapper, not the svg: Chrome animates an svg's transform on the main thread, every frame */}
+        <span className="bell-icon"><Icon name="bell" /></span>
+        {/* keyed by the count: a new unread item restarts the badge's (finite) ping */}
+        {unread > 0 && <span key={unread} className="badge" aria-hidden="true">{unread > 9 ? "9+" : unread}</span>}
       </button>
       {open && (
         <div id="notif-panel" className="notif-panel" role="region" aria-label="Notifications">

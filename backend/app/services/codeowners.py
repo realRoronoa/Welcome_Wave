@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import fnmatch
 
+CATCH_ALL = {"*", "/*", "**", "/**"}  # patterns that match every path: the owner of last resort, not an expert on a file
+
 
 def parse_codeowners(text: str) -> list[tuple[str, list[str]]]:
     """(pattern, owners without '@') per rule line, in file order. A pattern with no owners is kept with owners=[]:

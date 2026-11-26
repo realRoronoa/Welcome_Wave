@@ -18,7 +18,7 @@ test and build numbers in section 4.
 | | `demo` | `self_hosted` | `gcp` |
 |---|---|---|---|
 | Store / index | `MemoryStore` (wrapped by `LiveStore`), `MemoryIndex` + `HashEmbedder` | Postgres + pgvector (`PgStore`, `PgIndex`) | Cloud SQL Postgres 16 + pgvector |
-| LLM | `OfflineLLM`; `GeminiLLM` if `GEMINI_API_KEY` | Gemini by API key; otherwise `NoLLM`, and AI routes return 503 `AI_OFF` | Vertex AI Gemini (`gemini-3.1-flash`/`-pro`, `gemini-embedding-001`, 768-d) |
+| LLM | `OfflineLLM`; `GeminiLLM` if `GEMINI_API_KEY` | Gemini by API key; otherwise `NoLLM`, and AI routes return 503 `AI_OFF` | Vertex AI Gemini (`gemini-3.5-flash-lite`/`gemini-3.5-flash`, `gemini-embedding-001`, 768-d) |
 | Sign-in | `X-Demo-User` header (trusted) | Firebase Auth (free project) | Identity Platform (email/password) |
 | Files | `LocalBlobStorage(".blobs")`, relative to the process cwd | Disk under `DATA_DIR`, signed links via `/api/blobs/{token}` | GCS (signed URLs) |
 | Events | `InlineBus`: handled synchronously in the request | `LocalQueue` threads pumping the outbox table | Pub/Sub (3 queues + dead letters), GKE workers, Scheduler outbox flush |
@@ -37,7 +37,7 @@ reported `livekit: true` and `POST /meetings` returned a LiveKit token.
 | Ports | `app/ports.py` (326 lines) | Pydantic rows; `Index`, `Store`/`AppStore` (108 methods), `RepoSource`, `BlobStorage`, `EventBus`. Optional capabilities found with `getattr` (`put_file`, `signed_url`, `verify`, `installation_account`). |
 | Adapters | `memory.py` (925 lines), `postgres.py` (950), `github.py`, `github_url.py`, `gcp.py` | Every store method is written twice: once in memory, once in SQL. |
 | Agents | `agents/` ingestion, qa, meeting, task, review, llm, prompts, schemas | Agents see only ports. The GitHub client has no write methods. |
-| Supervisor | `agents/supervisor.py` | LangGraph. `route` sends each event to one node. `guarded` retries a node, records it in `agent_runs`, and escalates on failure. |
+| Supervisor | `agents/supervisor/graph.py` | LangGraph. `route` sends each event to one node. `guarded` retries a node, records it in `agent_runs`, and escalates on failure. |
 | Services | `services/` knowledge (1,197 lines), code_tour (1,155), kt_planner (545), knowledge_risk, kt_review, kt_linker, coverage, dashboard, chunking, codeowners, diff, embeddings, redaction, livekit | `knowledge.py` is the shared core behind knowledge risk, the KT planner and the code tour. |
 | API | `api/routes.py` (951 lines, 50 routes), `auth.py`, `demo.py`, `stream.py`, `outbox.py`, `webhooks.py`, plus one module each for `knowledge_risk`, `kt_planner` and `code_tour` | Each handler validates, checks permissions, then calls the store or the Supervisor. `require(*roles)` always lets admin through. `check_project` returns 404 to non-members. |
 | Runtime | `main.py`, `live.py`, `selfhost.py`, `migrate.py`, `secrets.py`, `workers/worker.py` | JSON logs with a request id, security headers, `/health` and `/health/ready`. |
