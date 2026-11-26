@@ -1,0 +1,33 @@
+# On GKE the front doors accept Google's front ends only (the load balancer's proxies and health checks connect to pod
+# addresses from these two ranges), plus the pods in this namespace that call the API. These replace the base's "any
+# source" rules: as a patch, each replaces its policy's ingress list as a whole.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-ingress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: web }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: { cidr: 35.191.0.0/16 }
+        - ipBlock: { cidr: 130.211.0.0/22 }
+      ports: [{ protocol: TCP, port: 8080 }]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress
+spec:
+  podSelector:
+    matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: api }
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock: { cidr: 35.191.0.0/16 }
+        - ipBlock: { cidr: 130.211.0.0/22 }
+        - podSelector:
+            matchExpressions:
+              - { key: app.kubernetes.io/component, operator: In, values: [web, scheduler] }
+      ports: [{ protocol: TCP, port: 8080 }]

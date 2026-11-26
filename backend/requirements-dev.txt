@@ -1,4 +1,6 @@
 -r requirements.txt
-pytest>=8
-ruff>=0.5
-locust>=2.29
+# Development tools, pinned so that a new release cannot change a lint or a test run on its own (Cloud Build runs ruff on
+# release builds). Move them on purpose.
+pytest==9.1.1
+ruff==0.17.6
+locust==2.46.7

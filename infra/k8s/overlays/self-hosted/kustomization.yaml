@@ -1,0 +1,39 @@
+# Welcome Wave on any Kubernetes cluster without Google Cloud (EKS, AKS, on-premises, a laptop's kind): MODE=self_hosted.
+# Edit settings/config.env, create the Secrets ww-api and ww-migrate (../../base/secrets.example.yaml), then:
+#   infra/k8s/deploy.sh self-hosted --api-image <registry>/welcome-wave-api@sha256:... --web-image <registry>/welcome-wave-web@sha256:...
+# Needs: Postgres 16 with pgvector, an Ingress controller, a TLS certificate as the Secret ww-tls (or cert-manager), a
+# default storage class. docs/KUBERNETES.md, "Any cluster".
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: welcome-wave
+
+labels: # on what the components add too
+  - pairs:
+      app.kubernetes.io/part-of: welcome-wave
+    includeSelectors: false
+
+resources:
+  - ../../base
+
+components:
+  - ../../components/self-hosted # before settings: settings/config.env can change anything it sets
+  - settings
+  - ../../components/public-url
+
+# Your Ingress controller. Without ingressClassName, the cluster's default class serves the Ingress. Uploads reach 25 MB
+# (documents) and 2 GB (KT recordings), and GET /api/live is a stream the API ends every 15 minutes: raise the controller's
+# body-size limit and its read timeout for /api to match (docs/KUBERNETES.md, "Any cluster"). With cert-manager, its
+# issuer annotation fills the Secret ww-tls. For example:
+#
+# patches:
+#   - target: { kind: Ingress, name: welcome-wave }
+#     patch: |-
+#       apiVersion: networking.k8s.io/v1
+#       kind: Ingress
+#       metadata:
+#         name: welcome-wave
+#         annotations:
+#           cert-manager.io/cluster-issuer: letsencrypt
+#       spec:
+#         ingressClassName: traefik

@@ -1,7 +1,8 @@
 # The executive role, the permission matrix, and the organisation's data
 
 **Executive.** A read-only role (`users.role` enum value `executive`, migration 010). Admins invite executives.
-`current_user` refuses an executive every non-GET request except `POST /api/me/leave` and `POST /api/notifications/read`, so
+`current_user` refuses an executive every non-GET request except `POST /api/me/leave`, `POST /api/notifications/read` and
+`POST /api/legal/accept` (their own acceptance of the terms: [legal-consent.md](legal-consent.md)), so
 read-only holds for every route, including future ones. Executives read reports, survey aggregates and their home; not
 individual hires' programs (404).
 

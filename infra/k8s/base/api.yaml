@@ -1,0 +1,108 @@
+# The API (backend/Dockerfile, its default command: uvicorn on $PORT, one process per pod). Pods are added by the
+# HorizontalPodAutoscaler (scaling.yaml), so this Deployment names no replica count: a deploy never resets it.
+#
+# Probes: started = /health answers (imports done, settings checked); ready = /health/ready, the database answers (a pod
+# that cannot reach it gets no traffic); alive = /health, cheap on purpose, so a slow database never restarts the process.
+# Stopping: the pod leaves the Service first (preStop), then uvicorn finishes in-flight requests and ends the live-update
+# streams within 20 s (--timeout-graceful-shutdown in the image), well inside the grace period.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: api
+spec:
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 25%, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: welcome-wave
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: welcome-wave
+        app.kubernetes.io/component: api
+      annotations:
+        kubectl.kubernetes.io/default-container: api
+    spec:
+      serviceAccountName: api
+      automountServiceAccountToken: false
+      enableServiceLinks: false # no API_PORT=tcp://... and friends in the environment, where settings are read from
+      terminationGracePeriodSeconds: 45
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001 # the image's own user (backend/Dockerfile)
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: api }
+          matchLabelKeys: [pod-template-hash]
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: api }
+          matchLabelKeys: [pod-template-hash]
+      containers:
+        - name: api
+          image: welcome-wave-api
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: PORT, value: "8080" }
+            - { name: HOME, value: /tmp } # the root filesystem is read-only: libraries that cache under $HOME write here
+          envFrom:
+            - configMapRef: { name: ww-config }
+            - secretRef: { name: ww-api }
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 2
+            failureThreshold: 60
+          readinessProbe:
+            httpGet: { path: /health/ready, port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "10"] } # the load balancer and kube-proxy stop sending before uvicorn stops
+          resources:
+            requests: { cpu: 500m, memory: 1Gi, ephemeral-storage: 1Gi }
+            limits: { memory: 1Gi, ephemeral-storage: 2Gi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: tmp, mountPath: /tmp } # uploads spool here before they are stored
+      volumes:
+        - name: tmp
+          emptyDir: { sizeLimit: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: api
+  ports:
+    - { name: http, port: 8080, targetPort: http }

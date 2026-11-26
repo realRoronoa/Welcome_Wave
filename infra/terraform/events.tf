@@ -63,12 +63,14 @@ locals {
 }
 # KT sessions on Google Calendar: once a session has ended, POST /internal/recordings/poll imports the recording Meet
 # attached to its event (from Google Drive) and marks sessions whose recording never came as ended
-# (docs/specs/scheduling.md). Same token, same audience as the outbox flush.
+# (docs/specs/scheduling.md). Same token, same audience as the outbox flush. An import streams the video from Drive into
+# Cloud Storage in chunks within the request (nothing is spooled on the instance); one import per session runs at a time.
 resource "google_cloud_scheduler_job" "recordings_poll" {
   name             = "${local.prefix}-recordings-poll"
   region           = var.region
   schedule         = "*/10 * * * *"
-  attempt_deadline = "900s" # an import streams the video from Drive into Cloud Storage within the request
+  attempt_deadline = "1800s" # the longest Cloud Scheduler allows; ww-api's own timeout is 60 minutes
+
   retry_config { retry_count = 0 } # the next run is ten minutes away
   http_target {
     http_method = "POST"
