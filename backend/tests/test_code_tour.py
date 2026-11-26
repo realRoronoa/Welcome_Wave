@@ -309,7 +309,7 @@ def test_cache_rebuilds_on_new_sha(demo):
     first = T.graph_for(demo.index, PID, sha)
     assert T.graph_for(demo.index, PID, sha) is first  # same commit, same code: served from the cache
 
-    text = (T.__file__.rsplit("/app/", 1)[0] + "/sample_repo/engine/validate.py")
+    text = (T.__file__.replace("\\", "/").rsplit("/app/", 1)[0] + "/sample_repo/engine/validate.py")
     source = open(text).read().replace("        return []\n", "        return check_labels(resource, rule)\n")
     demo.index.upsert(chunk_code(PID, VALIDATE, source, commit="x"))  # same line ranges, so the same chunk ids: a content change
     demo.store.update_repo("repo-demo", last_indexed_sha="x")
@@ -327,7 +327,7 @@ def test_cache_key_reads_no_code_but_sees_a_same_commit_reindex(demo):
     assert first.calls[f"{VALIDATE}::check_privileged"] == ()
 
     # a push handled after a later one re-indexes its file at the commit already recorded: same sha, same chunk ids
-    source = open(T.__file__.rsplit("/app/", 1)[0] + "/sample_repo/engine/validate.py").read()
+    source = open(T.__file__.replace("\\", "/").rsplit("/app/", 1)[0] + "/sample_repo/engine/validate.py").read()
     demo.index.upsert(chunk_code(PID, VALIDATE, source.replace("        return []\n", "        return check_labels(resource, rule)\n"), commit="later"))
     assert demo.store.repos_for(PID)[0].last_indexed_sha == sha
     assert stop(tour(demo), f"{VALIDATE}::check_privileged")["calls"] == [f"{VALIDATE}::check_labels"]

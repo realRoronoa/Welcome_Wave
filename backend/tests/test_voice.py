@@ -53,6 +53,8 @@ def test_demo_does_not_offer_a_fake_voice_call():
         headers = {"X-Demo-User": "u-vijay"}
         config = client.get("/api/voice/config", headers=headers)
         assert config.status_code == 200 and config.json()["available"] is False
+        history = client.get("/api/voice/sessions", params={"project_id": "proj-demo"}, headers=headers)
+        assert history.status_code == 200 and history.json() == []  # the in-memory demo store has no voice tables
         start = client.post("/api/voice/sessions", json={"project_id": "proj-demo"}, headers=headers)
         assert start.status_code == 503
         tool = client.post("/api/voice/tools/getEmployeeContext", json={}, headers={"Authorization": "Bearer fake"})

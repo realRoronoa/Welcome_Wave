@@ -152,6 +152,7 @@ def sync(session_id: str, user: User = Depends(current_user), c=Depends(containe
         summary.update(_recap(c, row, summary))
         c.store.run("UPDATE voice_sessions SET status = :st, ended_at = COALESCE(ended_at, now()), summary = CAST(:su AS jsonb) WHERE id = :s",
                     st=state, su=json.dumps(summary), s=session_id)
+        c.store.audit(user.org_id, user.id, "voice.ended", session_id, {"onboarding_id": str(row["onboarding_id"]), "by": "provider", "status": state})
     return session(session_id, user, c)
 
 
@@ -163,6 +164,8 @@ def session(session_id: str, user: User = Depends(current_user), c=Depends(conta
 
 @router.get("/sessions")
 def history(project_id: str, user: User = Depends(current_user), c=Depends(container)):
+    if c.settings.is_demo or not c.settings.voice_ready:
+        return []
     check_project(c, user, project_id)
     return [_public(r) for r in c.store.rows("""SELECT * FROM voice_sessions WHERE org_id = :o AND user_id = :u AND project_id = :p
                                            ORDER BY created_at DESC LIMIT 20""", o=user.org_id, u=user.id, p=project_id)]
@@ -188,6 +191,8 @@ def transcript(session_id: str, body: TranscriptIn, user: User = Depends(current
 @router.post("/sessions/{session_id}/stop")
 def stop(session_id: str, user: User = Depends(current_user), c=Depends(container)):
     row = _own(c, user, session_id)
+    if row["status"] in {"ended", "failed"}:
+        return _public(row, _actions(c, session_id))
     if row["status"] in {"active", "starting"} and row["agora_session_id"]:
         try:
             if platform.status(c.settings, row["agora_session_id"]).upper() not in {"STOPPED", "FAILED"}:
@@ -283,7 +288,10 @@ def tool_call(name: str, body: ToolIn, authorization: str | None = Header(defaul
         return {"access": visibility.view(hc, ["access"])}
     if name == "searchCompanyKnowledge":
         question = _needed(body.question, "question")
-        result = routes.ask(routes.Question(project_id=str(row["project_id"]), question=question), user, c)
+        try:
+            result = routes.ask(routes.Question(project_id=str(row["project_id"]), question=question), user, c)
+        except HTTPException as exc:
+            return {"status": "unavailable", "answer": None, "citations": [], "kt_clips": [], "message": str(exc.detail)}
         citations = result.get("citations") or []
         kt_clips = result.get("kt_clips") or []
         sources = list(citations)

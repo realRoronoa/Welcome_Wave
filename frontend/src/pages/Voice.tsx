@@ -52,7 +52,11 @@ export default function Voice() {
     const onVisible = () => { if (document.visibilityState === "visible") void refreshAvailability(); };
     document.addEventListener("visibilitychange", onVisible);
     api<Saved[]>(`/voice/sessions?project_id=${encodeURIComponent(project.id)}`).then(setHistory).catch(() => {});
-    return () => { document.removeEventListener("visibilitychange", onVisible); void release(); };
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      if (current.current) void api(`/voice/sessions/${current.current.id}/stop`, { method: "POST", keepalive: true }).catch(() => {});
+      void release();
+    };
   }, [project.id, refreshAvailability]);
 
   useEffect(() => {
@@ -80,6 +84,7 @@ export default function Voice() {
   }, [saved?.id, phase]);
 
   async function release() {
+    setMuted(false);
     mic.current?.stop(); mic.current?.close(); mic.current = null;
     remoteAudio.current = null;
     try { if (rtm.current && current.current) await rtm.current.unsubscribe(current.current.channel); } catch { /* leave continues */ }

@@ -7,10 +7,11 @@ bodies or Authorization headers.
 from __future__ import annotations
 
 import http.client
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit
 
-UPSTREAM = ("127.0.0.1", 8000)
+UPSTREAM = ("127.0.0.1", int(os.environ.get("VOICE_PROXY_UPSTREAM_PORT", "8000")))
 MAX_BODY = 64 * 1024
 
 
