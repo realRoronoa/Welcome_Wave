@@ -9,8 +9,7 @@ services:
     dockerContext: ./backend
     plan: free
     healthCheckPath: /health
-    dockerCommand: >-
-      sh -c 'if [ "${MODE:-demo}" = "self_hosted" ] && [ -n "${DATABASE_URL_OWNER:-}" ]; then python -m app.migrate; fi && exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8080} --workers 1 --proxy-headers --timeout-graceful-shutdown 20'
+    dockerCommand: python -m scripts.render_start
     envVars:
       # Switch MODE to "demo" (with ENV=dev) to run in-memory without Neon or Firebase.
       - key: MODE
