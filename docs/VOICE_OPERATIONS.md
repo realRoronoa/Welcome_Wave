@@ -49,7 +49,7 @@ If the tool tunnel is unavailable, the voice may connect but custom tools cannot
 - A live Agora session started and stopped, and the authenticated `getEmployeeContext` tool returned 200 through the public HTTPS tunnel with Aman's real onboarding profile. An earlier browser RTC subscriber received the agent's playing audio track (measured peak audio level 0.845) with Murf Falcon configured. These checks confirm transport and tool reachability, not the spoken words or a complete employee conversation.
 - The full backend suite passed: 1,353 passed, 100 skipped. The frontend production build passed locally. The database voice test covers the six tool paths, pending proposals, explicit approval, record creation, idempotency, audit and organisation isolation.
 - This Agora Platform preview SDK rejects `advanced_features.enable_rtm` and `parameters.data_channel`, which the current Agora transcript guide requires. Live streaming transcripts and the complete spoken tool workflow have not been verified with this provider version. If the transcript panel remains empty, the call can still carry audio, and approved tool actions remain in the session record. Do not claim a saved full transcript in a judging demo until the RTM path is verified on the actual account.
-- Aman (`gatterboys123@gmail.com`) now has an active Welcome-Kit onboarding and an approved plan. The generic task to watch a recorded KT call was not approved because no KT recording is indexed. There is no genuine KT timestamp to cite yet.
+- A test new hire now has an active Welcome-Kit onboarding and an approved plan. The generic task to watch a recorded KT call was not approved because no KT recording is indexed. There is no genuine KT timestamp to cite yet.
 
 ## Provider references
 

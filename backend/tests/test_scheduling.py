@@ -2,6 +2,7 @@
 their recordings imported from Google Drive. Google is answered by httpx.MockTransport; nothing leaves the machine."""
 import io
 import json
+import sys
 import time
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qs, urlsplit
@@ -125,6 +126,7 @@ def test_oauth_state_round_trip_and_refusals(tmp_path):
     assert S.read_state(Settings(mode="self_hosted", token_encryption_key="j" * 40), state) is None  # another server's key
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="needs Unix file permissions")
 def test_refresh_tokens_are_encrypted_and_a_changed_key_reads_none(tmp_path):
     s = Settings(mode="self_hosted", data_dir=str(tmp_path))  # no key set: one is generated into DATA_DIR, once
     blob = S.encrypt_token(s, "1//refresh-token")

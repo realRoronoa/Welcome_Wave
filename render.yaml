@@ -18,9 +18,11 @@ services:
         value: prod
       - key: DATA_DIR
         value: /data
-      # Vercel rewrite + Render edge proxy append two X-Forwarded-For hops.
+      # Trust only the X-Forwarded-For entry Render's edge appends. "2" would also trust the entry before it, which a
+      # caller who reaches the onrender.com URL directly (skipping Vercel) writes themselves, and so picks the address
+      # the rate limits charge. Signed-in requests are still limited per person.
       - key: RATE_LIMIT_TRUSTED_HOPS
-        value: "2"
+        value: "1"
       # Keep pools and worker threads conservative for Render Free (512 MB RAM).
       - key: LOCAL_WORKERS
         value: "2"

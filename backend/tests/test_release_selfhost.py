@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -147,6 +148,7 @@ def test_the_api_container_reaches_the_database_container_by_name():
     assert r.returncode != 0 and "cannot reach" in r.stderr
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="runs the bash release script")
 def test_backup_settings_are_read_as_text_never_run(tmp_path):
     f = tmp_path / "selfhost.env"
     f.write_text('A=1\nTOKEN_ENCRYPTION_KEY="abc def"   # note\nexport BLOB_SIGNING_KEY=\'q1\'\nX=$(touch pwned)\n')
