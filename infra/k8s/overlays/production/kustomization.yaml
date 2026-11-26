@@ -1,0 +1,35 @@
+# Production on GKE: the whole product in the prod Google Cloud project (Terraform's), across the region's zones.
+# Edit settings/config.env, do the one-time setup in docs/KUBERNETES.md ("GKE"), then release by image digest:
+#   infra/k8s/deploy.sh production --api-image asia-south1-docker.pkg.dev/<project>/ww-images/backend@sha256:... \
+#                                  --web-image asia-south1-docker.pkg.dev/<project>/ww-images/web@sha256:...
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: welcome-wave
+
+labels: # on what the components add too
+  - pairs:
+      app.kubernetes.io/part-of: welcome-wave
+    includeSelectors: false
+
+resources:
+  - ../../base
+
+# Order matters: the settings first, then the components that read them.
+components:
+  - settings
+  - ../../components/public-url
+  - ../../components/gke
+  - ../../components/gcp-secret-manager
+
+patches:
+  # Three API pods at least: one per zone, so a zone outage or a node upgrade never takes the API away. At most ten: the
+  # database's connection budget (base/scaling.yaml).
+  - target: { kind: HorizontalPodAutoscaler, name: ^api$ }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 3 }
+      - { op: replace, path: /spec/maxReplicas, value: 10 }
+  - target: { kind: HorizontalPodAutoscaler, name: ^web$ }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 2 }
+      - { op: replace, path: /spec/maxReplicas, value: 6 }

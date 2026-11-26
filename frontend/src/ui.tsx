@@ -1,6 +1,7 @@
 import { Component, ReactNode, useEffect, useState } from "react";
 import { bootVisible, hideBoot } from "./boot";
 import { handedOver } from "./surface";
+import { isChunkError, reportError } from "./report";
 
 /* The Welcome Wave mark (docs/brand/BRAND.md): four identical strokes on a W. Each stroke is laid over the one before it,
    and the hairline seam it cuts shows where one person handed on to the next. Generated from one geometry
@@ -54,6 +55,13 @@ export function MarkLine({ className = "" }: { className?: string }) {
   return (
     <svg className={`mark-line ${className}`} viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path d={MARK_LINE} /></svg>
   );
+}
+
+/** The KT badge: a small "KT" beside a teal marker, so "explained in a recorded KT session" stays its own meaning now that
+ *  teal is also the brand colour (docs/brand/BRAND.md). Put it next to anything that comes from a recorded session: a
+ *  timestamp, a clip, a session in a list. Styled in styles.css (.kt-badge). */
+export function KtBadge({ title = "From a recorded KT session" }: { title?: string }) {
+  return <abbr className="kt-badge" title={title}>KT</abbr>;
 }
 
 /** A centred card for the screens shown before the app itself: sign-in, sign-up, invitations, errors. */
@@ -179,16 +187,28 @@ export function Icon({ name, size = 18 }: { name: IconName; size?: number }) {
 }
 
 /** Keeps one broken page from blanking the whole app. Keyed by route, so navigating away resets it. */
-export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null as Error | null };
+export class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null; ref: string }> {
+  state = { error: null as Error | null, ref: "" };
   static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: { componentStack?: string | null }) {
+    if (isChunkError(error)) return; // a page's chunk: "Try again" (or a reload) fetches it again
+    this.setState({ ref: reportError(error, "render", info.componentStack ?? undefined) });
+  }
   render() {
     if (!this.state.error) return this.props.children;
+    const chunk = isChunkError(this.state.error);
     return (
-      <section role="alert">
-        <h1>This page ran into a problem</h1>
-        <p className="muted">Reload the page or try again. If it keeps happening, tell your administrator what you were doing.</p>
-        <button onClick={() => this.setState({ error: null })}>Try again</button>
+      <section role="alert" className="page-problem">
+        <h1>{chunk ? "This page didn’t load" : "This page ran into a problem"}</h1>
+        <p className="muted">
+          {chunk ? "Check your connection and try again. If Welcome Wave was just updated, reload the page."
+            : "Try again, or reload the page. If it keeps happening, tell your administrator what you were doing"}
+          {!chunk && this.state.ref ? <> and quote <code>{this.state.ref}</code>.</> : !chunk ? "." : null}
+        </p>
+        <p className="page-problem-actions">
+          <button onClick={() => this.setState({ error: null, ref: "" })}>Try again</button>{" "}
+          <button className="secondary" onClick={() => location.reload()}>Reload</button>
+        </p>
       </section>
     );
   }

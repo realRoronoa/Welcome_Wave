@@ -76,19 +76,21 @@ def refuse_deactivated(user: User) -> User:
     return user
 
 
-def _resolve(c, authorization: str | None, x_demo_user: str | None) -> User:
-    """Blocking part of sign-in (token verification, database lookups). Runs in the threadpool."""
+def _resolve(c, authorization: str | None, x_demo_user: str | None, allow_deactivated: bool = False) -> User:
+    """Blocking part of sign-in (token verification, database lookups). Runs in the threadpool. `allow_deactivated`: the one
+    thing a deactivated member may still do is leave (POST /api/me/leave), which frees their login for another organisation."""
+    check = (lambda u: u) if allow_deactivated else refuse_deactivated
     if c.settings.is_demo:
         if not x_demo_user:
             raise HTTPException(401, "Sign in to the demo first")
         user = c.store.get_user(x_demo_user)
         if not user:
             raise HTTPException(403, "Unknown demo user")
-        return refuse_deactivated(user)
+        return check(user)
     who = _verify(c, authorization)
     user = c.store.user_by_firebase(who.uid)
     if user:
-        return refuse_deactivated(user)
+        return check(user)
     if who.email and not who.email_verified and c.settings.require_verified_email:
         raise HTTPException(403, detail={"code": "email_not_verified", "message": "Verify your email address, then sign in again."})
     pending = c.store.pending_invitations(who.email) if who.email else []
@@ -109,20 +111,27 @@ async def current_user(
     (sync endpoints run in a copy of this context) inherit."""
     c = container(request)
     _set_tenant(None)
-    user = await run_in_threadpool(_resolve, c, authorization, x_demo_user)
+    leaving = request.method == "POST" and request.url.path in DEACTIVATED_ALLOWED
+    user = await run_in_threadpool(_resolve, c, authorization, x_demo_user, leaving)
     _set_tenant(user.org_id)
     request.state.user = user
     if user.role in READ_ONLY_ROLES and request.method not in SAFE_METHODS and request.url.path not in READ_ONLY_ALLOWED:
         raise HTTPException(403, "Executives have read-only access")
+    if c.settings.legal_enforce:  # off by default: 403 `legal_required` on workspace routes until the terms are accepted
+        from app import legal
+
+        await run_in_threadpool(legal.enforce, c, user, request.method, request.url.path)
     return user
 
 
 # The executive role reads organisation-level reports and changes nothing: every write is refused here, for every route that
-# signs the caller in, whatever the route itself allows. Leaving the organisation and marking one's own notifications read
-# are not changes to the organisation's data.
+# signs the caller in, whatever the route itself allows. Leaving the organisation, marking one's own notifications read and
+# accepting the terms for oneself (app/api/legal.py) are not changes to the organisation's data.
 READ_ONLY_ROLES = frozenset({"executive"})
 SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-READ_ONLY_ALLOWED = frozenset({"/api/me/leave", "/api/notifications/read"})
+READ_ONLY_ALLOWED = frozenset({"/api/me/leave", "/api/notifications/read", "/api/legal/accept"})
+# A deactivated member can call nothing else: leaving unbinds the login, so it can join another organisation.
+DEACTIVATED_ALLOWED = frozenset({"/api/me/leave"})
 
 
 def require(*roles: str):
@@ -138,7 +147,7 @@ def check_project(c, user: User, project_id: str) -> Project:
     """The project exists, belongs to the caller's organisation, and the caller is a member (admins see all)."""
     try:
         project = c.store.get_project(project_id)
-    except Exception:  # unknown id, malformed uuid
+    except (LookupError, ValueError, TypeError):  # unknown or malformed id. A database error is not caught: it is a 500, not a 404
         project = None
     if not project or project.org_id != user.org_id:
         raise HTTPException(404, "Project not found")

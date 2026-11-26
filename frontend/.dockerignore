@@ -1,0 +1,12 @@
+# What never enters the web image's build context: the image installs its own node_modules (npm ci) and builds its own
+# dist, and secrets and local settings never leave this machine.
+node_modules
+dist
+.vite
+coverage
+*.tsbuildinfo
+.env
+.env.*
+*.pem
+*.log
+**/.DS_Store

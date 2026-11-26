@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta, timezone
 import pytest
 
 from app.adapters.memory import MemoryIndex, MemoryStore
-from app.agents.schemas import Chunk, Citation, Hit, KTLink, QAResult, Utterance
+from app.agents.core.schemas import Chunk, Citation, Hit, KTLink, QAResult, Utterance
 from app.config import Settings
 from app.container import build_container
 from app.ports import Onboarding, Project, TaskRow, User
@@ -302,7 +302,7 @@ def test_answered_question_without_clip_marks_the_cited_span(demo):
 
 def test_unanswered_question_anchored_by_search_weighs_two(demo):
     store, index = demo.store, demo.index
-    from app.agents.schemas import QAResult
+    from app.agents.core.schemas import QAResult
 
     mid = store.save_chat(PID, "u-vijay", "Why does check_privileged skip init containers?", QAResult(status="not_enough_information", answer="?"))
     store.save_chat(PID, "u-priya", "Why does check_labels exist?", QAResult(status="not_enough_information", answer="?"))  # not a new hire

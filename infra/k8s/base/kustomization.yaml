@@ -1,0 +1,41 @@
+# Welcome Wave on Kubernetes: the API, the web app, the three queue workers, the four scheduled calls and the database
+# migration Job, with the probes, limits, autoscaling, disruption budgets and network policies they need.
+#
+# This base holds only portable Kubernetes objects and runs the Google Cloud topology (MODE=gcp: Pub/Sub workers). What
+# belongs to one platform lives in ../components, and an environment is an overlay (../overlays):
+#   overlays/staging, overlays/production   GKE: components/gke + components/gcp-secret-manager
+#   overlays/self-hosted                    any cluster, no Google Cloud: components/self-hosted (MODE=self_hosted)
+#
+# Images are left as the names welcome-wave-api and welcome-wave-web: infra/k8s/deploy.sh sets the real ones (by digest)
+# at deploy time. Secrets are never in these files: base/secrets.example.yaml lists them. docs/KUBERNETES.md has the rest.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: welcome-wave
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: welcome-wave
+    includeSelectors: false # selectors stay as written: a Deployment's selector can never change
+    includeTemplates: true
+
+resources:
+  - namespace.yaml
+  - serviceaccounts.yaml
+  - api.yaml
+  - web.yaml
+  - workers.yaml
+  - scheduler.yaml
+  - migrate.yaml
+  - ingress.yaml
+  - scaling.yaml
+  - networkpolicies.yaml
+
+configMapGenerator:
+  # The application's settings (backend/app/config.py; every setting is an environment variable). The name gets a hash of
+  # the contents, so a changed setting rolls the pods that read it. Overlays merge their own values on top.
+  - name: ww-config
+    envs: [config.env]
+  # The scheduled calls' one script (scheduler.yaml)
+  - name: ww-scheduler
+    files: [call.py=scheduler/call.py]

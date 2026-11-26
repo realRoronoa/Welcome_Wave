@@ -108,11 +108,11 @@ export default function Nav({ path }: { path: string }) {
   };
 
   const way = (inMenu: boolean) => signedIn ? (
-    <a className="s-btn s-btn-ink s-btn-sm" href="/app" onClick={(e) => toApp(e, "/app")} {...prefetch}>Open Welcome Wave</a>
+    <a className="s-btn s-btn-brand s-btn-sm" href="/app" onClick={(e) => toApp(e, "/app")} {...prefetch}>Open Welcome Wave</a>
   ) : (
     <>
       <a className={inMenu ? "s-btn s-btn-line s-btn-sm" : "s-navlogin"} href="/login" onClick={(e) => toApp(e, "/login")} {...prefetch}>Log in</a>
-      <a className="s-btn s-btn-ink s-btn-sm" href="/signup" onClick={(e) => toApp(e, "/signup")} {...prefetch}>Get started</a>
+      <a className="s-btn s-btn-brand s-btn-sm" href="/signup" onClick={(e) => toApp(e, "/signup")} {...prefetch}>Get started</a>
     </>
   );
 

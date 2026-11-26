@@ -7,9 +7,10 @@ from datetime import date
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 
-from app.agents import ingestion, meeting
-from app.agents.schemas import Citation, KTLink, QAResult
-from app.agents.supervisor import build_supervisor, run_event
+from app.agents.core.schemas import Citation, KTLink, QAResult
+from app.agents.specialists.librarian import agent as ingestion
+from app.agents.specialists.note_taker import agent as meeting
+from app.agents.supervisor.graph import build_supervisor, run_event
 from app.container import ApprovalNotReady, ApprovalStale, Container
 from app.ports import Onboarding, RepoBusy, User
 
@@ -51,7 +52,7 @@ def _approve_all(c, onboarding_id="ob1"):
 
 # ---------------- a crashed run is continued, not dropped (runtime#0 / fix#52) ----------------
 def test_a_run_that_died_mid_node_is_continued_on_redelivery(c, world, monkeypatch):
-    from app.agents import task
+    from app.agents.specialists.planner import task
 
     _fail(monkeypatch, task, "plan_for", 1, KeyboardInterrupt())  # the pod is killed while the Task agent plans
     with pytest.raises(KeyboardInterrupt):

@@ -20,10 +20,16 @@ know what was explained, we also know what never was: the KT coverage map, the K
 
 | Doc | For |
 |---|---|
+| [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | Start here: complete orientation, local run, workflows, architecture, data, security, integrations, tests and limits |
+| [docs/video/welcome-wave-workflow-explainer.mp4](docs/video/welcome-wave-workflow-explainer.mp4) | Narrated animated workflow with a new-hire example |
+| [docs/video/welcome-wave-welcome-kit-demo.mp4](docs/video/welcome-wave-welcome-kit-demo.mp4) | 97-second animated hackathon walkthrough showing how Welcome-Kit becomes Welcome Wave's real code source |
 | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) | Each role: what Home shows, the main tasks step by step, where things live |
 | [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) | Setup, GitHub, Google Calendar, Calendly, people and roles, templates, audit log, export and deletion, retention, flags, rate limits, LangSmith |
+| [docs/LEGAL.md](docs/LEGAL.md) | Terms, privacy policy, data processing, recording notice: what is in the product, what to fill in, what a lawyer must decide (drafts, not legal advice) |
 | [docs/API.md](docs/API.md) | Every HTTP route by area, who may call it, errors and limits |
 | [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) | A verified 5-minute walkthrough on demo data, no keys |
+| [docs/HACKATHON_VOICE_DEMO.md](docs/HACKATHON_VOICE_DEMO.md) | Four-minute Welcome Wave judge recording using Welcome-Kit as the real code source |
+| [docs/VOICE_OPERATIONS.md](docs/VOICE_OPERATIONS.md) | Agora and Murf Voice setup, permissions, verification limits and judge demonstration |
 | [docs/AGENTS.md](docs/AGENTS.md) | The Supervisor and the eight specialist agents |
 | [docs/STATUS.md](docs/STATUS.md) | What landed this round, what is behind flags, what was deferred |
 | [docs/DEPLOY.md](docs/DEPLOY.md) | Google Cloud runbook and day-2 operations |
@@ -31,7 +37,7 @@ know what was explained, we also know what never was: the KT coverage map, the K
 | [docs/PERMISSIONS.md](docs/PERMISSIONS.md) | Every route × role, enforced by a test |
 | [docs/specs/](docs/specs/lifecycle.md) | One spec per lifecycle capability, plus scheduling |
 | [docs/PLAN.md](docs/PLAN.md), [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) | The round's plan and its baseline |
-| [docs/VOICE.md](docs/VOICE.md) | How we write in this repository |
+| [docs/VOICE.md](docs/VOICE.md), [CLAUDE.md](CLAUDE.md) | How we write; rules for working in this repository |
 
 ## Run modes
 
@@ -48,7 +54,7 @@ One codebase, three modes, chosen by `MODE` (settings in `backend/app/config.py`
 ```bash
 # backend: in-memory data, offline model, a small sample repo and one recorded KT session
 cd backend
-python3 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
+python3.11 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt  # or Python 3.12
 MODE=demo .venv/bin/uvicorn app.main:app --port 8080
 
 # frontend (second terminal)
@@ -96,7 +102,7 @@ production):
   ([docs/specs/scheduling.md](docs/specs/scheduling.md)).
 
 ```bash
-cd backend && .venv/bin/python -m pytest -q   # 488 passed, 53 skipped without Postgres (+ Postgres tests with TEST_PG_ADMIN_URL)
+cd backend && .venv/bin/python -m pytest -q   # add TEST_PG_ADMIN_URL for the Postgres integration tests
 MODE=demo .venv/bin/python -m eval.run_eval   # retrieval recall@5 on eval/golden_set.jsonl (answer metrics with a real model)
 cd ../frontend && npx tsc --noEmit -p .        # type-check (there are no frontend tests yet)
 ```
@@ -131,6 +137,33 @@ agent moved, a session someone booked, a repository that finished indexing. Post
 (`db/migrations/009_live.sql`), the API streams it to signed-in browsers (`GET /api/live`), and the page reloads that
 part through the normal API, so permissions apply as usual.
 
+## Run with Docker or Kubernetes
+
+Two images, each built from its own Dockerfile, run everywhere the product runs:
+
+| Image | Dockerfile | What it runs |
+|---|---|---|
+| API | [`backend/Dockerfile`](backend/Dockerfile) | The API; with another command, the queue workers, the database migrations and the scheduled calls |
+| Web app | [`frontend/Dockerfile`](frontend/Dockerfile) | The built web app behind nginx, with its Content-Security-Policy and security headers |
+
+Both are multi-stage builds on base images pinned by digest. They run as a non-root user on a read-only filesystem, and
+report their health.
+
+```bash
+docker compose up --build              # the demo in containers: http://localhost:5173, password welcome-wave
+docker compose --profile db up -d db   # Postgres + pgvector for the integration tests
+```
+
+| Where | Release with | Guide |
+|---|---|---|
+| One server | `./scripts/selfhost.sh release` | [docs/ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md) |
+| Kubernetes on GKE: staging, production | `infra/k8s/deploy.sh production --api-image … --web-image …` | [docs/KUBERNETES.md](docs/KUBERNETES.md) |
+| Any Kubernetes cluster, no Google Cloud | `infra/k8s/deploy.sh self-hosted --api-image … --web-image …` | [docs/KUBERNETES.md](docs/KUBERNETES.md#any-cluster) |
+| Cloud Run, with the workers on GKE | the Cloud Build pipeline | [docs/DEPLOY.md](docs/DEPLOY.md) |
+
+On Kubernetes, each release runs the database migrations first and rolls out the new code only if they succeed. To see
+every object a release creates, without a cluster, run `kubectl kustomize infra/k8s/overlays/production`.
+
 ## Architecture
 
 | Layer | What runs there |
@@ -139,7 +172,7 @@ part through the normal API, so permissions apply as usual.
 | Cloud Run `ww-api` | FastAPI: auth (Identity Platform), chat, the onboarding lifecycle, approvals, webhooks; runs the Supervisor for chat and approval resumes |
 | GKE Autopilot | `meeting-worker`, `ingestion-worker`, `review-worker` — one image, scaled by KEDA on Pub/Sub backlog |
 | LangGraph Supervisor | routes every event to one agent, chains agents, pauses for a person's approval, escalates failures |
-| Agents | Today's modules: Ingestion, Project Q&A, Meeting, Task, Review (`backend/app/agents/`). This round they become eight named specialists under the Supervisor ([docs/AGENTS.md](docs/AGENTS.md)). |
+| Agents | Eight specialists: Librarian, Note-taker, Guide, Planner, Scout, Reviewer, Coach and Keeper ([docs/AGENTS.md](docs/AGENTS.md)). |
 | Lifecycle services | Programs, pre-boarding, routing, first task, progress, blockers, check-ins, completion, handovers, reports (`backend/app/lifecycle/`) |
 | Cloud SQL Postgres 16 + pgvector | all app data, embeddings (HNSW), LangGraph checkpoints; row-level security per organisation |
 | Cloud Storage, Pub/Sub, Vertex AI (Gemini), Secret Manager, Cloud Logging/Monitoring | files, events, models, secrets, operations |
@@ -156,13 +189,16 @@ Agents only see the interfaces in `app/ports.py`. In demo mode those are in-memo
 welcome-wave/
 ├── backend/
 │   ├── app/
-│   │   ├── agents/          supervisor.py (LangGraph), qa.py, meeting.py, task.py, review.py, ingestion.py,
-│   │   │                    llm.py (Gemini / offline / off), prompts.py, schemas.py, deps.py
+│   │   ├── agents/          the multi-agent system (its README.md explains the layout):
+│   │   │                    supervisor/ (the LangGraph graph, ask.free, the daily tick),
+│   │   │                    specialists/ (librarian, note_taker, guide, planner, scout, reviewer, coach, keeper:
+│   │   │                    an agent.py each), core/ (llm.py: Gemini / offline / off; the agent loop, roster,
+│   │   │                    prompts, schemas, deps), tools/ (the read-only tools agents call)
 │   │   ├── lifecycle/       templates, enrolment, preboarding, routing, first_task, presubmit, progress, blockers,
 │   │   │                    summaries, feedback, checkins, completion, handover, visibility, reporting, home, clock, flags
 │   │   ├── services/        kt_linker.py ★, knowledge.py, code_tour.py, kt_planner.py, kt_review.py, knowledge_risk.py,
 │   │   │                    scheduling.py, coverage.py, chunking.py, diff.py, codeowners.py, redaction.py, embeddings.py,
-│   │   │                    dashboard.py
+│   │   │                    dashboard.py, documents.py
 │   │   ├── adapters/        memory.py, lifecycle_memory.py (demo/tests); postgres.py, lifecycle_pg.py, audit_store.py;
 │   │   │                    github.py, github_url.py, gcp.py, google_calendar.py, calendly.py
 │   │   ├── api/             routes.py, lifecycle.py, members.py, audit.py, integrations.py, knowledge_risk.py,
@@ -177,14 +213,14 @@ welcome-wave/
 │   │   ├── seed.py          the demo organisation
 │   │   └── main.py          FastAPI app, security headers, request logs
 │   ├── workers/worker.py    Pub/Sub consumer for GKE
-│   ├── db/migrations/       001_init.sql … 013_members.sql (forward-only, forced row-level security)
+│   ├── db/migrations/       001_init.sql … 014_agents.sql (forward-only, forced row-level security)
 │   ├── eval/                golden_set.jsonl, run_eval.py
 │   ├── load/locustfile.py   load test
 │   ├── sample_repo/         small codebase used by the demo and tests
 │   ├── scripts/             check_models.py
 │   └── tests/               services, agents, lifecycle, permissions matrix, Postgres, injection fixtures
 ├── frontend/
-│   ├── src/site/            the landing page and its 3D story (Story.tsx, office/ with three.js)
+│   ├── src/site/            the public site and its cinematic, scroll-driven landing page
 │   ├── src/auth/            sign-in (Firebase, demo accounts)
 │   ├── src/lifecycle/       Home, Setup, Enrol, Team, Program, Reports, Templates, Handovers, People, Audit, Feedback,
 │   │                        Visibility, DemoClock; portal/ (the pre-boarding page)
