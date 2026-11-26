@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.blobs/
+.pytest_cache/
+node_modules/
+dist/
+*.tfstate*
+.terraform/
+*.tsbuildinfo
+infra/terraform/*.tfvars
+!infra/terraform/*.tfvars.example
+selfhost.env
+.data/
+backups/
+# secrets and local settings: never committed (scripts/package.sh leaves them out of a zip too)
+.env.*
+!.env.example
+*.pem
+.ruff_cache/
+.DS_Store

@@ -1,0 +1,30 @@
+digraph G {
+  graph [rankdir=TB, fontname="Carlito", nodesep=0.25, ranksep=0.45, pad=0.2];
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#9aa6c2", fontname="Carlito", fontsize=12, fontcolor="#1d2742", margin="0.14,0.06"];
+  edge [color="#55607a", fontname="Carlito", fontsize=10, fontcolor="#55607a", arrowsize=0.7];
+  start [label="event", shape=circle, width=0.6, fixedsize=true, fillcolor="#edf0f5"];
+  route [label="Supervisor: route\nrules by event type", color="#1d2742", penwidth=1.6];
+  ingest [label="Ingestion agent\nrepo, push, document"];
+  qa [label="Project Q&A agent\ncited answer or\nhand to an expert"];
+  meeting [label="Meeting agent\nnotes + KT links", color="#0b7a75", penwidth=1.6];
+  plan [label="Task agent: plan\n30 days + first PR"];
+  gate1 [label="Manager approves\nor edits the plan", fillcolor="#fff4e0", color="#b7791f", penwidth=1.6];
+  prs [label="Task agent:\nmatch PR to task"];
+  review [label="Review agent\nfindings with evidence"];
+  gate2 [label="Manager decides\napprove or changes", fillcolor="#fff4e0", color="#b7791f", penwidth=1.6];
+  done [label="end", shape=circle, width=0.5, fixedsize=true, fillcolor="#edf0f5"];
+  fail [label="Any agent fails after\n3 retries with backoff", shape=note, fillcolor="#fbe7e5", color="#c8403a"];
+  esc [label="Escalate:\nnotify the manager", fillcolor="#fbe7e5", color="#c8403a"];
+
+  start -> route;
+  route -> ingest [label="repo.*, document.*"];
+  route -> qa [label="chat.question"];
+  route -> meeting [label="meeting.recording_ready"];
+  route -> plan [label="onboarding.started"];
+  route -> prs [label="pr.*"];
+  meeting -> plan [label="action items"];
+  plan -> gate1 -> done;
+  prs -> review [label="code task"]; review -> gate2 -> done;
+  ingest -> done; qa -> done;
+  fail -> esc -> done [color="#c8403a"];
+}

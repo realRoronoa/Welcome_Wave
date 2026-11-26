@@ -1,0 +1,74 @@
+/* Demo sign-in (auth/DemoSignIn.tsx): what the demo adds to the shared entry form (entry.css): the Google button that is
+   off with a tooltip, a quiet note, and the demo accounts and invitations, one row each. Tokens only, so light and dark
+   both follow styles.css; monochrome, since teal only ever means "explained in a KT call". */
+
+/* ---------- Continue with Google, off in the demo ---------- */
+.si-google { position: relative; }
+.en-provider.si-off { cursor: not-allowed; color: var(--ink-soft); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.en-provider.si-off:hover { background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.en-provider.si-off:active { transform: none; }
+.en-provider.si-off svg { filter: grayscale(1); opacity: .55; }
+.si-tip { position: absolute; left: 50%; bottom: calc(100% + 8px); z-index: 5; width: max-content; max-width: min(300px, 92vw); padding: .4rem .6rem;
+  border-radius: var(--radius-s); background: var(--ink); color: var(--surface); font-size: .78rem; font-weight: 500; line-height: 1.35; text-align: center;
+  box-shadow: var(--shadow-m); pointer-events: none; opacity: 0; transform: translate(-50%, 4px); transition: opacity .15s, transform .15s var(--ease); }
+.si-tip::after { content: ""; position: absolute; left: 50%; top: 100%; margin-left: -5px; border: 5px solid transparent; border-top-color: var(--ink); }
+.si-google:hover .si-tip, .si-google:focus-within .si-tip { opacity: 1; transform: translate(-50%, 0); transition-delay: .15s; }
+@media (hover: none) { .si-google:hover .si-tip { opacity: 0; } .si-google:focus-within .si-tip { opacity: 1; } }
+
+/* ---------- messages under the form ---------- */
+.en-form > .si-msg { margin: 1rem 0 0; }
+.si-note { margin: 0; padding: .55rem .8rem; border-radius: var(--radius-s); font-size: .88rem; line-height: 1.45; color: var(--ink-2);
+  background: var(--surface-2); border: 1px solid var(--line); }
+
+/* ---------- demo accounts and invitations: one click fills the form and signs in ---------- */
+.si-demo { margin-top: 1.6rem; }
+.si-demo-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; margin: 0 0 .55rem; }
+.si-demo-head h2 { margin: 0; font-size: .84rem; font-weight: 600; color: var(--ink-2); letter-spacing: -.005em; }
+.si-demo-head span { font: 500 .72rem var(--code); color: var(--ink-soft); text-align: right; }
+.si-demo-head code { font: inherit; color: var(--ink); background: none; padding: 0; border: 0; }
+.si-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: var(--radius-l); overflow: hidden; background: var(--surface); }
+.si-list li + li { border-top: 1px solid var(--line); }
+.si-acct { width: 100%; display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; align-items: center; gap: .75rem; text-align: left;
+  padding: .55rem .8rem; border-radius: 0; background: transparent; color: var(--ink); box-shadow: none; font-weight: 500; transition: background .15s; }
+.si-acct:hover:not(:disabled) { background: var(--surface-2); }
+.si-acct:active:not(:disabled) { transform: none; background: var(--hover); }
+.si-acct:focus-visible { outline-offset: -2px; border-radius: 0; }
+.si-acct:disabled { opacity: .5; cursor: default; background: transparent; }
+.si-acct[aria-busy="true"] { background: var(--surface-2); }
+.si-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-size: .7rem; font-weight: 650; letter-spacing: .02em;
+  color: var(--ink-2); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.si-av.invited { background: transparent; box-shadow: none; border: 1px dashed var(--ink-faint); } /* not a member yet */
+.si-av .en-spin { width: 12px; height: 12px; }
+.si-acct-text { display: grid; min-width: 0; line-height: 1.3; }
+.si-acct-text strong { font-size: .88rem; font-weight: 580; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-acct-text span { font: 400 .74rem var(--code); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.si-role { font-size: .72rem; font-weight: 550; padding: .14rem .5rem; border-radius: 999px; color: var(--ink-2);
+  background: var(--surface-2); border: 1px solid var(--line); white-space: nowrap; }
+.si-acct-go { color: var(--ink-faint); transition: transform .2s var(--ease), color .2s; }
+.si-acct:hover:not(:disabled) .si-acct-go, .si-acct:focus-visible .si-acct-go { color: var(--ink); transform: translateX(2px); }
+.si-accept { font-size: .76rem; font-weight: 600; padding: .22rem .6rem; border-radius: var(--radius-s); color: var(--btn-ink); background: var(--btn); white-space: nowrap; }
+.si-acct:hover:not(:disabled) .si-accept { background: var(--btn-hover); }
+
+/* while the accounts load: three quiet rows of the same height */
+.si-skel { display: grid; grid-template-columns: 30px 1fr; align-items: center; gap: .75rem; padding: .55rem .8rem; height: 49px; box-sizing: border-box; }
+.si-skel span { height: 30px; border-radius: 50%; background: var(--surface-2); animation: si-pulse 1.4s ease-in-out infinite; }
+.si-skel span + span { height: 10px; width: 55%; border-radius: 4px; }
+@keyframes si-pulse { 50% { opacity: .5; } }
+
+/* the narrowest phones: the chevron gives way first, so the name and the role keep their room */
+@media (max-width: 380px) {
+  .si-acct { grid-template-columns: 30px minmax(0, 1fr) auto; }
+  .si-acct .si-acct-go { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .si-tip, .si-acct-go { transition: none; }
+  .si-skel span { animation: none; }
+}
+/* the picker stays short: the other demo accounts unfold under it */
+button.si-more { display: inline-flex; align-items: center; gap: .35rem; margin: .55rem 0 0; padding: .3rem .1rem; background: none; box-shadow: none;
+  color: var(--ink-soft); font-size: .8rem; font-weight: 550; }
+button.si-more:hover { background: none; color: var(--ink); }
+button.si-more:active { transform: none; }
+.si-list li.si-extra { animation: si-unfold .25s var(--ease-out) both; }
+@keyframes si-unfold { from { opacity: 0; transform: translateY(-3px); } }
+@media (prefers-reduced-motion: reduce) { .si-list li.si-extra { animation: none; } }

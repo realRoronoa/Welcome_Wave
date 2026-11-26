@@ -1,0 +1,107 @@
+/* Command palette (src/CommandPalette.tsx). Tokens only, so light and dark themes both work. */
+.pal-layer { position: fixed; inset: 0; z-index: 1200; display: grid; justify-items: center; align-items: start; padding: max(12vh, 64px) 16px 16px; }
+.pal-backdrop { position: absolute; inset: 0; background: color-mix(in srgb, var(--overlay) 75%, transparent); -webkit-backdrop-filter: blur(6px) saturate(1.15); backdrop-filter: blur(6px) saturate(1.15); }
+
+.pal { position: relative; width: min(640px, 100%); max-height: min(560px, 76vh); display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line-strong); border-radius: 16px;
+  box-shadow: var(--shadow-l), 0 2px 8px -2px color-mix(in srgb, var(--ink) 12%, transparent); transform-origin: 50% 0; }
+/* a hairline of ink along the top edge (teal is only for what a KT session explained) */
+.pal::before { content: ""; position: absolute; top: 0; left: 14%; right: 14%; height: 1px; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--ink-soft) 30%, var(--ink-soft) 70%, transparent); opacity: .5; }
+
+/* ---------- the field ---------- */
+.pal-field { display: flex; align-items: center; gap: 12px; height: 58px; padding: 0 12px 0 18px; border-bottom: 1px solid var(--line); flex: none; }
+.pal-search { flex: none; color: var(--ink-faint); transition: color .15s; }
+.pal-field:has(.pal-input:not(:placeholder-shown)) .pal-search { color: var(--ink); }
+.pal .pal-input, .pal .pal-input:hover, .pal .pal-input:focus { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent;
+  box-shadow: none; outline: none; color: var(--ink); font: 450 1.05rem/1.3 var(--ui); letter-spacing: -.008em; }
+.pal-input::placeholder { color: var(--ink-faint); }
+.pal-input::-webkit-search-cancel-button { display: none; }
+.pal button.pal-esc { flex: none; display: inline-flex; align-items: center; padding: 4px; margin: 0; background: none; box-shadow: none; color: var(--ink-soft);
+  border-radius: var(--radius-s); font: 550 .86rem/1 var(--ui); }
+.pal button.pal-esc:hover { background: var(--hover); color: var(--ink); }
+.pal button.pal-esc:active { transform: none; }
+.pal-esc .kbd { cursor: pointer; }
+.pal-cancel { display: none; }
+
+/* ---------- results ---------- */
+.pal-list { position: relative; flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 4px 8px 8px;
+  scrollbar-width: thin; scrollbar-color: var(--scroll) transparent; }
+.pal-list::-webkit-scrollbar { width: 10px; }
+.pal-list::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 999px; border: 3px solid var(--surface); }
+
+/* one highlight that glides between rows instead of each row flashing on and off */
+.pal-glide { position: absolute; top: 0; left: 8px; right: 8px; border-radius: 10px; pointer-events: none; z-index: 0;
+  background: color-mix(in srgb, var(--ink) 6%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 4%, transparent); }
+.pal-glide::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 2px; border-radius: 0 2px 2px 0; background: var(--ink); }
+.pal-glide.anim { transition: transform .14s var(--ease-out), height .14s var(--ease-out); }
+
+.pal-group + .pal-group { margin-top: 2px; }
+.pal-label { padding: 12px 10px 6px; font-size: .68rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-faint); user-select: none; }
+.pal-group-ask .pal-label { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.pal-group-ask { padding: 4px 0; }
+.pal-group-ask:not(:last-child) { border-bottom: 1px solid var(--line); margin: 0 -8px 2px; padding: 4px 8px; }
+
+.pal-item { position: relative; z-index: 1; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 42px;
+  padding: 0 10px 0 12px; border-radius: 10px; color: var(--ink-2); font-size: .92rem; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.pal-item.on { color: var(--ink); }
+.pal-icon { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 8px; color: var(--ink-soft); background: var(--surface-2);
+  border: 1px solid var(--line); transition: color .14s, background .14s, border-color .14s; }
+.pal-item.on .pal-icon { color: var(--ink); background: var(--surface); border-color: var(--line-strong); }
+.pal-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pal-text mark { background: none; color: var(--ink); font-weight: 650; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 3px; }
+.pal-hint { display: inline-flex; align-items: center; gap: 3px; }
+.pal-hint .kbd + .kbd { margin-left: 0; }
+.pal-item .pal-hint .kbd { background: var(--surface-2); }
+.pal-item.on .pal-hint .kbd { background: var(--surface); color: var(--ink-2); }
+
+.pal-item.ask { color: var(--ink-2); }
+.pal-item.ask .pal-icon { color: var(--ink); background: var(--surface); border-color: var(--line-strong); }
+.pal-ask-lead { color: var(--ink-soft); }
+.pal-q { color: var(--ink); font-weight: 550; }
+.pal-item.ask:not(.on) .pal-hint { opacity: .55; }
+
+.pal-empty { display: grid; justify-items: center; gap: 4px; padding: 30px 16px 26px; text-align: center; }
+.pal-empty-mark { margin-bottom: 10px; color: var(--ink-faint); opacity: .7; } /* ui.tsx Logo, still: the list changes with every key */
+.pal-empty-title { margin: 0; font-weight: 600; color: var(--ink); font-size: .95rem; }
+.pal-empty-text { margin: 0; color: var(--ink-soft); font-size: .86rem; }
+
+/* ---------- footer ---------- */
+.pal-foot { flex: none; display: flex; align-items: center; gap: 18px; padding: 9px 16px; border-top: 1px solid var(--line); background: var(--surface-2);
+  font-size: .75rem; color: var(--ink-soft); user-select: none; }
+.pal-legend { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.pal-legend .kbd + .kbd { margin-left: -3px; }
+.pal-legend-ask { margin-left: auto; }
+
+/* ---------- motion ---------- */
+.pal-layer[data-state="open"] .pal-backdrop { animation: pal-fade .14s var(--ease-out) both; }
+.pal-layer[data-state="open"] .pal { animation: pal-in .14s var(--ease-out) both; }
+.pal-layer[data-state="closing"] { pointer-events: none; }
+.pal-layer[data-state="closing"] .pal-backdrop { animation: pal-fade .12s ease-in reverse both; }
+.pal-layer[data-state="closing"] .pal { animation: pal-out .12s ease-in both; }
+@keyframes pal-fade { from { opacity: 0; } }
+@keyframes pal-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } }
+@keyframes pal-out { to { opacity: 0; transform: scale(.98); } }
+
+/* ---------- small screens: a sheet from the top edge, clear of the on-screen keyboard ---------- */
+@media (max-width: 560px) {
+  .pal-layer { padding: 0; }
+  .pal { width: 100%; max-height: 72vh; max-height: 72dvh; border-radius: 0 0 18px 18px; border-width: 0 0 1px; }
+  .pal::before { left: 0; right: 0; }
+  .pal-field { height: 56px; padding: 0 8px 0 16px; }
+  .pal-esc .kbd { display: none; }
+  .pal-cancel { display: inline; color: var(--ink); padding: 6px 6px; }
+  .pal-item { min-height: 46px; }
+  .pal-foot { display: none; }
+  .pal-list { padding-bottom: 10px; }
+  @keyframes pal-in { from { opacity: 0; transform: translateY(-14px); } }
+  @keyframes pal-out { to { opacity: 0; transform: translateY(-14px); } }
+}
+@media (hover: none) and (pointer: coarse) {
+  .pal-hint, .pal-foot { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pal-layer .pal, .pal-layer .pal-backdrop { animation: none !important; }
+  .pal-glide.anim { transition: none; }
+}

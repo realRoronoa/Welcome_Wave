@@ -1,0 +1,25 @@
+project_id      = "welcome-wave-dev"
+env             = "dev"
+region          = "asia-south1"
+alert_email     = "oncall@example.com"
+billing_account = "" # XXXXXX-XXXXXX-XXXXXX to get budget alerts at 50%, 90% and 100%
+domain          = "" # e.g. dev.welcomewave.app ; empty = use run.app URLs
+api_host        = "" # after the first deploy: ww-api-xxxx-el.a.run.app (or the domain)
+github_repo     = "" # owner/name, after connecting the repo to Cloud Build
+
+# Deploy configuration passed to cloudbuild.yaml (none of these are secrets)
+build_substitutions = {
+  _GITHUB_APP_ID          = ""
+  _GITHUB_APP_SLUG        = ""
+  _GITHUB_CLIENT_ID       = ""
+  _GOOGLE_OAUTH_CLIENT_ID = "" # OAuth client (Web application) for Google Calendar + Meet; empty = sessions held elsewhere
+  _PUBLIC_URL             = "" # https://<domain> or the ww-web run.app URL
+  _MODEL_FAST             = "" # generally-available Gemini ids; verify with python -m scripts.check_models
+  _MODEL_SMART            = ""
+  _MODEL_FALLBACK         = ""
+  _API_MIN_INSTANCES      = "0"
+  _SIGNUP_ENABLED         = "true" # "false" = invitation-only
+  _LANGSMITH_TRACING      = "false" # opt-in: "true" sends agent prompts and outputs to LangSmith (docs/SECURITY.md)
+  _LANGSMITH_ENDPOINT     = ""     # EU region: https://eu.api.smith.langchain.com (default: US)
+  # _DB_INSTANCE      = "ww-db-dev-restore"  # only when pointing the services at a restored instance
+}
