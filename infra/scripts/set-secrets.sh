@@ -3,9 +3,10 @@
 # written to disk or shell history) and stored as new versions in Secret Manager.
 #   PROJECT_ID=welcome-wave-dev ./infra/scripts/set-secrets.sh
 #   PROJECT_ID=... ./infra/scripts/set-secrets.sh github-app-private-key=path/to/key.pem calendly-webhook-signing-key=unused  # file or literal
+# smtp-password: the mail server password (with _SMTP_HOST and _SMTP_USER in build_substitutions); Terraform starts it as "unused".
 set -euo pipefail
 : "${PROJECT_ID:?set PROJECT_ID}"
-SECRETS=(github-app-private-key github-webhook-secret github-client-secret google-oauth-client-secret calendly-webhook-signing-key langsmith-api-key)
+SECRETS=(github-app-private-key github-webhook-secret github-client-secret google-oauth-client-secret calendly-webhook-signing-key langsmith-api-key smtp-password)
 
 put() { # name, value-from-stdin
   gcloud secrets versions add "ww-$1" --project "$PROJECT_ID" --data-file=- >/dev/null && echo "  ww-$1 updated"

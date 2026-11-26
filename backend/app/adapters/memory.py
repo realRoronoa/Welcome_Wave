@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import hashlib
+import heapq
 import os
 import threading
 import uuid
@@ -11,17 +12,53 @@ from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 from app import ports
-from app.agents.schemas import Chunk, Hit, KTLink, MeetingResult, ProposedTask, QAResult, ReviewResult
+from app.agents.core.schemas import Chunk, Hit, KTLink, MeetingResult, ProposedTask, QAResult, ReviewResult
 from app.ports import Approval, CodeChunks, Meeting, Onboarding, Project, Repository, ReviewRow, TaskRow, User, link_matches, norm_question
+from app.rag import text as rag_text
+from app.rag.bm25 import BM25
+from app.rag.fuse import rrf
 from app.services.chunking import should_index, split_identifiers
 from app.services.embeddings import Embedder, cosine
 from app.services.kt_linker import CodeRef
 
 RRF_K = 60
+GRID_DEPTH = 50  # search_grid: each channel's list (vector, BM25) before fusion, as search() takes
+
+
+class _Corpus:
+    """One project's non-stale chunks as search_grid reads them: their ids and kinds, an inverted index of the vectors'
+    non-zero dimensions (the hashing embedder's vectors are sparse, so a query touches only the chunks that share one of
+    its dimensions), and BM25 over their tokens. Built lazily and rebuilt when the project's chunks change (`gen`)."""
+
+    __slots__ = ("gen", "ids", "kinds", "vec", "bm25")
+
+    def __init__(self, gen: int, ids: list[str], kinds: list[str], vec: dict[int, list[tuple[int, float]]], bm25: BM25):
+        self.gen, self.ids, self.kinds, self.vec, self.bm25 = gen, ids, kinds, vec, bm25
+
+    def cosines(self, qv: list[float]) -> dict[int, float]:
+        """Chunk number -> its vector's dot product with qv (the cosine: both are unit vectors), for chunks that share a
+        non-zero dimension with it; every other chunk's is 0."""
+        acc: dict[int, float] = {}
+        for d, x in enumerate(qv):
+            if not x:
+                continue
+            for i, y in self.vec.get(d, ()):
+                acc[i] = acc.get(i, 0.0) + x * y
+        return acc
 
 
 def new_id() -> str:
     return uuid.uuid4().hex[:12]
+
+
+def _current_tenant() -> str | None:
+    """The organisation the request runs as (set by app/api/auth.py for every mode), for the few reads that rely on
+    row-level security in Postgres (MemoryStore.org_installations)."""
+    try:
+        from app.adapters.postgres import current_org
+    except ImportError:
+        return None
+    return current_org.get()
 
 
 class MemoryIndex:
@@ -30,6 +67,15 @@ class MemoryIndex:
         self.chunks: dict[str, Chunk] = {}
         self.vectors: dict[str, list[float]] = {}
         self.tokens: dict[str, set[str]] = {}
+        # search_grid's per-project corpora, rebuilt when a project's generation moves (upsert, delete_paths,
+        # delete_document). Each chunk's sparse vector and BM25 term counts are kept with the object they were computed
+        # from, so a replaced chunk or vector is never read through an old entry.
+        self._gens: dict[str, int] = defaultdict(int)
+        self._corpora: dict[str, _Corpus] = {}
+        self._sparse: dict[str, tuple[list[float], dict[int, float]]] = {}
+        self._codemaps: dict[str, tuple[int, dict[str, list[str]], dict[str, list[str]]]] = {}  # _code_map, per generation
+        self._terms: dict[str, tuple[Chunk, dict[str, int]]] = {}
+        self._build = threading.Lock()
 
     def upsert(self, chunks):
         if not chunks:
@@ -38,20 +84,37 @@ class MemoryIndex:
         for c, v in zip(chunks, vecs):
             self.chunks[c.id], self.vectors[c.id] = c, v
             self.tokens[c.id] = set(split_identifiers(c.content + " " + (c.symbol or "")).split())
+        self._changed({c.project_id for c in chunks})
         return len(chunks)
 
     def delete_paths(self, project_id, paths):
         gone = [cid for cid, c in self.chunks.items() if c.project_id == project_id and c.source_type == "code" and c.ref.get("path") in set(paths)]
-        for cid in gone:
-            self.chunks.pop(cid), self.vectors.pop(cid), self.tokens.pop(cid)
+        self._drop(project_id, gone)
         return gone
 
     def delete_document(self, project_id, document_id):
         gone = [cid for cid, c in self.chunks.items() if c.project_id == project_id and c.source_type == "doc"
                 and str(c.ref.get("document_id")) == str(document_id)]
-        for cid in gone:
-            self.chunks.pop(cid), self.vectors.pop(cid), self.tokens.pop(cid)
+        self._drop(project_id, gone)
         return gone
+
+    def delete_meeting(self, project_id, meeting_id):
+        gone = [cid for cid, c in self.chunks.items() if c.project_id == project_id and c.source_type == "meeting"
+                and str(c.ref.get("meeting_id")) == str(meeting_id)]
+        self._drop(project_id, gone)
+        return gone
+
+    def _drop(self, project_id, ids):
+        for cid in ids:
+            self.chunks.pop(cid), self.vectors.pop(cid), self.tokens.pop(cid)
+            self._sparse.pop(cid, None), self._terms.pop(cid, None)
+        if ids:
+            self._changed({project_id})
+
+    def _changed(self, project_ids):
+        """After the chunks changed (never before): a corpus built meanwhile carries the old generation and is rebuilt."""
+        for pid in project_ids:
+            self._gens[pid] += 1
 
     def _pool(self, project_id, source_types):
         return [c for c in self.chunks.values() if c.project_id == project_id and not c.stale and (not source_types or c.source_type in source_types)]
@@ -81,21 +144,157 @@ class MemoryIndex:
         best = sorted(fused, key=fused.get, reverse=True)[:k]
         return [Hit(chunk=self.chunks[cid], score=fused[cid], similarity=max(0.0, sims[cid])) for cid in best]
 
+    # --- search_grid: the research crew's batched retrieval (app/rag, docs/specs/rag-crew.md) ---
+    def search_grid(self, project_id, queries, kinds, k, semantic=True):
+        """For each query, for each kind, the top k[kind] hybrid hits: the vector list and a BM25 keyword list (top
+        GRID_DEPTH each) fused by RRF. One embedding call for every query. Every Hit.similarity is the cosine to
+        queries[0], the question as asked (the retrieval gate's evidence), whichever query found the hit.
+        semantic=False: the keyword list alone, no embedding call, every similarity 0.0 (the crew's fallback when the query
+        embedding fails). A kind that is not a source type has no hits."""
+        if not queries:
+            return []
+        corpus = self._corpus(project_id)
+        vecs = self.embedder.embed(list(queries), "query") if semantic else [None] * len(queries)
+        want = list(dict.fromkeys(kinds))
+        anchor: dict[int, float] = {}
+        out = []
+        for qi, (query, qv) in enumerate(zip(queries, vecs)):
+            sims = corpus.cosines(qv) if qv is not None else {}
+            if qi == 0:
+                anchor = sims
+            vec_by_kind = self._by_kind(sims, corpus, want)
+            kw_by_kind = self._by_kind(corpus.bm25.scores(rag_text.index_terms(query)), corpus, want)
+            row = {}
+            for kind in want:
+                live: dict[int, Chunk] = {}
+                vec_rank = self._best(project_id, corpus, vec_by_kind[kind], kind, live)
+                kw_rank = self._best(project_id, corpus, kw_by_kind[kind], kind, live)
+                fused = rrf([(vec_rank, 1.0), (kw_rank, 1.0)], RRF_K)
+                best = sorted(fused, key=lambda i: (-fused[i], i))[: max(0, int(k.get(kind, 8)))]
+                row[kind] = [Hit(chunk=live[i], score=fused[i], similarity=max(0.0, anchor.get(i, 0.0))) for i in best]
+            out.append(row)
+        return out
+
+    @staticmethod
+    def _by_kind(scores: dict[int, float], corpus, kinds: list[str]) -> dict[str, list[tuple[float, int]]]:
+        """One pass over a channel's scores: (-score, chunk number) per wanted kind, positive scores only."""
+        out: dict[str, list[tuple[float, int]]] = {kd: [] for kd in kinds}
+        ck = corpus.kinds
+        for i, x in scores.items():
+            if x > 0:
+                bucket = out.get(ck[i])
+                if bucket is not None:
+                    bucket.append((-x, i))
+        return out
+
+    def _best(self, project_id, corpus, scored: list[tuple[float, int]], kind: str, live: dict) -> list[int]:
+        """The GRID_DEPTH best chunk numbers of one kind (best score first, ties by number), skipping any chunk that went
+        stale or was deleted since the corpus was built (search() leaves stale chunks out the same way). `live` collects
+        the chunks. Only the top of the list is sorted (a heap), widened while stale chunks leave it short."""
+        out: list[int] = []
+        n = GRID_DEPTH * 2
+        while True:
+            top = heapq.nsmallest(n, scored) if len(scored) > n else sorted(scored)
+            out.clear()
+            for _, i in top:
+                c = self.chunks.get(corpus.ids[i])
+                if c is None or c.stale or c.project_id != project_id or c.source_type != kind:
+                    continue
+                live[i] = c
+                out.append(i)
+                if len(out) == GRID_DEPTH:
+                    return out
+            if len(top) == len(scored):
+                return out
+            n *= 4
+
+    def _corpus(self, project_id) -> _Corpus:
+        gen = self._gens[project_id]
+        built = self._corpora.get(project_id)
+        if built is not None and built.gen == gen:
+            return built
+        with self._build:
+            built = self._corpora.get(project_id)
+            if built is not None and built.gen == gen:
+                return built
+            ids, kinds, docs = [], [], []
+            vec: dict[int, list[tuple[int, float]]] = {}
+            for cid, c in list(self.chunks.items()):
+                if c.project_id != project_id or c.stale:
+                    continue
+                v = self.vectors.get(cid)
+                if v is None:
+                    continue
+                i = len(ids)
+                ids.append(cid)
+                kinds.append(c.source_type)
+                sp = self._sparse.get(cid)
+                if sp is None or sp[0] is not v:
+                    sp = (v, {d: x for d, x in enumerate(v) if x})
+                    self._sparse[cid] = sp
+                for d, x in sp[1].items():
+                    vec.setdefault(d, []).append((i, x))
+                tm = self._terms.get(cid)
+                if tm is None or tm[0] is not c:
+                    counts: dict[str, int] = {}
+                    for t in rag_text.index_terms(c.content + " " + (c.symbol or "")):
+                        counts[t] = counts.get(t, 0) + 1
+                    tm = (c, counts)
+                    self._terms[cid] = tm
+                docs.append(tm[1])
+            built = _Corpus(gen, ids, kinds, vec, BM25(docs))
+            self._corpora[project_id] = built
+            return built
+
     # --- CodeIndex for the KT linker ---
     def _code(self, project_id):
         return [c for c in self.chunks.values() if c.project_id == project_id and c.source_type == "code"]
 
+    def _code_map(self, project_id) -> tuple[dict[str, list[str]], dict[str, list[str]]]:
+        """The project's code chunk ids by path (line order) and by symbol (path, then line order), built once per
+        generation, as the corpus is: file_chunks, symbols_named and symbols_in read a few ids instead of every chunk. Each
+        id is looked up again when read, so a chunk marked stale in place is seen as it is now."""
+        gen = self._gens[project_id]
+        built = self._codemaps.get(project_id)
+        if built is not None and built[0] == gen:
+            return built[1], built[2]
+        with self._build:
+            built = self._codemaps.get(project_id)
+            if built is not None and built[0] == gen:
+                return built[1], built[2]
+            code = sorted(self._code(project_id), key=lambda c: (c.ref["path"], c.ref.get("start_line") or 0, c.id))
+            by_path: dict[str, list[str]] = {}
+            by_name: dict[str, list[str]] = {}
+            for c in code:
+                by_path.setdefault(c.ref["path"], []).append(c.id)
+                if c.symbol:
+                    by_name.setdefault(c.symbol, []).append(c.id)
+            self._codemaps[project_id] = (gen, by_path, by_name)
+            return by_path, by_name
+
+    def _mapped(self, project_id, ids, path=None, symbol=None) -> list[Chunk]:
+        out = []
+        for cid in ids:
+            c = self.chunks.get(cid)
+            if c is None or c.project_id != project_id or c.source_type != "code":
+                continue
+            if (path is not None and c.ref.get("path") != path) or (symbol is not None and c.symbol != symbol):
+                continue
+            out.append(c)
+        return out
+
     def all_paths(self, project_id):
-        return sorted({c.ref["path"] for c in self._code(project_id)})
+        return sorted(self._code_map(project_id)[0])
 
     def _ref(self, c: Chunk) -> CodeRef:
         return CodeRef(path=c.ref["path"], symbol=c.symbol, start_line=c.ref.get("start_line"), end_line=c.ref.get("end_line"), chunk_id=c.id)
 
     def symbols_named(self, project_id, name):
-        return [self._ref(c) for c in self._code(project_id) if c.symbol == name]
+        """In one order whatever the history of the index: by path (code point), then start line (PgIndex the same)."""
+        return [self._ref(c) for c in self._mapped(project_id, self._code_map(project_id)[1].get(name, ()), symbol=name)]
 
     def symbols_in(self, project_id, path):
-        return [self._ref(c) for c in self._code(project_id) if c.ref["path"] == path and c.symbol]
+        return [self._ref(c) for c in self._mapped(project_id, self._code_map(project_id)[0].get(path, ()), path=path) if c.symbol]
 
     def semantic_code(self, project_id, text, k=3):
         return [(self._ref(h.chunk), h.similarity) for h in self.search(project_id, text, k, ["code"])]
@@ -111,7 +310,7 @@ class MemoryIndex:
         return CodeChunks((c if content else c.model_copy(update={"content": ""}) for c in live[:kept]), truncated=kept < len(live))
 
     def file_chunks(self, project_id, path):
-        return sorted((c for c in self._code(project_id) if c.ref.get("path") == path and not c.stale),
+        return sorted((c for c in self._mapped(project_id, self._code_map(project_id)[0].get(path, ()), path=path) if not c.stale),
                       key=lambda c: c.ref.get("start_line") or 0)
 
     def code_version(self, project_id):
@@ -150,6 +349,7 @@ class MemoryStore:
         self.invites: dict[str, dict] = {}
         self.installations: dict[str, dict] = {}
         self.audit_rows: list[dict] = []
+        self.legal_rows: list[dict] = []  # legal acceptances (app/legal.py): appended, never changed or removed
         self.approval_claims: set[str] = set()
         self.installation_senders: dict[str, dict] = {}
         self.org_created: dict[str, date] = {}
@@ -252,6 +452,14 @@ class MemoryStore:
     def add_kt_links(self, project_id, links):
         keep = [l for l in self.links[project_id] if l.meeting_id not in {x.meeting_id for x in links}]
         self.links[project_id] = keep + list(links)
+
+    def erase_meeting_content(self, meeting_id):
+        m = self.meetings.get(meeting_id)
+        if m is None:
+            return
+        self.notes.pop(meeting_id, None)
+        self.links[m.project_id] = [l for l in self.links[m.project_id] if l.meeting_id != meeting_id]
+        self.update_meeting(meeting_id, recording_uri=None, summary=None, status="ended", transcript_source=None)
 
     def kt_links(self, project_id, path=None, chunk_ids=None):
         out = self.links[project_id]
@@ -772,6 +980,49 @@ class MemoryStore:
     def set_member_status(self, org_id, user_id, status):
         return self._change_member(org_id, user_id, status=status)
 
+    def find_person(self, org_id, email):
+        return next((u for u in self.users.values() if u.org_id == org_id and u.email.lower() == email.strip().lower()), None)
+
+    def erase_person(self, org_id, user_id):
+        user = self.users.get(user_id)
+        if user is None or user.org_id != org_id:
+            return {}
+        email = user.email.lower()
+        chats = [k for k, m in self.chats.items() if m["user_id"] == user_id]
+        asked = [k for k, r in self.expert_requests.items() if r.get("asked_by") == user_id]
+        for k in chats:
+            del self.chats[k]
+        for k in asked:
+            del self.expert_requests[k]
+        before = len(self.notifications)
+        self.notifications = [n for n in self.notifications if n["user_id"] != user_id]
+        links = [k for k in self.sched_links if k[0] == user_id]
+        for k in links:
+            del self.sched_links[k]
+        invites = [k for k, i in self.invites.items() if i["org_id"] == org_id and i["email"] == email]
+        for k in invites:
+            del self.invites[k]
+        self.firebase = {uid: u for uid, u in self.firebase.items() if u != user_id}
+        self.left.add(user_id)
+        for members in self.project_members.values():
+            members.discard(user_id)
+        # the reasons they wrote when asking for a recording to be removed are their own words: blanked, the rows stay
+        reasons = [r for r in self.__dict__.get("recording_removal_rows", {}).values()
+                   if r.get("org_id") == org_id and r.get("requested_by") == user_id and r.get("reason")]
+        for r in reasons:
+            r["reason"] = ""
+        self.users[user_id] = user.model_copy(update={"name": "Erased person", "email": f"erased-{user_id}@erased.invalid",
+                                                      "github_login": None, "status": "deactivated"})
+        return {"chat_messages": len(chats), "expert_requests": len(asked), "notifications": before - len(self.notifications),
+                "scheduling_links": len(links), "invitations": len(invites), "recording_removal_reasons": len(reasons)}
+
+    def set_github_login(self, org_id, user_id, login):
+        user = self.users.get(user_id)
+        if user is None or user.org_id != org_id:
+            return None
+        self.users[user_id] = user.model_copy(update={"github_login": login})
+        return self.users[user_id]
+
     # ---- documents ----
     def documents(self, project_id):
         return [d for d in self.document_rows.values() if d["project_id"] == project_id]
@@ -820,6 +1071,23 @@ class MemoryStore:
     def audit(self, org_id, actor_id, action, target, detail=None):
         self.audit_rows.append({"org_id": org_id, "actor_id": actor_id, "action": action, "target": target, "detail": detail or {}})
 
+    # ---- legal acceptances (append-only, as in 019_legal.sql) ----
+    def record_legal_acceptance(self, org_id, user_id, document, version, method, ip_prefix=None, user_agent=None, at=None):
+        with self._guard:
+            for r in self.legal_rows:
+                if r["document"] == document and r["version"] == version and (
+                        r["org_id"] == org_id if document == "dpa" else r["user_id"] == user_id):
+                    return None
+            row = {"id": len(self.legal_rows) + 1, "org_id": org_id, "user_id": user_id, "document": document, "version": version,
+                   "method": method, "accepted_at": at or datetime.now(timezone.utc), "ip_prefix": ip_prefix, "user_agent": user_agent}
+            self.legal_rows.append(row)
+            return dict(row)
+
+    def legal_acceptances(self, org_id, user_id=None, document=None):
+        rows = [dict(r) for r in self.legal_rows if r["org_id"] == org_id and (user_id is None or r["user_id"] == user_id)
+                and (document is None or r["document"] == document)]
+        return sorted(rows, key=lambda r: (r["accepted_at"], r["id"]), reverse=True)
+
     # ---- installations and pre-tenant lookups ----
     def record_installation_sender(self, installation_id, sender_id, sender_login, account_login):
         self.installation_senders[str(installation_id)] = {"sender_id": int(sender_id), "sender_login": sender_login, "account_login": account_login}
@@ -832,7 +1100,15 @@ class MemoryStore:
         self.installation_senders.pop(str(installation_id), None)
 
     def org_installations(self):
-        return [{"installation_id": k, "account_login": v["account"]} for k, v in self.installations.items()]
+        """The calling organisation's installations only, as row-level security gives Postgres: the tenant the request set
+        (app/api/auth.py _set_tenant). No tenant set: none."""
+        org = _current_tenant()
+        return [{"installation_id": k, "account_login": v["account"]} for k, v in self.installations.items()
+                if org is not None and v["org_id"] == org]
+
+    def organization_exists(self):
+        """Any organisation at all (a self-hosted server lets sign-up create only the first one)."""
+        return bool(self.orgs)
 
     def installation_org(self, installation_id):
         return (self.installations.get(installation_id) or {}).get("org_id")
@@ -1060,6 +1336,7 @@ class MemoryScheduler:
         self.events: dict[str, ports.CalendarEvent] = {}
         self.cancelled: list[str] = []
         self.recordings: dict[str, tuple[ports.RecordingFile, bytes]] = {}  # event id -> (file, bytes)
+        self.transcripts: dict[str, str] = {}  # event id -> the transcript text Meet saved beside the recording
         self._lock = threading.Lock()
 
     @staticmethod
@@ -1082,6 +1359,21 @@ class MemoryScheduler:
     def add_recording(self, event_id: str, data: bytes, duration_s: float | None = None, mime: str = "video/mp4"):
         self.recordings[event_id] = (ports.RecordingFile(file_id=f"file-{event_id}", name="Recording.mp4", mime=mime,
                                                          duration_s=duration_s, size=len(data)), data)
+
+    def add_transcript(self, event_id: str, text: str):
+        """Tests: Meet saved this transcript beside the recording of the event."""
+        self.transcripts[event_id] = text
+
+    def find_transcript(self, event_id):
+        return ports.TranscriptFile(file_id=f"transcript-{event_id}", name="Transcript") if event_id in self.transcripts else None
+
+    def fetch_transcript(self, file, max_bytes):
+        text = next((t for e, t in self.transcripts.items() if f"transcript-{e}" == file.file_id), None)
+        if text is None:
+            raise ports.RecordingNotShared()
+        if len(text.encode()) > max_bytes:
+            raise ValueError("The transcript is larger than the limit")
+        return text
 
     def find_recording(self, event_id):
         if event_id in self.recordings:

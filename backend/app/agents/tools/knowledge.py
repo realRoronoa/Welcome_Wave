@@ -1,4 +1,8 @@
-"""Knowledge tools: hybrid search, reading a file, finding a symbol, and verified answers. Read-only; see __init__."""
+"""Knowledge tools: the research crew's search, reading a file, finding a symbol, and verified answers. Read-only; see __init__.
+
+search_knowledge runs the crew's rules (app/rag/crew.search: the query's plan, every kind in one batched pass, the names it
+gives looked up exactly, fused and ranked), never a model: the agent calling it is the one thinking. Each result's similarity
+is its cosine to the query as given."""
 from __future__ import annotations
 
 import posixpath
@@ -7,8 +11,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.agents.runtime import REGISTRY, ToolCtx, ToolResult, untrusted
-from app.agents.schemas import Chunk
+from app.agents.core.runtime import REGISTRY, ToolCtx, ToolResult, untrusted
+from app.agents.core.schemas import Chunk
+from app.rag import crew
 from app.services.chunking import _chunk_id
 
 KINDS = {"code": "code", "doc": "doc", "kt": "meeting", "verified": "verified_answer"}
@@ -30,12 +35,13 @@ class SearchArgs(BaseModel):
         default_factory=list, description="Only these kinds of source (kt: recorded KT sessions). Empty: all of them")
 
 
-@REGISTRY.tool("search_knowledge", "Hybrid (semantic and keyword) search over the project's code, documents, recorded KT sessions and "
-               "verified answers. Returns numbered sources [n] you can cite. Search again with other words, or narrower, when "
-               "the results miss.", SearchArgs, label="Searched the knowledge base")
+@REGISTRY.tool("search_knowledge", "Search the project's code, documents, recorded KT sessions and verified answers: several "
+               "searches in the project's own words (semantic and keyword), the files and functions the query names looked up "
+               "exactly, ranked best first. Returns numbered sources [n] you can cite. Search again with other words, or "
+               "narrower, when the results miss.", SearchArgs, label="Searched the knowledge base")
 def search_knowledge(ctx: ToolCtx, args: SearchArgs) -> ToolResult:
     kinds = list(dict.fromkeys(args.kinds))
-    hits = ctx.deps.index.search(ctx.project_id, args.query, k=args.k, source_types=[KINDS[k] for k in kinds] or None)
+    hits = crew.search(ctx.deps, ctx.project_id, args.query, k=args.k, kinds=[KINDS[k] for k in kinds] or None)
     known = {e.chunk.id for e in ctx.evidence}
     rows, sources = [], []
     for h in hits:
@@ -115,6 +121,7 @@ def read_file(ctx: ToolCtx, args: ReadArgs) -> ToolResult:
                   ref={"path": path, "start_line": start, "end_line": end, "commit": commit, "language": (chunks[0].ref.get("language") if chunks else "")},
                   content=f"File: {path} (lines {start}-{end})\n" + "\n".join(body))
     n = ctx.cite(chunk)
+    ctx.notes.setdefault("opened", set()).add(n)  # the Guide opened this source itself (guide._waived_how)
     numbered = "\n".join(f"{i:>5} | {t}" for i, t in zip(range(start, end + 1), body))
     more = {"more": f"The file goes on to line {last}: read from {end + 1}."} if end < last else {}
     where = f"{path} · L{start}–{end}"
@@ -140,6 +147,7 @@ def find_symbol(ctx: ToolCtx, args: SymbolArgs) -> ToolResult:
             continue
         seen.add(chunk.id)
         n = ctx.cite(chunk)
+        ctx.notes.setdefault("opened", set()).add(n)  # the Guide opened this source itself (guide._waived_how)
         sources.append(ctx.evidence[n - 1].source)
         defs.append({"n": n, "source": ctx.evidence[n - 1].source.label, "text": chunk.content[:SNIPPET]})
     word = re.compile(rf"\b{re.escape(name)}\b")
@@ -180,15 +188,20 @@ def verified_answers(ctx: ToolCtx, args: VerifiedArgs) -> ToolResult:
               for r in store.answered_requests(ctx.project_id) if r.get("answer")]
     rows, sources, seen = [], [], set()
     shown = ctx.notes.setdefault("related", {})
-    for kind, rid, q, a, question in sorted(cands, key=lambda c: -routing.similarity(args.query, c[2]))[:5]:
-        sim = routing.similarity(args.query, q)
+
+    def sim_of(c) -> float:  # like its question, or like the question with its answer ("how are swaps agreed?")
+        return max(routing.similarity(args.query, c[2]), routing.similarity(args.query, f"{c[2]} {c[3]}"))
+
+    for (kind, rid, q, a, question), sim in sorted(((c, sim_of(c)) for c in cands), key=lambda x: -x[1])[:5]:
         if sim < MIN_SHOWN or routing.norm_question(q) in seen:
             continue
         seen.add(routing.norm_question(q))
-        item = {"kind": kind, "id": rid, "question": question, "answer": a, "similarity": round(sim, 2)}
+        # tier 2 (guide._related) reads the similarity of the questions alone: an answer that shares words is a source to cite
+        item = {"kind": kind, "id": rid, "question": question, "answer": a, "similarity": round(routing.similarity(args.query, q), 2)}
         cid = routing._chunk_id(item, answers)
         ref = {"question": question, **({"verified_answer_id": rid} if kind == "verified_answer" else {"request_id": rid})}
-        n = ctx.cite(Chunk(id=cid, project_id=ctx.project_id, source_type="verified_answer", ref=ref, content=f"Q: {question}\nA: {a}"), sim)
+        n = ctx.cite(Chunk(id=cid, project_id=ctx.project_id, source_type="verified_answer", ref=ref,
+                             content=f"Q: {question}\nA (verified): {a}"), sim)
         shown[rid] = {**item, "n": n}
         sources.append(ctx.evidence[n - 1].source)
         rows.append({"n": n, "id": rid, "question": question, "answer": a[:SNIPPET], "similarity": round(sim, 2)})

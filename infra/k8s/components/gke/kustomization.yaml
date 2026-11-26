@@ -1,0 +1,65 @@
+# Google Kubernetes Engine (Autopilot or Standard): what the base needs to run on the Google Cloud project Terraform
+# created (infra/terraform), with no key files anywhere.
+#
+#   Workload Identity  each Kubernetes service account acts as its own Google service account (ww-api, ww-worker,
+#                      ww-migrate, ww-scheduler). Their domain is taken from OUTBOX_FLUSH_INVOKER in the overlay's settings.
+#   Cloud SQL          the Cloud SQL Auth Proxy as a native sidecar (it starts before the app and stops after it), IAM-
+#                      authorised and encrypted: a Unix socket for the API and the migration (the same URLs Cloud Run uses,
+#                      ww-database-url and ww-database-url-owner), 127.0.0.1:5432 for the workers (ww-database-url-proxy).
+#   KEDA               scales each worker on its Pub/Sub backlog, the meeting and ingestion workers down to zero.
+#   Ingress            Google's HTTPS load balancer: a Google-managed certificate for PUBLIC_URL's host, HTTP redirected to
+#                      HTTPS, hour-long live-update streams, cookie affinity for the API, request logs sampled at 20 %.
+#   Network policies   the front doors accept only Google's front ends; Workload Identity's metadata server and Cloud SQL
+#                      are reachable.
+#
+# Include it after the overlay's settings and components/public-url. docs/KUBERNETES.md lists the one-time setup (the
+# Workload Identity bindings, KEDA, the static IP address).
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - ingress.yaml
+  - keda.yaml
+  - networkpolicies.yaml
+
+patches:
+  - path: workload-identity.yaml
+  - path: services.yaml
+  - path: front-doors.yaml
+  - path: ingress-patch.yaml
+  - target: { kind: Ingress, name: welcome-wave }
+    patch: |-
+      - op: remove
+        path: /spec/tls
+  # The API and the migration reach Cloud SQL through a Unix socket in /cloudsql
+  - target: { group: apps, kind: Deployment, name: ^api$ }
+    path: cloud-sql-socket.yaml
+  - target: { group: batch, kind: Job, name: ^migrate$ }
+    path: cloud-sql-socket.yaml
+  # The workers through 127.0.0.1:5432
+  - target: { group: apps, kind: Deployment, name: ^(meeting|ingestion|review)-worker$ }
+    path: cloud-sql-tcp.yaml
+
+replacements:
+  # ww-scheduler@<project>.iam.gserviceaccount.com -> every workload's Google service account in the same project
+  - source:
+      kind: ConfigMap
+      name: ww-config
+      fieldPath: data.OUTBOX_FLUSH_INVOKER
+      options: { delimiter: "@", index: 1 }
+    targets:
+      - select: { kind: ServiceAccount }
+        reject:
+          - { kind: ServiceAccount, name: web }
+        fieldPaths:
+          - metadata.annotations.[iam.gke.io/gcp-service-account]
+        options: { delimiter: "@", index: 1 }
+  # https://<host> -> the managed certificate's domain
+  - source:
+      kind: ConfigMap
+      name: ww-config
+      fieldPath: data.PUBLIC_URL
+      options: { delimiter: "/", index: 2 }
+    targets:
+      - select: { kind: ManagedCertificate, name: ww-web }
+        fieldPaths: [spec.domains.0]

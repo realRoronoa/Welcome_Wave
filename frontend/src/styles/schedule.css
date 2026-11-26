@@ -1,0 +1,147 @@
+/* KT sessions and their scheduling (pages/schedule.tsx, Meetings.tsx, settings/Integrations.tsx).
+   Monochrome: ink on the canvas, hairlines, generous space. Teal stays for KT meaning (notes ready) and focus. */
+
+/* ---------------------------------------------------------------- the KT sessions page */
+.sc-page-head .sc-new { flex: none; }
+.sc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .65rem; }
+.sc-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1rem 1.35rem; padding: 1.05rem 1.2rem;
+  border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface); transition: border-color .15s, box-shadow .2s var(--ease); }
+.sc-row:hover { border-color: var(--line-strong); box-shadow: var(--shadow-s); }
+.sc-row.here { outline: 2px solid var(--ink-soft); outline-offset: 3px; }
+.sc-date { display: grid; place-items: center; align-content: center; width: 50px; height: 54px; border-radius: 11px; line-height: 1;
+  color: var(--ink-2); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.sc-date b { font-size: 1.28rem; font-weight: 650; letter-spacing: -.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.sc-date small { margin-top: .28rem; font-size: .64rem; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.sc-row.p-now .sc-date { background: var(--btn); box-shadow: none; }
+.sc-row.p-now .sc-date b, .sc-row.p-now .sc-date small { color: var(--btn-ink); }
+.sc-row.p-cancelled { background: var(--surface-2); }
+.sc-row.p-cancelled .sc-title { color: var(--ink-soft); text-decoration: line-through; text-decoration-color: var(--ink-faint); }
+.sc-main { display: grid; gap: .32rem; min-width: 0; }
+.sc-title { justify-self: start; color: var(--ink); font-weight: 600; font-size: 1rem; letter-spacing: -.012em; text-decoration: none; overflow-wrap: anywhere; }
+.sc-title:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+.sc-meta { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; margin: 0; color: var(--ink-soft); font-size: .84rem; }
+.sc-dot { color: var(--ink-muted); }
+.sc-faces { display: inline-flex; align-items: center; margin-left: .35rem; }
+.sc-faces .dp-avatar { font-size: 8.5px !important; }
+.sc-faces .dp-avatar + .dp-avatar { margin-left: -6px; box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 2px var(--surface); }
+.sc-more { margin-left: .35rem; font-size: .76rem; color: var(--ink-soft); }
+.sc-side { display: grid; justify-items: end; gap: .6rem; min-width: 0; }
+.sc-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; align-items: center; gap: .4rem; }
+.sc-actions .dp-btn { margin: 0; } /* button.small's global margin-left would push the first button of a line off its edge */
+.sc-actions .dp-upload { flex-basis: 100%; }
+.sc-actions .dp-upload-error { flex-basis: 100%; text-align: left; }
+.sc-join { white-space: nowrap; }
+.sc-join .sc-ext { opacity: .6; margin-left: -.1rem; }
+@media (max-width: 760px) {
+  .sc-row { grid-template-columns: auto minmax(0, 1fr); padding: .95rem; gap: .85rem .9rem; }
+  .sc-date { width: 44px; height: 48px; border-radius: 10px; }
+  .sc-date b { font-size: 1.12rem; }
+  .sc-dot { display: none; } /* the meta line wraps: a dot would hang at a line's end */
+  .sc-side { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: .55rem; }
+  .sc-actions { justify-content: flex-start; flex: 1 1 auto; }
+}
+
+/* ---------------------------------------------------------------- the schedule dialog */
+.sc-dialog { width: min(560px, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); margin: auto; padding: 0; overflow: auto; overscroll-behavior: contain;
+  border: 1px solid var(--line); border-radius: 18px; background: var(--surface); color: var(--ink); box-shadow: var(--shadow-l); }
+.sc-dialog::backdrop { background: var(--overlay); backdrop-filter: blur(3px); }
+.sc-dialog[open] { animation: sc-in .24s var(--ease-out) both; }
+@keyframes sc-in { from { opacity: 0; transform: translateY(8px) scale(.985); } }
+.sc-form { display: grid; gap: 1.5rem; padding: 1.75rem 1.75rem 1.5rem; }
+.sc-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
+.sc-head h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -.02em; }
+button.sc-x { display: grid; place-items: center; padding: .4rem; margin: -.4rem -.4rem -.4rem 0; border-radius: 9px; background: none; box-shadow: none; color: var(--ink-soft); }
+button.sc-x:hover { background: var(--hover); color: var(--ink); }
+.sc-form fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
+.sc-form legend { margin-bottom: .55rem; padding: 0; font-weight: 550; font-size: .84rem; color: var(--ink-2); }
+.sc-form .error { margin: 0; }
+
+.sc-seg { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .3rem; padding: .3rem; border-radius: 13px; background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line); }
+.sc-seg-opt { position: relative; display: flex; align-items: center; gap: .55rem; min-width: 0; padding: .62rem .75rem; border-radius: 10px; cursor: pointer;
+  color: var(--ink-2); font-size: .88rem; font-weight: 550; transition: background .15s, box-shadow .15s, color .15s; }
+.sc-seg-opt input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: inherit; }
+.sc-seg-opt svg { flex: none; color: var(--ink-soft); }
+.sc-seg-opt:hover:not(.off):not(.on) { color: var(--ink); }
+.sc-seg-opt.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-s), inset 0 0 0 1px var(--line-strong); }
+.sc-seg-opt.on svg { color: var(--ink); }
+.sc-seg-opt.off { cursor: not-allowed; color: var(--ink-muted); }
+.sc-seg-opt.off svg { color: var(--ink-muted); }
+.sc-seg-opt:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 1px; }
+.sc-seg-text { display: grid; min-width: 0; line-height: 1.2; }
+.sc-seg-text > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-seg-text small { margin-top: .1rem; font-size: .7rem; font-weight: 450; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sc-fixed { margin: 0; padding: .8rem .95rem; border-radius: 11px; background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line);
+  font-weight: 600; font-size: .98rem; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.sc-when { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr); gap: .8rem; }
+.sc-form .field > span:first-child em { font-style: normal; font-weight: 450; color: var(--ink-muted); margin-left: .3rem; }
+
+.sc-chips { display: flex; flex-wrap: wrap; gap: .5rem; }
+.sc-chip, button.sc-chip { position: relative; display: inline-flex; align-items: center; gap: .45rem; margin: 0; padding: .28rem .75rem .28rem .3rem; border-radius: 999px;
+  background: var(--surface); color: var(--ink-2); font: inherit; font-size: .86rem; font-weight: 500; box-shadow: inset 0 0 0 1px var(--line-strong);
+  cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; }
+.sc-chip:hover, button.sc-chip:hover { background: var(--hover); color: var(--ink); }
+.sc-chip.on, button.sc-chip.on, .sc-chip.on:hover, button.sc-chip.on:hover { background: var(--btn); color: var(--btn-ink); box-shadow: none; }
+.sc-chip.on .dp-avatar { background: transparent; color: inherit; box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--btn-ink) 35%, transparent); }
+.sc-chip.locked { cursor: default; }
+.sc-chip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.sc-chip:has(input:focus-visible) { outline: 2px solid var(--focus); outline-offset: 2px; }
+.sc-chip .dp-avatar { font-size: 8.5px !important; }
+.sc-chip-tick { margin-left: -.1rem; }
+.sc-quiet { margin: .7rem 0 0; font-size: .82rem; color: var(--ink-soft); }
+
+.sc-foot { display: flex; justify-content: flex-end; align-items: center; gap: .5rem; padding-top: .35rem; }
+.sc-foot .dp-btn { padding: .6rem 1.05rem; }
+.sc-spin { display: inline-block; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin .8s linear infinite; }
+
+@media (max-width: 560px) {
+  .sc-form { padding: 1.35rem 1.2rem 1.2rem; gap: 1.3rem; }
+  .sc-seg-opt { flex-direction: column; justify-content: center; gap: .3rem; padding: .6rem .35rem; text-align: center; }
+  .sc-seg-text { justify-items: center; }
+  .sc-when { grid-template-columns: 1fr 1fr; }
+  .sc-when > :first-child { grid-column: 1 / -1; }
+  .sc-foot .dp-btn { flex: 1; }
+}
+
+/* ---------------------------------------------------------------- Settings -> Integrations */
+.sc-facts { list-style: none; display: grid; gap: 1rem; margin: 0; padding: 0; }
+.sc-facts li { display: flex; align-items: center; gap: .85rem; color: var(--ink-2); font-size: .92rem; }
+.sc-fact-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; color: var(--ink-2);
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.sc-int { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem 1.1rem; }
+.sc-int-mark { flex: none; display: grid; place-items: center; width: 46px; height: 46px; border-radius: 12px; color: var(--ink);
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+.sc-int-text { flex: 1 1 220px; min-width: 0; display: grid; gap: .2rem; }
+.sc-int-name { margin: 0; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+.sc-state { display: inline-flex; align-items: center; gap: .45rem; margin: 0; font-size: .84rem; color: var(--ink-soft); }
+.sc-state i { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--line-strong); }
+.sc-state.on i { background: var(--ink); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ink) 12%, transparent); }
+.sc-int-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.sc-link-form { display: flex; gap: .6rem; align-items: flex-end; flex-wrap: wrap; max-width: 620px; }
+.sc-link-form .field { flex: 1 1 280px; }
+.sc-link-form > button { min-height: 2.65rem; padding-inline: 1.1rem; }
+.sc-hook { display: grid; gap: .55rem; padding-top: 1.1rem; border-top: 1px solid var(--line); }
+.sc-hook code { justify-self: start; max-width: 100%; padding: .35rem .55rem; border-radius: 7px; font-size: .8rem; color: var(--ink-2);
+  background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); overflow-wrap: anywhere; }
+
+/* ---------- Integrations: the services behind the app (admins) ---------- */
+.int-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.int-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem 1.5rem; padding: .95rem 0; border-top: 1px solid var(--line); }
+.int-row:first-child { border-top: 0; padding-top: .2rem; }
+.int-row:last-child { padding-bottom: .2rem; }
+.int-text { min-width: 0; display: grid; gap: .15rem; }
+.int-name { margin: 0; font-weight: 600; color: var(--ink); }
+.int-detail { margin: 0; font-size: .84rem; color: var(--ink-soft); overflow-wrap: anywhere; }
+.int-chip { flex: none; display: inline-flex; align-items: center; gap: .35rem; height: 1.5rem; padding: 0 .65rem; border-radius: 999px; font-size: .76rem; font-weight: 550;
+  white-space: nowrap; color: var(--ink-soft); background: transparent; border: 1px solid var(--line-strong); }
+.int-chip.is-ok { color: var(--ink); background: var(--surface-2); font-weight: 600; }
+.int-chip.is-set { color: var(--ink-2); border-color: var(--ink-soft); }
+.int-chip.is-bad { color: var(--rec); background: var(--rec-wash); border-color: var(--rec-line); }
+
+/* the schedule form's line about recording: who is told, and that a recording waits for a confirmation */
+.sc-recorded { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .55rem; align-items: start; margin: 0; padding: .7rem .8rem;
+  border: 1px solid var(--line); border-radius: var(--radius-m); background: var(--surface); font-size: .84rem; line-height: 1.5; color: var(--ink-2); }
+.sc-recorded svg { margin-top: .2rem; color: var(--ink-soft); }
+.sc-recorded a { color: var(--primary-text); text-decoration: underline; text-underline-offset: 3px; white-space: nowrap; }

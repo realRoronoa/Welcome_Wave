@@ -38,7 +38,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Literal
 
-from app.agents.schemas import KTLink
+from app.agents.core.schemas import KTLink
 from app.ports import User
 from app.services import knowledge as K
 from app.services.chunking import module_of

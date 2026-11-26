@@ -13,6 +13,17 @@
 :where(html:not(.is-site)) ::-webkit-scrollbar-thumb { background: var(--scroll); border-radius: 999px; border: 3px solid transparent; background-clip: padding-box; }
 :where(html:not(.is-site)) ::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-hover); }
 .rail, .rail * { scrollbar-color: var(--rail-line) transparent; }
+/* the app's page keeps its scrollbar's room on every page (where scrollbars take room: a mouse, Windows, "always show"), so
+   a short page, a page that grows when its data lands, or the drawer pausing the scroll never moves the layout sideways.
+   html.ww-app is set by Workspace while the app is on screen. */
+html.ww-app { scrollbar-gutter: stable; }
+/* nothing the browser scrolls to lands under the sticky bar (52 px; the phone's top bar is 56 px): a control reached by Tab
+   stops 12 px below it, an anchor or a section 16 px. Margins on the targets, not scroll-padding on the root, so tabbing
+   into the bar itself never scrolls the page. :where keeps each page's own value (an accordion, a chat turn) in charge. */
+.shell { --bar-h: 52px; }
+@media (max-width: 899px) { .shell { --bar-h: 56px; } }
+:where(.shell main) :where(a[href], button, input, select, textarea, summary, [tabindex]:not([tabindex="-1"])) { scroll-margin-top: calc(var(--bar-h) + 12px); }
+:where(.shell main) :where([id]) { scroll-margin-top: calc(var(--bar-h) + 16px); }
 
 button:active:not(:disabled) { transform: translateY(1px) scale(.985); }
 button.link:active:not(:disabled) { transform: none; }
@@ -29,9 +40,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .stage { position: relative; min-width: 0; isolation: isolate; }
 
 /* ---------- desktop top bar: where you are (project / page), search, notifications ---------- */
+/* an opaque surface, not a backdrop blur: a blur under a sticky bar is redone on every scroll frame (it tripled the GPU's
+   work while scrolling), and over the page's own colour the two read the same */
 .stage-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 1rem; height: 52px; padding: 0 clamp(1.25rem, 3.5vw, 2.75rem);
-  background: color-mix(in srgb, var(--steel) 82%, transparent); border-bottom: 1px solid var(--line);
-  -webkit-backdrop-filter: saturate(1.4) blur(10px); backdrop-filter: saturate(1.4) blur(10px); }
+  background: var(--steel); border-bottom: 1px solid transparent; }
+/* the bar's hairline appears once the page scrolls under it: a scroll-driven opacity (the compositor runs it, no script), or
+   where that is missing or motion is reduced, html.ww-scrolled from one passive listener (src/scroll.ts). It sits on the
+   bar's own (transparent) border, so the bar is the same size either way. */
+.stage-bar::after { content: ""; position: absolute; left: 0; right: 0; bottom: -1px; height: 1px; background: var(--line); opacity: 0; pointer-events: none; }
+.ww-scrolled .stage-bar::after { opacity: 1; }
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .stage-bar::after { animation: bar-edge linear both; animation-timeline: scroll(root block); animation-range: 0 16px; }
+  }
+}
+@keyframes bar-edge { to { opacity: 1; } }
 .crumbs { min-width: 0; }
 .crumbs ol { display: flex; align-items: center; gap: .5rem; margin: 0; padding: 0; list-style: none; font-size: .84rem; white-space: nowrap; }
 .crumbs li { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; }
@@ -41,7 +64,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible { outline: non
 .demo-tag { font: 500 .68rem/1 var(--code); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); padding: .3rem .5rem;
   border: 1px solid var(--ink-soft); background: transparent; border-radius: 999px; cursor: default; } /* an ink outline, not a colour */
 button.bar-search { display: inline-flex; align-items: center; gap: .5rem; width: 240px; height: 32px; padding: 0 .35rem 0 .65rem; background: var(--surface);
-  color: var(--ink-faint); box-shadow: inset 0 0 0 1px var(--line); font-size: .82rem; font-weight: 450; text-align: left; transition: box-shadow .15s, color .15s; }
+  color: var(--ink-muted); box-shadow: inset 0 0 0 1px var(--line); font-size: .82rem; font-weight: 450; text-align: left; transition: box-shadow .15s, color .15s; }
 button.bar-search:hover { background: var(--surface); color: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--line-strong); }
 button.bar-search:active:not(:disabled) { transform: none; }
 .bar-search span:not(.bar-search-keys) { flex: 1; }
@@ -73,7 +96,7 @@ button.bar-search:active:not(:disabled) { transform: none; }
 /* ---------- skip link and the focus target after a route change ---------- */
 .skip-link { position: fixed; z-index: 1200; left: .75rem; top: .75rem; padding: .55rem .9rem; border-radius: var(--radius-s); font-size: .88rem; font-weight: 600;
   color: var(--btn-ink); background: var(--btn); text-decoration: none; transform: translateY(calc(-100% - 1rem)); }
-.skip-link:focus, .skip-link:focus-visible { transform: none; color: var(--btn-ink); outline-color: var(--ink); box-shadow: var(--shadow-m); }
+.skip-link:focus, .skip-link:focus-visible { transform: none; color: var(--btn-ink); outline-color: var(--focus); box-shadow: var(--shadow-m); }
 main:focus { outline: none; }
 main h1:focus { outline: none; }
 .page-head > .page-actions { grid-column: 2; grid-row: 1 / span 3; align-self: end; display: flex; gap: .5rem; flex-wrap: wrap; justify-content: flex-end; max-width: none; }
@@ -108,7 +131,7 @@ main h1:focus { outline: none; }
 /* one highlight that glides between items */
 .rail-mark { position: absolute; left: 0; right: 0; top: 0; height: 0; z-index: 0; pointer-events: none; opacity: 0; border-radius: var(--radius-s);
   background: var(--rail-active); }
-.rail-mark::before { content: ""; position: absolute; left: 0; top: 25%; bottom: 25%; width: 2px; border-radius: 2px; background: var(--rail-bright); }
+.rail-mark::before { content: ""; position: absolute; left: 0; top: 22%; bottom: 22%; width: 2px; border-radius: 2px; background: var(--rail-accent); }
 .rail-mark.on { opacity: 1; }
 .rail-mark.ready { transition: transform .38s var(--ease-out), height .38s var(--ease-out), opacity .2s; }
 
@@ -157,7 +180,7 @@ main h1:focus { outline: none; }
   background: var(--rail-hover-2); box-shadow: inset 0 0 0 1px var(--rail-line), var(--shadow-xs);
   transform: translateX(calc(var(--at, 0) * 100%)); transition: transform .32s var(--ease-out); }
 .theme-switch button { position: relative; z-index: 1; display: grid; place-items: center; padding: .34rem 0; background: none; box-shadow: none;
-  color: var(--rail-faint); border-radius: 5px; line-height: 0; }
+  color: var(--rail-mute); border-radius: 5px; line-height: 0; }
 .theme-switch button:hover { background: none; color: var(--rail-text); }
 .theme-switch button[aria-pressed="true"] { color: var(--rail-bright); }
 .theme-switch button[aria-pressed="true"] svg { color: var(--rail-accent); }
@@ -165,10 +188,13 @@ main h1:focus { outline: none; }
 
 /* ---------- notifications ---------- */
 .bell { transition: color .15s, background .15s; }
-.bell.has-unread svg { transform-origin: 50% 2px; animation: bell-nudge 5s ease-in-out 1.2s 2; }
+.bell-icon { display: grid; } /* exactly the svg's box, so it turns about the same point */
+.bell.has-unread .bell-icon { transform-origin: 50% 2px; animation: bell-nudge 5s ease-in-out 1.2s 2; }
 @keyframes bell-nudge { 0%, 88%, 100% { transform: none; } 91% { transform: rotate(12deg); } 94% { transform: rotate(-10deg); } 97% { transform: rotate(5deg); } }
+/* three pings, then still: an endless one restyled the page on every frame, on every page. The badge is keyed by its
+   count (Notifications.tsx), so a new unread item pings again. 60-100% equals the resting style, so the end is seamless. */
 .badge::after { content: ""; position: absolute; inset: 0; border-radius: inherit; border: 2px solid var(--rail-accent); opacity: 0;
-  animation: badge-ping 2.6s var(--ease-out) infinite; }
+  animation: badge-ping 2.6s var(--ease-out) 3; }
 @keyframes badge-ping { 0% { transform: scale(1); opacity: .7; } 60%, 100% { transform: scale(2); opacity: 0; } }
 
 .notif-panel { width: min(400px, calc(100vw - 1.5rem)); max-height: min(72vh, 580px); padding: .5rem; transform-origin: 12% 0;
@@ -194,8 +220,9 @@ main h1:focus { outline: none; }
 .notif-item.k-incident .notif-icon { color: var(--rec); background: var(--rec-wash); border-color: var(--rec-line); }
 .notif-text { line-height: 1.42; padding-top: .28rem; overflow-wrap: anywhere; }
 .notif-panel .notif-item .when { padding-top: .32rem; font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.notif-dot { position: absolute; right: .78rem; bottom: .8rem; width: 7px; height: 7px; border-radius: 50%; background: var(--ink); }
-.notif-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--ink); animation: dot-ping 2.2s var(--ease-out) infinite; }
+.notif-dot { position: absolute; right: .78rem; bottom: .8rem; width: 7px; height: 7px; border-radius: 50%; background: var(--primary-fill); }
+/* finite for the same reason as the badge; at rest the ring sits exactly on the dot, in the dot's colour */
+.notif-dot::after { content: ""; position: absolute; inset: 0; border-radius: 50%; background: var(--primary-fill); animation: dot-ping 2.2s var(--ease-out) 3; }
 @keyframes dot-ping { 0% { transform: scale(1); opacity: .6; } 70%, 100% { transform: scale(2.6); opacity: 0; } }
 .notif-empty { display: grid; justify-items: center; gap: .35rem; padding: 1.6rem 1rem 1.4rem; text-align: center; }
 .notif-empty-mark { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: var(--ink-soft); background: var(--line);
@@ -206,10 +233,10 @@ main h1:focus { outline: none; }
 .toasts { position: fixed; z-index: 1100; left: 50%; bottom: max(1.25rem, env(safe-area-inset-bottom)); transform: translateX(-50%);
   display: grid; gap: .5rem; justify-items: center; pointer-events: none; width: max-content; max-width: calc(100vw - 2rem); }
 .toast { display: inline-flex; align-items: center; gap: .55rem; padding: .5rem .95rem .5rem .55rem; border-radius: 999px;
-  background: var(--btn); color: var(--btn-ink); font-size: .86rem; font-weight: 500; box-shadow: var(--shadow-l);
+  background: var(--ink); color: var(--steel); font-size: .86rem; font-weight: 500; box-shadow: var(--shadow-l);
   animation: toast-in .38s var(--ease-out); }
-.toast-icon { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--btn-ink); color: var(--btn); }
-.toast-error .toast-icon { background: var(--rec); color: var(--btn); }
+.toast-icon { width: 20px; height: 20px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--primary-fill); color: var(--teal-950); }
+.toast-error .toast-icon { background: var(--rec); color: var(--steel); }
 .toast.leaving { animation: toast-out .3s var(--ease) forwards; }
 @keyframes toast-in { from { opacity: 0; transform: translateY(12px) scale(.96); } }
 @keyframes toast-out { to { opacity: 0; transform: translateY(6px) scale(.98); } }
@@ -233,9 +260,11 @@ main h1:focus { outline: none; }
   .rail { position: fixed; inset: 0 auto 0 0; width: min(300px, 86vw); height: 100vh; height: 100dvh; z-index: 40;
     transform: translateX(-102%); visibility: hidden; transition: transform .32s var(--ease-out), visibility 0s linear .32s; }
   .drawer-open .rail { transform: none; visibility: visible; transition: transform .32s var(--ease-out); box-shadow: var(--shadow-l); }
-  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: var(--overlay); opacity: 0; pointer-events: none;
-    transition: opacity .28s var(--ease); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
-  .drawer-open .scrim { opacity: 1; pointer-events: auto; }
+  /* hidden (not just transparent) while the drawer is closed, so its full-screen blur is never composited under a scroll;
+     visibility flips after the fade-out, as the rail's does */
+  .scrim { display: block; position: fixed; inset: 0; z-index: 35; background: var(--overlay); opacity: 0; pointer-events: none; visibility: hidden;
+    transition: opacity .28s var(--ease), visibility 0s linear .28s; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
+  .drawer-open .scrim { opacity: 1; pointer-events: auto; visibility: visible; transition: opacity .28s var(--ease); }
   .rail-foot { margin-top: auto; }
 
   /* iOS zooms the page when a field under 16px takes focus: keep every field at 16px on phones and tablets */
@@ -250,7 +279,7 @@ main h1:focus { outline: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-enter, .notif-panel, .notif-panel li, .toast, .bell svg, .badge::after, .notif-dot::after { animation: none !important; }
+  .page-enter, .notif-panel, .notif-panel li, .toast, .bell-icon, .badge::after, .notif-dot::after { animation: none !important; }
   .rail-mark.ready, .theme-thumb, .rail, .scrim { transition: none !important; }
 }
 
@@ -289,7 +318,7 @@ button.demo-clock-btn svg { color: var(--ink-soft); }
 .demo-clock-day strong { font-size: 1.65rem; line-height: 1; font-weight: 650; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .demo-clock-day span { font-size: .86rem; color: var(--ink-soft); }
 .demo-clock-bar { position: relative; height: 4px; border-radius: 999px; background: var(--line); }
-.demo-clock-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--ink); transition: width .5s var(--ease-out); }
+.demo-clock-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--primary-fill); transition: width .5s var(--ease-out); }
 .demo-clock-bar b { position: absolute; top: -3px; width: 1px; height: 10px; background: var(--ink-faint); }
 .demo-clock-grid { display: grid; gap: .4rem; }
 .demo-clock-grid.g2 { grid-template-columns: repeat(2, 1fr); }

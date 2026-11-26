@@ -1,0 +1,59 @@
+1
+00:00:00,000 --> 00:00:06,805
+Welcome Kit is the interactive sample application. Welcome Wave is the onboarding product that learns its real codebase.
+
+2
+00:00:06,805 --> 00:00:12,479
+A new engineer explores Welcome Kit's missions, then asks Welcome Wave how those missions actually work.
+
+3
+00:00:12,479 --> 00:00:16,985
+The repo and the live site are real. Mission progress stays in the engineer's browser.
+
+4
+00:00:16,985 --> 00:00:25,305
+In Welcome Wave, open the Welcome Kit project, then Settings and Repository. Connect Vijayabaskar R dash zero six slash welcome kit.
+
+5
+00:00:25,305 --> 00:00:32,425
+Wait for Ready. The Librarian indexes files such as source slash lib slash mission dot t s without changing the repository.
+
+6
+00:00:32,425 --> 00:00:37,658
+A code citation is a link to inspect. It is not a made-up answer or a write back to GitHub.
+
+7
+00:00:37,658 --> 00:00:43,708
+From Team and Enrol, choose a hire, mentor, start date, role, and the Welcome Kit project.
+
+8
+00:00:43,708 --> 00:00:50,442
+The Planner drafts a program. A manager opens Approvals, reviews the tasks, and assigns the approved plan.
+
+9
+00:00:50,442 --> 00:00:55,992
+The new hire signs in and sees a real onboarding board with next steps and an Ask the Project entry point.
+
+10
+00:00:55,992 --> 00:01:01,066
+The hire asks: Where is mission progress stored, and what happens when I complete a mission?
+
+11
+00:01:01,066 --> 00:01:05,689
+Welcome Wave searches the indexed Welcome Kit code and cites the file behind the answer.
+
+12
+00:01:05,689 --> 00:01:13,031
+Open the cited source in Code Tour. Show the path through source slash App dot t s x and source slash lib slash mission dot t s.
+
+13
+00:01:13,031 --> 00:01:21,033
+With an active onboarding, the hire can open Voice and allow the microphone. Agora carries the room and Murf is configured for assistant speech.
+
+14
+00:01:21,033 --> 00:01:28,206
+The assistant can look up project context and propose a task or a knowledge transfer request. A manager must approve a write.
+
+15
+00:01:28,206 --> 00:01:37,391
+For the hackathon, rehearse the live call before recording. Show only transcript, citations, and action records that the session actually produces.

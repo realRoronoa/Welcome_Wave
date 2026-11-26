@@ -7,11 +7,11 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.agents import qa
-from app.agents.llm import OfflineLLM, embed_data
-from app.agents.review import NO_DIFF, review_pr
-from app.agents.schemas import Chunk, Hit, QADraft, ReviewDraft
-from app.agents.supervisor import run_event
+from app.agents.core.llm import OfflineLLM, embed_data
+from app.agents.core.schemas import Chunk, Hit, QADraft, ReviewDraft
+from app.agents.specialists.guide import qa
+from app.agents.specialists.reviewer.review import NO_DIFF, review_pr
+from app.agents.supervisor.graph import run_event
 from app.config import get_settings
 from app.main import create_app
 from app.ports import TaskRow
@@ -115,7 +115,8 @@ def test_offline_answers_quote_the_cited_moment_and_only_relevant_sources():
     code = {"n": 2, "label": "webhooks/server.py:L25-L30 (do_POST)", "text": "File: webhooks/server.py (lines 25-30)\nSymbol: do_POST\ndef do_POST(self): ..."}
     d = draft("Why does validation return a list instead of raising?", [meeting, code])
     assert d.sufficient and d.cited == [1]  # the unrelated second block is not cited
-    assert "[01:38] Ravi: We never raise" in d.answer  # the first utterance is quoted, not skipped as a header
+    # the first utterance is quoted, not skipped as a header, and attributed to its moment and speaker
+    assert d.answer.startswith("KT #1 at 01:38, Ravi: We never raise inside validation [1].")
     off = draft("What is our on-call rotation and pager escalation policy?",
                 [{"n": 1, "label": "engine/policy.py:L22-L26 (load_policy)", "text": "File: engine/policy.py\nSymbol: load_policy\ndef load_policy(text): return Policy(...)"}])
     assert not off.sufficient and off.cited == []
@@ -236,7 +237,7 @@ def test_a_review_of_an_empty_diff_says_it_could_not_judge(world):
 def test_a_merged_pull_request_closes_its_pending_review(world, graph):
     from datetime import date
 
-    from app.agents.schemas import ProposedTask
+    from app.agents.core.schemas import ProposedTask
 
     store = world.store
     world.llm.responders["ReviewDraft"] = lambda p, m: ReviewDraft(recommendation="looks_good", summary="ok")
@@ -296,7 +297,8 @@ def test_an_expert_can_cancel_the_session_they_booked(client):
 
 def test_a_session_on_the_demo_calendar_has_a_meet_link_and_its_cancel_reaches_the_calendar(client):
     """KT sessions are held on Google Meet (the demo's built-in calendar), not in the app: no join token, a Meet link."""
-    m = client.post("/api/meetings", json={"project_id": PID, "title": "KT #2", "starts_at": "2030-01-07T10:00:00Z", "attendees": ["u-ravi"]},
+    m = client.post("/api/meetings", json={"project_id": PID, "title": "KT #2", "starts_at": "2030-01-07T10:00:00Z", "attendees": ["u-ravi"],
+                                           "recording_promise": True},
                     headers=MANAGER).json()["meeting"]
     assert m["provider"] == "google" and m["join_url"].startswith("https://meet.google.com/") and m["status"] == "scheduled"
     assert [a["user_id"] for a in m["attendees"]] == ["u-priya", "u-ravi"]

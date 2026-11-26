@@ -7,10 +7,10 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from app.agents.deps import Deps
+from app.agents.core.deps import Deps
 from app.adapters.mailer import mailer_for
-from app.agents.llm import GeminiLLM, NoLLM, OfflineLLM
-from app.agents.supervisor import SYNC_EVENTS, build_supervisor, resume, run_event
+from app.agents.core.llm import SYNC_CALL_S, GeminiLLM, NoLLM, OfflineLLM, call_budget
+from app.agents.supervisor.graph import SYNC_EVENTS, build_supervisor, resume, run_event
 from app.config import Settings
 from app.services.redaction import RegexRedactor
 
@@ -85,7 +85,8 @@ class Container:
         succeeds. If the process dies mid-run the lease expires and Pub/Sub's redelivery runs it again.
         """
         if event.get("type") in SYNC_EVENTS:  # answered while the caller waits; never paused, so never checkpointed
-            return run_event(self.chat_graph or self.graph, event, f"{event['type']}:{uuid.uuid4().hex}")
+            with call_budget(SYNC_CALL_S):  # each structured model call fits the wait: one try per model, no backoff
+                return run_event(self.chat_graph or self.graph, event, f"{event['type']}:{uuid.uuid4().hex}")
         key = event.get("dedupe")
         if not key:
             return self._run(event, f"{event['type']}:{uuid.uuid4().hex}")
@@ -181,8 +182,8 @@ class Container:
         return {i.value.get("approval_id"): i.id for t in state.tasks for i in (t.interrupts or ()) if isinstance(i.value, dict)}
 
     def tick(self, org_id: str, project_id: str | None = None, day=None, force: bool = False) -> dict:
-        """The daily tick of one organisation (app/agents/tick.py)."""
-        from app.agents import tick
+        """The daily tick of one organisation (app/agents/supervisor/tick.py)."""
+        from app.agents.supervisor import tick
 
         return tick.run(self, org_id, project_id, day, force)
 
