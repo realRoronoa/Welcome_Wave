@@ -47,7 +47,12 @@ resource "google_container_cluster" "workers" {
 }
 
 # Empty values are dropped so cloudbuild.yaml's defaults apply instead of being overridden with "".
-locals { build_subs = { for k, v in var.build_substitutions : k => v if v != "" } }
+# With a domain, the load balancer is the only way in (cloudbuild.yaml _INGRESS) and the app's address is the domain; either
+# can be overridden in build_substitutions (e.g. _INGRESS = "all" until the domain's certificate is active).
+locals {
+  build_subs  = { for k, v in var.build_substitutions : k => v if v != "" }
+  domain_subs = { for k, v in { _INGRESS = "internal-and-cloud-load-balancing", _PUBLIC_URL = "https://${var.domain}" } : k => v if var.domain != "" }
+}
 
 # Optional: Cloud Build triggers. They need the GitHub repository connected to Cloud Build once, by hand
 # (Console > Cloud Build > Repositories > Connect). Leave github_repo empty to create triggers in the console.
@@ -57,7 +62,7 @@ resource "google_cloudbuild_trigger" "main" {
   location        = "global" # triggers on the GitHub (Cloud Build GitHub App) connection are global
   service_account = google_service_account.build.id
   filename        = "cloudbuild.yaml"
-  substitutions   = merge({ _ENV = "dev", _REGION = var.region, _DB_INSTANCE = google_sql_database_instance.db.name, _FIREBASE_API_KEY = google_apikeys_key.web.key_string }, local.build_subs)
+  substitutions   = merge({ _ENV = "dev", _REGION = var.region, _DB_INSTANCE = google_sql_database_instance.db.name, _FIREBASE_API_KEY = google_apikeys_key.web.key_string }, local.domain_subs, local.build_subs)
   github {
     owner = split("/", var.github_repo)[0]
     name  = split("/", var.github_repo)[1]
@@ -70,7 +75,7 @@ resource "google_cloudbuild_trigger" "release" {
   location        = "global" # triggers on the GitHub (Cloud Build GitHub App) connection are global
   service_account = google_service_account.build.id
   filename        = "cloudbuild.yaml"
-  substitutions   = merge({ _ENV = "prod", _REGION = var.region, _DB_INSTANCE = google_sql_database_instance.db.name, _FIREBASE_API_KEY = google_apikeys_key.web.key_string }, local.build_subs)
+  substitutions   = merge({ _ENV = "prod", _REGION = var.region, _DB_INSTANCE = google_sql_database_instance.db.name, _FIREBASE_API_KEY = google_apikeys_key.web.key_string }, local.domain_subs, local.build_subs)
   github {
     owner = split("/", var.github_repo)[0]
     name  = split("/", var.github_repo)[1]

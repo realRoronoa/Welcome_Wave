@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import app.adapters.github as gh
-import app.agents.task as task_mod
+import app.agents.specialists.planner.task as task_mod
 from app.adapters.github import GitHubApp, events_from_webhook
 from app.api.outbox import flush
 from app.config import Settings, get_settings
@@ -135,8 +135,12 @@ def test_a_webhook_event_survives_a_failed_publish_and_the_flush_sends_it(client
         raise TimeoutError("Pub/Sub")
 
     monkeypatch.setattr(c.deps.bus, "publish", down)
+    # outside the demo a webhook needs a real secret and a repository connected through the GitHub App's installation
+    monkeypatch.setattr(c.settings, "github_webhook_secret", "a-real-webhook-secret-0123456789")
+    repo = next(r for r in c.store.repos.values() if r.full_name == "demo/mini-policy-engine")
+    monkeypatch.setattr(repo, "installation_id", "42")
     push = {"ref": "refs/heads/main", "after": "abc123", "repository": {"full_name": "demo/mini-policy-engine", "default_branch": "main"},
-            "commits": [{"modified": ["engine/validate.py"]}]}
+            "installation": {"id": 42}, "commits": [{"modified": ["engine/validate.py"]}]}
     body, sig = _signed(c.settings.github_webhook_secret, push)
     r = client.post("/webhooks/github", content=body, headers={"X-GitHub-Event": "push", "X-Hub-Signature-256": sig})
     assert r.status_code == 202 and r.json() == {"events": 1}
@@ -334,11 +338,11 @@ def test_invitations_show_the_inviters_email_and_a_wrong_join_can_be_left(client
     real = next(p for p in pending if p["org_id"] == "org-demo")
     assert real["invited_by_email"] == "priya@demo.dev" and "org_created_at" in real
 
-    assert client.post("/api/invitations/accept", json={"org_id": "org-evil"}, headers=prod).status_code == 200  # the wrong one
-    assert client.post("/api/invitations/accept", json={"org_id": "org-demo"}, headers=prod).status_code == 409
+    assert client.post("/api/invitations/accept", json={"org_id": "org-evil", "accept": ["terms", "privacy"]}, headers=prod).status_code == 200  # the wrong one
+    assert client.post("/api/invitations/accept", json={"org_id": "org-demo", "accept": ["terms", "privacy"]}, headers=prod).status_code == 409
     assert client.post("/api/me/leave", headers=prod).status_code == 204
     assert client.get("/api/me", headers=prod).status_code == 403
-    me = client.post("/api/invitations/accept", json={"org_id": "org-demo"}, headers=prod).json()
+    me = client.post("/api/invitations/accept", json={"org_id": "org-demo", "accept": ["terms", "privacy"]}, headers=prod).json()
     assert me["org_id"] == "org-demo" and [p["id"] for p in me["projects"]] == [PID]
 
 
@@ -365,17 +369,17 @@ def test_someone_who_left_can_be_invited_back(client, monkeypatch):
     _fake = lambda tok, clock_skew_seconds=0: tokens[tok]
     monkeypatch.setattr("app.firebase_tokens.verify", lambda tok, *_a, **_k: _fake(tok))  # real Firebase path
     f, h = {"Authorization": "Bearer tok-f"}, {"Authorization": "Bearer tok-h"}
-    me = client.post("/api/signup", json={"name": "F", "org_name": "Acme", "project_name": "P"}, headers=f).json()
+    me = client.post("/api/signup", json={"name": "F", "org_name": "Acme", "project_name": "P", "accept": ["terms", "privacy"]}, headers=f).json()
     pid, org = me["projects"][0]["id"], me["org_id"]
     client.post(f"/api/projects/{pid}/invitations", json={"email": "hire@acme.dev", "role": "admin"}, headers=f)
-    assert client.post("/api/invitations/accept", json={"org_id": org}, headers=h).json()["role"] == "admin"
+    assert client.post("/api/invitations/accept", json={"org_id": org, "accept": ["terms", "privacy"]}, headers=h).json()["role"] == "admin"
     assert client.post("/api/me/leave", headers=h).status_code == 204
 
     r = client.post(f"/api/projects/{pid}/invitations", json={"email": "hire@acme.dev", "role": "new_hire"}, headers=f)
     assert r.status_code == 201 and "invited" in r.json()  # an invitation, not a silent add
     r = client.get("/api/me", headers=h)
     assert r.status_code == 403 and r.json()["detail"]["code"] == "invitation_pending"
-    back = client.post("/api/invitations/accept", json={"org_id": org}, headers=h).json()
+    back = client.post("/api/invitations/accept", json={"org_id": org, "accept": ["terms", "privacy"]}, headers=h).json()
     assert back["role"] == "new_hire" and [p["id"] for p in back["projects"]] == [pid]  # the role invited with, not admin
 
 
@@ -396,3 +400,27 @@ def test_pr_events_carry_when_github_sent_them():
     pr = {"number": 7, "html_url": "u", "head": {"sha": "s2", "ref": "fix"}, "user": {"login": "vijay"}, "updated_at": "2026-10-16T10:05:00Z"}
     ev, = events_from_webhook("pull_request", {"action": "synchronize", "pull_request": pr, "repository": {"full_name": "a/b"}}, "p", "r")
     assert ev["pr_updated_at"] == "2026-10-16T10:05:00Z"  # orders reviews by commit, not by which finished first
+
+
+def test_gcp_production_requires_the_firebase_api_key_and_a_real_database_url():
+    base = dict(mode="gcp", env="prod", gcp_project="p", gcs_bucket="b", github_webhook_secret="s" * 32,
+                outbox_flush_audience="a", outbox_flush_invoker="i", public_url="https://ww.example")
+    s = Settings(**base)  # no Firebase key, and the development DATABASE_URL default
+    problems = s.production_problems()
+    assert any("FIREBASE_API_KEY" in p for p in problems)
+    assert any("DATABASE_URL" in p for p in problems)
+    assert not any("FIREBASE_API_KEY" in p for p in s.production_problems(serves_http=False))  # workers serve no sign-in
+    ok = Settings(**base, firebase_api_key="k", database_url="postgresql+psycopg://app:pw@db.internal/ww")
+    assert not any("FIREBASE_API_KEY" in p or "DATABASE_URL" in p for p in ok.production_problems())
+    assert not any("DATABASE_URL" in p for p in Settings(mode="gcp", gcp_project="p", gcs_bucket="b").production_problems())  # dev: default is fine
+
+
+def test_cors_allows_put_for_the_routes_that_use_it(monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import create_app
+    monkeypatch.setenv("CORS_ORIGINS", "https://web.example")
+    from app import config
+    config.get_settings.cache_clear() if hasattr(config.get_settings, "cache_clear") else None
+    c = TestClient(create_app())
+    r = c.options("/api/health", headers={"Origin": "https://web.example", "Access-Control-Request-Method": "PUT"})
+    assert "PUT" in r.headers.get("access-control-allow-methods", "")

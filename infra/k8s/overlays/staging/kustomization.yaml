@@ -1,0 +1,33 @@
+# Staging on GKE: the whole product in the dev (or a staging) Google Cloud project, as production runs it, smaller.
+# Edit settings/config.env, do the one-time setup in docs/KUBERNETES.md ("GKE"), then:
+#   infra/k8s/deploy.sh staging --api-image <region>-docker.pkg.dev/<project>/ww-images/backend@sha256:... \
+#                               --web-image <region>-docker.pkg.dev/<project>/ww-images/web@sha256:...
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: welcome-wave
+
+labels: # on what the components add too
+  - pairs:
+      app.kubernetes.io/part-of: welcome-wave
+    includeSelectors: false
+
+resources:
+  - ../../base
+
+# Order matters: the settings first, then the components that read them.
+components:
+  - settings
+  - ../../components/public-url
+  - ../../components/gke
+  - ../../components/gcp-secret-manager
+
+patches:
+  - target: { kind: HorizontalPodAutoscaler, name: ^api$ }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 1 }
+      - { op: replace, path: /spec/maxReplicas, value: 3 }
+  - target: { kind: HorizontalPodAutoscaler, name: ^web$ }
+    patch: |-
+      - { op: replace, path: /spec/minReplicas, value: 1 }
+      - { op: replace, path: /spec/maxReplicas, value: 2 }

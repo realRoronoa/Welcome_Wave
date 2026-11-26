@@ -1,10 +1,17 @@
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { api, ApiError, Config, demoSignOut, errorMessage, getDemoUser, Me, Role, setMode } from "./api";
 import AuthGate from "./auth";
+import LegalGate from "./consent/LegalGate";
+import { forgetLegalStatus } from "./consent/legalStatus";
 import DemoSignIn from "./auth/DemoSignIn";
-import Workspace from "./Workspace";
+import { lazyPage } from "./lazyPage";
+import { resetShared } from "./lifecycle/shared";
 import { setSignedIn } from "./surface";
 import { Booting, Splash } from "./ui";
+
+/* The workspace is its own chunk: the sign-in screen renders without it, and fetches it while the person signs in. */
+const Workspace = lazyPage(() => import("./Workspace"));
+const WorkspaceSlot = (props: Parameters<typeof Workspace>[0]) => <Suspense fallback={<Booting />}><Workspace {...props} /></Suspense>;
 
 export default function App() {
   const [config, setConfig] = useState<Config | null>(null);
@@ -17,6 +24,7 @@ export default function App() {
       .catch((e) => setError(errorMessage(e)));
   };
   useEffect(load, []);
+  useEffect(() => { const t = window.setTimeout(() => void Workspace.preload(), 600); return () => clearTimeout(t); }, []);
   useEffect(() => { document.title = "Welcome Wave"; }, []); // the site's title until the workspace names the project
 
   if (!config) {
@@ -26,7 +34,12 @@ export default function App() {
   if (config.mode === "demo") return <DemoSession config={config} />;
   return (
     <AuthGate config={config} onSignedIn={enterApp} onSignedOut={leaveApp}>
-      {(me, setMe, signOut, reload) => <Workspace config={config} me={me} setMe={setMe} signOut={signOut} reloadAccount={reload} />}
+      {(me, setMe, signOut, reload) => (
+        // the current terms and privacy policy first, for anyone who has not accepted them (consent/LegalGate.tsx)
+        <LegalGate key={me.id} config={config} me={me} signOut={signOut} reloadAccount={reload}>
+          <WorkspaceSlot config={config} me={me} setMe={setMe} signOut={signOut} reloadAccount={reload} />
+        </LegalGate>
+      )}
     </AuthGate>
   );
 }
@@ -46,6 +59,7 @@ function landOnRolePage(me: Me, afterSignIn: boolean) {
 /** Signed in (just now, or a session resumed): the workspace lives at /app, so /login and /signup become /app#/<role page>, a deep
  *  link (/app#/meetings/x, opened while signed out) is kept, and the landing page learns to offer "Open Welcome Wave". */
 export function enterApp(me: Me, afterSignIn: boolean) {
+  if (afterSignIn) resetShared();
   if (/^\/(login|signup)?\/?$/.test(location.pathname)) history.replaceState(history.state, "", `/app${location.search}${location.hash}`);
   landOnRolePage(me, afterSignIn);
   setSignedIn(true);
@@ -53,8 +67,21 @@ export function enterApp(me: Me, afterSignIn: boolean) {
 
 /** Signed out: the sign-in page, at its own address (no page in the hash, so the next person starts on their own page). */
 export function leaveApp() {
+  resetShared();
+  forgetSession();
+  forgetLegalStatus();
   setSignedIn(false);
   history.replaceState(null, "", "/login");
+}
+
+/** Per-tab memories of the person who signed out: the Ask page's answer details (ww-routes:<project>). */
+function forgetSession() {
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k?.startsWith("ww-routes:")) sessionStorage.removeItem(k);
+    }
+  } catch { /* storage blocked */ }
 }
 
 /** Demo mode: a real sign-in (email and the demo password against POST /api/demo/login, or one click on a demo account);
@@ -104,5 +131,9 @@ function DemoSession({ config }: { config: Config }) {
       </Splash>
     );
   }
-  return <Workspace key={me.id} config={config} me={me} setMe={setMe} signOut={signOut} />;
+  return (
+    <LegalGate key={me.id} config={config} me={me} signOut={signOut}>
+      <WorkspaceSlot key={me.id} config={config} me={me} setMe={setMe} signOut={signOut} />
+    </LegalGate>
+  );
 }

@@ -10,7 +10,7 @@ import requests
 from fastapi.testclient import TestClient
 from langchain_core.tracers.langchain import wait_for_all_tracers
 
-from app.agents.llm import OfflineLLM
+from app.agents.core.llm import OfflineLLM
 from app.config import Settings, get_settings
 from app.container import build_container
 from app.main import create_app

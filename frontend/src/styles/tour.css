@@ -8,7 +8,7 @@
 .ct-title-row h1 { margin: 0; }
 .ct-info { position: relative; display: inline-flex; }
 .ct-info-btn { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; padding: 0; border-radius: 999px;
-  color: var(--ink-faint); background: none; box-shadow: none; cursor: help; }
+  color: var(--ink-muted); background: none; box-shadow: none; cursor: help; }
 .ct-info-btn:hover { color: var(--ink); background: var(--surface-2); }
 .ct-info-btn:active:not(:disabled) { transform: none; }
 .ct-tip { display: none; position: absolute; left: 50%; top: calc(100% + 8px); z-index: 30; width: min(300px, calc(100vw - 40px)); transform: translateX(-50%);
@@ -49,7 +49,7 @@
 .ct-share span { display: block; height: 100%; border-radius: inherit; background: var(--kt); transform-origin: left; animation: dp-grow-x .9s var(--ease) both .15s; }
 .ct-strip-text { flex: 1 1 22rem; min-width: 0; margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; font-size: .88rem; color: var(--ink-2); }
 .ct-strip-text strong { color: var(--ink); font-weight: 650; font-variant-numeric: tabular-nums; }
-.ct-sep { color: var(--ink-faint); }
+.ct-sep { color: var(--ink-muted); }
 .ct-dim { color: var(--ink-soft); }
 .ct-people { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .3rem .5rem; min-width: 0; }
 .ct-ask { display: inline-flex; flex-wrap: wrap; align-items: center; gap: .3rem .45rem; }
@@ -58,7 +58,7 @@
 .ct-ask-item > a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .ct-x { color: var(--ink-soft); font-weight: 500; font-variant-numeric: tabular-nums; }
 .ct-sha { margin-left: auto; display: inline-flex; align-items: center; gap: .35rem; font: 500 .74rem/1 var(--code); color: var(--ink-soft); cursor: default; }
-.ct-sha svg { color: var(--ink-faint); }
+.ct-sha svg { color: var(--ink-muted); }
 
 /* ---------- layout: sticky stepper on the left, the stop on the right ---------- */
 .ct-grid { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 1.5rem; align-items: start; }
@@ -108,7 +108,7 @@
 .ct-stop.is-ref .ct-stop-sym { color: var(--ink-soft); font-weight: 450; }
 .ct-stop-marks { display: inline-flex; align-items: center; gap: .3rem; padding-top: .12rem; color: var(--ink-2); }
 .ct-mark-flag { display: inline-grid; color: var(--ink); }
-.ct-mark-seen { display: inline-grid; color: var(--ink-faint); }
+.ct-mark-seen { display: inline-grid; color: var(--ink-muted); }
 
 /* appendices: tests and unreached, collapsed under the chapters */
 .ct-appendix { margin-top: .75rem; padding-top: .35rem; border-top: 1px solid var(--line); }
@@ -135,7 +135,7 @@
 @keyframes ct-in { from { opacity: 0; transform: translateY(5px); } }
 .ct-kicker { margin: 0; font-size: .7rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .ct-trail { display: flex; flex-wrap: wrap; align-items: center; gap: .1rem .2rem; list-style: none; margin: .55rem 0 0; padding: 0; }
-.ct-trail li { display: inline-flex; align-items: center; gap: .2rem; min-width: 0; color: var(--ink-faint); }
+.ct-trail li { display: inline-flex; align-items: center; gap: .2rem; min-width: 0; color: var(--ink-muted); }
 .ct-trail button { padding: .1rem .3rem; border-radius: 5px; font: 500 .76rem/1.4 var(--code); color: var(--ink-soft); background: none; box-shadow: none;
   overflow-wrap: anywhere; text-align: left; }
 .ct-trail button:hover { color: var(--ink); background: var(--surface-2); }
@@ -149,7 +149,7 @@
 .ct-where a { font: 450 .8rem var(--code); color: var(--ink-soft); text-decoration: none; overflow-wrap: anywhere; }
 .ct-where a:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 .ct-summary { max-width: 68ch; margin: .85rem 0 0; font-size: .96rem; line-height: 1.6; color: var(--ink-2); overflow-wrap: anywhere; } /* a URL in a docstring */
-.ct-summary.is-none { font-size: .88rem; font-style: italic; color: var(--ink-faint); }
+.ct-summary.is-none { font-size: .88rem; font-style: italic; color: var(--ink-muted); }
 .ct-summary.is-file { color: var(--ink-soft); }
 .ct-from { display: inline-block; margin-right: .5rem; padding: 0 .4rem; border-radius: 5px; font: 500 .74rem/1.55 var(--code); vertical-align: 1px; color: var(--ink-2);
   background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
@@ -203,7 +203,7 @@
 .ct .dp-code figcaption::before { flex: none; background: var(--rail-text); opacity: .45; } /* the caption dot turns teal only on explained code */
 .ct-pane.is-explained .dp-code figcaption::before { background: var(--rail-accent); opacity: .85; }
 .ct-code-path { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long path gives way; the dot and lines stay */
-.ct-code-lines { flex: none; margin-left: auto; padding-left: .5rem; opacity: .7; }
+.ct-code-lines { flex: none; margin-left: auto; padding-left: .5rem; opacity: .85; } /* AA on the dark code bar */
 .ct-cut { margin: .55rem 0 0; font-size: .8rem; color: var(--ink-soft); }
 .ct-cut a { color: var(--ink); font-weight: 550; }
 
@@ -224,8 +224,8 @@
 
 /* ---------- footer: previous / next, where you are, how much you have seen ---------- */
 .ct-foot { position: sticky; bottom: 14px; z-index: 6; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 1rem;
-  margin-top: 1rem; padding: .5rem; border-radius: calc(var(--radius-l) + 2px); background: color-mix(in srgb, var(--surface) 86%, transparent);
-  -webkit-backdrop-filter: saturate(1.4) blur(12px); backdrop-filter: saturate(1.4) blur(12px); box-shadow: var(--shadow-m), inset 0 0 0 1px var(--line); }
+  margin-top: 1rem; padding: .5rem; border-radius: calc(var(--radius-l) + 2px); background: var(--surface);
+  box-shadow: var(--shadow-m), inset 0 0 0 1px var(--line); } /* opaque, as the top bar: no blur redone on every scroll frame */
 .ct-foot .dp-btn { gap: .5rem; padding-block: .5rem; }
 .ct-keys { display: inline-flex; margin-left: .1rem; }
 .ct-keys .kbd { height: 1.35em; min-width: 1.35em; font-size: .68rem; }
@@ -238,7 +238,7 @@
 .ct-segments i.seen { background: var(--ink-faint); }
 .ct-segments i.now { background: var(--ink); }
 .ct-meter { height: 5px; border-radius: 999px; background: var(--line); overflow: hidden; }
-.ct-meter span { display: block; height: 100%; border-radius: inherit; background: var(--ink); transition: width .4s var(--ease); }
+.ct-meter span { display: block; height: 100%; border-radius: inherit; background: var(--primary-fill); transition: width .4s var(--ease); }
 
 /* ---------- below 980px: the stepper folds into a chapter list above the stop ---------- */
 .ct-list { border-radius: var(--radius-l); background: var(--surface); box-shadow: var(--shadow-xs), inset 0 0 0 1px var(--line); }
@@ -255,7 +255,7 @@
 .ct-list-sk .ct-list-text { gap: .15rem; }
 .ct-list-sk .skeleton span { width: fit-content; color: transparent; }
 .ct-list-sk .ct-list-code { font-family: var(--code); font-size: .86rem; font-weight: 600; }
-.ct-list-sk .ct-list-cta { color: var(--ink-faint); }
+.ct-list-sk .ct-list-cta { color: var(--ink-muted); }
 
 @media (max-width: 979px) {
   .ct-grid { grid-template-columns: minmax(0, 1fr); gap: .85rem; }
@@ -282,7 +282,7 @@
   .ct-banner-go { width: 100%; padding-left: calc(32px + .8rem); }
   .ct-edges { grid-template-columns: minmax(0, 1fr); }
   .ct-foot { gap: .6rem; bottom: 10px; }
-  .ct-prev .ct-btn-text { display: none; }
+  .ct-prev .ct-btn-text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; } /* still its name */
   .ct-progress-sep, .ct-progress p > span:last-child { display: none; }
 }
 
@@ -291,4 +291,4 @@
   .ct-bar.glide, .ct-seg-thumb, .ct-dot, .ct-segments i, .ct-meter span, .ct-play { transition: none; }
   .ct-play:hover { transform: none; }
 }
-.ct-chip-more { display: inline-flex; align-items: center; padding: .15rem .3rem; font-size: .8rem; color: var(--ink-faint); }
+.ct-chip-more { display: inline-flex; align-items: center; padding: .15rem .3rem; font-size: .8rem; color: var(--ink-muted); }

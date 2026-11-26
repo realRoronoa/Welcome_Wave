@@ -8,7 +8,7 @@ from collections import defaultdict
 
 from pydantic import BaseModel, Field
 
-from app.agents.runtime import REGISTRY, Source, ToolCtx, ToolResult, untrusted
+from app.agents.core.runtime import REGISTRY, Source, ToolCtx, ToolResult, untrusted
 from app.services.diff import TEST_PATH
 
 PATHISH = re.compile(r"[\w./-]+\.\w{1,5}|[\w-]+/[\w./-]+")

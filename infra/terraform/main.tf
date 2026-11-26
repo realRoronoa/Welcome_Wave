@@ -50,12 +50,12 @@ variable "domain" {
 variable "api_host" {
   type        = string
   default     = ""
-  description = "Host the uptime check calls /health/ready on: the domain (the web app proxies it to the API) or ww-api's run.app host"
+  description = "Host the uptime check calls /health/ready on: the domain (the load balancer sends it to the API), or ww-api's run.app host when there is no domain"
 }
 variable "web_host" {
   type        = string
   default     = ""
-  description = "ww-web's run.app host (after the first deploy), so sign-in also works on that URL"
+  description = "ww-web's run.app host (after the first deploy), so sign-in and recording uploads also work on that URL"
 }
 variable "github_repo" {
   type        = string
@@ -66,7 +66,7 @@ variable "github_repo" {
 variable "build_substitutions" {
   type        = map(string)
   default     = {}
-  description = "Non-secret deploy configuration for cloudbuild.yaml: _GITHUB_APP_ID, _GITHUB_APP_SLUG, _GITHUB_CLIENT_ID, _GOOGLE_OAUTH_CLIENT_ID, _PUBLIC_URL, _MODEL_FAST, _MODEL_SMART, _MODEL_FALLBACK, _API_MIN_INSTANCES, _SIGNUP_ENABLED, _LANGSMITH_TRACING, _LANGSMITH_ENDPOINT, _DB_INSTANCE"
+  description = "Non-secret deploy configuration for cloudbuild.yaml: _GITHUB_APP_ID, _GITHUB_APP_SLUG, _GITHUB_CLIENT_ID, _GOOGLE_OAUTH_CLIENT_ID, _PUBLIC_URL, _INGRESS, _MODEL_FAST, _MODEL_SMART, _MODEL_FALLBACK, _API_MIN_INSTANCES, _SIGNUP_ENABLED, _LANGSMITH_TRACING, _LANGSMITH_ENDPOINT, _SMTP_HOST, _SMTP_PORT, _SMTP_USER, _SMTP_FROM, _DB_INSTANCE"
 }
 
 # billing_project + user_project_override: with user credentials (gcloud auth application-default login), APIs such as

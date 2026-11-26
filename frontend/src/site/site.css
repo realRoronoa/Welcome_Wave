@@ -24,6 +24,9 @@ html.is-site body { margin: 0; background: #f2f2f2; color: #0a0a0a; overflow-x: 
   --hatch: repeating-linear-gradient(135deg, rgb(10 10 10 / .24) 0 1px, transparent 1px 6px);
   /* contextual: these flip on black ([data-tone="night"], the menu, the nav over black) */
   --fg: var(--ink); --fg-2: var(--ink-2); --soft: var(--ink-soft); --bg: var(--paper); --line: var(--rule); --line-strong: var(--rule-strong);
+  /* the brand (Ink + Teal, docs/brand/BRAND.md): the primary call to action. Teal 700 with white on paper (5.47:1), teal 400 with
+     teal 950 on black (flips with the tone below) */
+  --brand: #0f766e; --brand-hover: #115e59; --on-brand: #fff;
   --sans: "Geist", "Geist Fallback", system-ui, -apple-system, sans-serif;
   --mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
   --m: clamp(16px, 4vw, 64px); --gut: clamp(12px, 1.6vw, 24px); --sec: clamp(56px, 8.4vw, 120px);
@@ -48,6 +51,7 @@ html.is-site body { margin: 0; background: #f2f2f2; color: #0a0a0a; overflow-x: 
 .site [data-tone="night"], .site .s-menu, html.s-night .site .s-nav {
   --fg: var(--night-ink); --fg-2: #d4d4d4; --soft: var(--night-soft); --bg: var(--night);
   --line: var(--night-rule); --line-strong: rgb(255 255 255 / .5);
+  --brand: #2dd4bf; --brand-hover: #5eead4; --on-brand: #042f2e;
   color: var(--fg);
 }
 
@@ -134,6 +138,8 @@ body .site button:active:not(:disabled) { transform: none; }
 .site .s-btn-sm::before { content: ""; position: absolute; inset: -4px 0; }
 .site .s-btn-ink { background: var(--fg); color: var(--bg); }
 .site .s-btn-ink:hover { background: var(--fg-2); color: var(--bg); }
+.site .s-btn-brand { background: var(--brand); color: var(--on-brand); }
+.site .s-btn-brand:hover { background: var(--brand-hover); color: var(--on-brand); }
 .site .s-btn-line { box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--fg); }
 .site .s-btn-line:hover { box-shadow: inset 0 0 0 1px var(--fg); color: var(--fg); }
 .site .s-btn-paper { background: var(--night-ink); color: var(--ink); }
@@ -147,11 +153,21 @@ body .site button:active:not(:disabled) { transform: none; }
 .site .s-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
 
 /* ------------------------------------------------------------------------------------------------------------- nav */
-.site .s-nav { position: sticky; top: 0; z-index: 50; height: 64px; color: var(--fg); background: transparent;
-  box-shadow: 0 1px 0 transparent; transition: background-color .2s var(--ease), box-shadow .2s var(--ease), color .2s; }
-/* solid once the page moves: the paper (or, over the night, the ink) at 84%, the film softly blurred beneath it */
-.site .s-nav.is-solid { background: color-mix(in srgb, var(--bg) 84%, transparent); box-shadow: 0 1px 0 var(--line);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1); }
+.site .s-nav { position: sticky; top: 0; z-index: 50; height: 64px; color: var(--fg); }
+/* the bar itself, solid once the page moves: the paper (or, over the night, the ink) at 84%, a hairline under it, the page
+   softly blurred beneath. It is a layer of its own and only its opacity changes, so the bar arrives rather than appears
+   (colour, hairline and blur together, eased), and nothing is repainted while it does. The blur exists only while the bar
+   does: it comes with the first frame of the fade in, and goes after the last frame of the fade out. Its tone (paper or
+   ink, and the text on it) turns at once with the page under it: only opacity is ever animated. */
+.site .s-nav::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; will-change: opacity;
+  background: color-mix(in srgb, var(--bg) 84%, transparent); box-shadow: 0 1px 0 var(--line);
+  transition: opacity .4s var(--ease), -webkit-backdrop-filter 0s .4s, backdrop-filter 0s .4s; }
+.site .s-nav.is-solid::before { opacity: 1; -webkit-backdrop-filter: blur(14px) saturate(1.1); backdrop-filter: blur(14px) saturate(1.1);
+  transition: opacity .4s var(--ease); }
+/* over the landing's film (html.s-film-on, from the film's controller) the bar is plain ink, a little denser: a backdrop
+   blur over playing video is redrawn by the GPU on every frame of the film, for a difference nobody sees on a dark picture */
+html.s-film-on .site .s-nav::before, html.s-film-on .site .s-nav.is-solid::before { background: color-mix(in srgb, var(--bg) 90%, transparent);
+  -webkit-backdrop-filter: none; backdrop-filter: none; }
 .site .s-nav-in { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 24px; height: 100%;
   max-width: calc(1600px + 2 * var(--m)); margin: 0 auto; padding: 0 var(--m); }
 .site .s-nav-start { display: flex; align-items: center; gap: 16px; min-width: 0; }
