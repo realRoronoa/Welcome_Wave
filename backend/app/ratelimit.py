@@ -8,20 +8,28 @@ accepted (a made-up token) never gets a bucket of its own, so it cannot be used 
 
 Groups (first match wins). Each has its own limit per minute, set by an environment variable:
 
-| Group       | Routes                                                      | Charged to       | Default | Variable                         |
-|-------------|-------------------------------------------------------------|------------------|---------|----------------------------------|
-| auth        | POST sign-in, sign-up and joining an organisation           | client address   | 10      | RATE_LIMIT_AUTH_PER_MINUTE        |
-| chat        | POST /api/chat, /api/ask/..., a task's presubmit-review     | person / address | 20      | RATE_LIMIT_CHAT_PER_MINUTE        |
-| preboarding | /api/preboarding/* (a link token instead of a sign-in)      | client address   | 30      | RATE_LIMIT_PREBOARDING_PER_MINUTE |
-| webhooks    | /webhooks/* (GitHub, calendar providers)                    | client address   | 60      | RATE_LIMIT_WEBHOOKS_PER_MINUTE    |
-| default     | everything else                                             | person / address | 120     | RATE_LIMIT_DEFAULT_PER_MINUTE     |
+| Group         | Routes                                                      | Charged to       | Default | Variable                            |
+|---------------|-------------------------------------------------------------|------------------|---------|-------------------------------------|
+| auth          | POST sign-in, sign-up and joining an organisation           | client address   | 10      | RATE_LIMIT_AUTH_PER_MINUTE          |
+| chat          | POST /api/chat, /api/ask/..., a task's presubmit-review     | person / address | 20      | RATE_LIMIT_CHAT_PER_MINUTE          |
+| agents        | other routes that run an agent in the request: a hire's     | person / address | 20      | RATE_LIMIT_AGENTS_PER_MINUTE        |
+|               | first-task shortlist and completion review (GET), a weekly  |                  |         |                                     |
+|               | summary, a handover, the daily tick on demand (POST)        |                  |         |                                     |
+| preboarding   | /api/preboarding/* (a link token instead of a sign-in)      | client address   | 30      | RATE_LIMIT_PREBOARDING_PER_MINUTE   |
+| webhooks      | /webhooks/* (GitHub, calendar providers)                    | client address   | 60      | RATE_LIMIT_WEBHOOKS_PER_MINUTE      |
+| client_errors | POST /api/client-errors (the web app's crash reports, sent  | client address   | 10      | RATE_LIMIT_CLIENT_ERRORS_PER_MINUTE |
+|               | without a sign-in)                                          |                  |         |                                     |
+| default       | everything else                                             | person / address | 120     | RATE_LIMIT_DEFAULT_PER_MINUTE       |
 
 A bucket holds a minute's worth of requests and refills continuously, so a burst up to the limit is allowed. Over the limit
 the API answers 429 with Retry-After (whole seconds). /health and /health/ready are never limited, nor are CORS preflights.
 
 RATE_LIMIT_ENABLED=false turns it off (the tests do). RATE_LIMIT_TRUSTED_HOPS: how many proxies in front of the API append
-to X-Forwarded-For; the client address is the entry that many places from the right. 0 (the default) uses the address the
-server resolved (uvicorn --proxy-headers).
+to X-Forwarded-For; the client address is the entry that many places from the right, so the entries a client wrote itself
+(on the left) are never used. 0 (the default) uses the address the server resolved (uvicorn --proxy-headers, which trusts
+X-Forwarded-For only from FORWARDED_ALLOW_IPS: 127.0.0.1 unless set). Google Cloud: the web container's nginx forwards the
+one address Google's front end appended, and the API's own front end appends the web container's, so ww-api runs with 2
+(cloudbuild.yaml); through the load balancer the chain is client, load balancer: 2 as well. docs/DEPLOY.md shows how to check.
 
 Limits are per process: with several API instances (Cloud Run scales out), each enforces its own. The chat route keeps its
 own per-person limit too (CHAT_RATE_PER_MINUTE, app/api/routes.py).
@@ -37,8 +45,10 @@ import threading
 import time
 from collections import OrderedDict
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Callable
 
+from fastapi import HTTPException
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from app.config import dotenv_unless_demo
@@ -57,9 +67,11 @@ class RateLimitSettings(BaseSettings):
     enabled: bool = True
     default_per_minute: int = 120
     chat_per_minute: int = 20
+    agents_per_minute: int = 20
     auth_per_minute: int = 10
     preboarding_per_minute: int = 30
     webhooks_per_minute: int = 60
+    client_errors_per_minute: int = 10  # a page load sends at most 5 (frontend/src/report.ts)
     trusted_hops: int = 0
     max_keys: int = 100_000  # buckets kept; the least recently used go first (a full bucket loses nothing by going)
 
@@ -75,8 +87,12 @@ class Group:
 GROUPS = (
     Group("auth", frozenset({"POST"}), re.compile(r"^/api/(demo/login|signup|invitations/accept|demo/invitations/accept)/?$"), False),
     Group("chat", frozenset({"POST"}), re.compile(r"^/api/(chat|ask(/[^/]+)?|tasks/[^/]+/presubmit-review)/?$"), True),  # each calls the model
+    # each runs an agent (the Scout, the Coach, the Planner, the Keeper, or every agent's tick) inside the request
+    Group("agents", frozenset({"POST"}), re.compile(r"^/api/(onboardings/[^/]+/summaries|handovers|agents/tick)/?$"), True),
+    Group("agents", frozenset({"GET"}), re.compile(r"^/api/onboardings/[^/]+/(first-task/shortlist|completion)/?$"), True),
     Group("preboarding", None, re.compile(r"^/api/preboarding(/|$)"), False),
     Group("webhooks", None, re.compile(r"^/webhooks/"), False),
+    Group("client_errors", frozenset({"POST"}), re.compile(r"^/api/client-errors/?$"), False),  # no sign-in to charge
 )
 DEFAULT = Group("default", None, re.compile(""), True)
 EXEMPT = frozenset({"/health", "/health/ready"})
@@ -132,6 +148,17 @@ def client_address(scope, trusted_hops: int) -> str:
             return forwarded[-trusted_hops]
     client = scope.get("client")
     return client[0] if client else "unknown"
+
+
+@lru_cache(maxsize=1)
+def _trusted_hops() -> int:
+    return RateLimitSettings().trusted_hops
+
+
+def request_address(scope) -> str:
+    """The caller's address as the rate limits see it, for the records and limits that keep one (a pre-boarding
+    acknowledgement, the demo's sign-in attempts): never a client-written X-Forwarded-For entry."""
+    return client_address(scope, _trusted_hops())
 
 
 def _fingerprint(scope) -> str | None:
@@ -197,3 +224,85 @@ class RateLimitMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_and_learn)
+
+
+# ---------------------------------------------------------------- request body size
+MiB = 1024 * 1024
+CLIENT_ERROR_BYTES = 16 * 1024  # report.ts sends under 4,200 characters; room for JSON escapes and multi-byte text
+
+
+class BodyTooLarge(HTTPException):
+    """Raised while a route reads its body. An HTTPException, so FastAPI answers 413 instead of 'error parsing the body'."""
+
+    def __init__(self, limit: int):
+        super().__init__(413, _too_large_text(limit))
+
+
+def _too_large_text(limit: int) -> str:
+    size = f"{limit // MiB} MB" if limit >= MiB else f"{limit // 1024} KB"
+    return f"The request is too large (at most {size})."
+
+
+def body_limit(method: str, path: str, settings) -> int:
+    """The largest request body a route takes, in bytes: an upload's own limit (plus room for the form around it), GitHub's
+    and Calendly's deliveries (GitHub sends up to 25 MB), a crash report (16 KB), and MAX_JSON_KB for everything else."""
+    if method == "POST" and re.match(r"^/api/projects/[^/]+/documents/?$", path):
+        return settings.max_upload_mb * MiB + MiB
+    if method in {"POST", "PUT"} and re.match(r"^/api/meetings/[^/]+/recording/?$", path):  # self-hosted: the file itself
+        return settings.max_recording_mb * MiB + MiB
+    if path.startswith("/webhooks/"):
+        return 26 * MiB
+    if re.match(r"^/api/client-errors/?$", path):  # a crash report: a few short fields (app/api/client_errors.py)
+        return CLIENT_ERROR_BYTES
+    return max(1, settings.max_json_kb) * 1024
+
+
+class BodyLimitMiddleware:
+    """Refuses a request body over its route's limit (413) before anything reads it whole: a declared Content-Length is
+    checked first, and a chunked body is counted as it arrives. Without it, a client could stream gigabytes to a route that
+    reads its body before the sign-in or signature check (FastAPI parses JSON before the dependencies run). Pure ASGI."""
+
+    def __init__(self, app, settings=None):
+        self.app = app
+        if settings is None:
+            from app.config import get_settings
+
+            settings = get_settings()
+        self.settings = settings
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        limit = body_limit(scope["method"], scope["path"], self.settings)
+        declared = _header(scope, b"content-length")
+        if declared is not None and declared.strip().isdigit() and int(declared) > limit:
+            return await _too_large(send, limit)
+        received, started = 0, False
+
+        async def counted():
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body") or b"")
+                if received > limit:
+                    raise BodyTooLarge(limit)
+            return message
+
+        async def tracked(message):
+            nonlocal started
+            started = started or message["type"] == "http.response.start"
+            await send(message)
+
+        try:
+            await self.app(scope, counted, tracked)
+        except BodyTooLarge:  # read outside a route's own error handling (a middleware): answer here if nothing was sent
+            if started:
+                raise
+            await _too_large(send, limit)
+
+
+async def _too_large(send, limit: int) -> None:
+    body = json.dumps({"detail": _too_large_text(limit)}).encode()
+    await send({"type": "http.response.start", "status": 413, "headers": [
+        (b"content-type", b"application/json"), (b"content-length", str(len(body)).encode()), (b"connection", b"close")]})
+    await send({"type": "http.response.body", "body": body})

@@ -1,4 +1,4 @@
-"""The shared read-only tools agents call in their loop (app/agents/runtime.py; docs/AGENTS.md, "Tools").
+"""The shared read-only tools agents call in their loop (app/agents/core/runtime.py; docs/AGENTS.md, "Tools").
 
 Every tool:
   - reads only the project of its ToolCtx (the model never names a project) and re-checks the acting user's access
@@ -17,7 +17,7 @@ Every tool:
 
 Use: `from app.agents.tools import REGISTRY; tools = REGISTRY.select("search_knowledge", "read_file")`.
 """
-from app.agents.runtime import REGISTRY
+from app.agents.core.runtime import REGISTRY
 from app.agents.tools import hire, knowledge, people, repo  # noqa: F401 - importing registers the tools
 
 GUIDE_TOOLS = ("search_knowledge", "read_file", "find_symbol", "kt_moments", "verified_answers", "code_owners", "who_knows")

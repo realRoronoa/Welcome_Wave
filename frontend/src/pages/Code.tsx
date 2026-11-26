@@ -3,7 +3,7 @@ import { api, errorMessage, isManager, KTClip, mmss } from "../api";
 import { useSession } from "../session";
 import { EmptyState, reducedMotion, Ring, Skeleton } from "../fx";
 import { CopyButton, Glyph, highlight, initials, Tokens } from "./chat-parts";
-import { Logo, MarkLine } from "../ui";
+import { KtBadge, Logo, MarkLine } from "../ui";
 import { useLive } from "../live";
 import FeedbackButton from "../lifecycle/FeedbackButton";
 
@@ -183,7 +183,7 @@ export default function Code({ path, line }: { path: string | null; line: number
       <header className="page-head">
         <p className="page-eyebrow">{project.name}</p>
         <h1>Code and KT</h1>
-        <p>Teal lines were explained in a KT session. Select the mark to watch.</p>
+        <p>Lines marked <KtBadge /> were explained in a recorded KT session. Select the mark to watch.</p>
       </header>
       {error && <p className="error" role="alert">{error}</p>}
       {!files ? <CodeSkeleton /> : files.length === 0 ? (!error && (

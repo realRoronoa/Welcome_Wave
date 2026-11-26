@@ -1,0 +1,223 @@
+/* The in-app Home (src/lifecycle/Home.tsx): the workspace header, the key figures, the two columns, the 30/60/90 milestones,
+   the current milestone's tasks, KT sessions, hires and their stage, decisions, recent activity and "How we work here".
+   Tokens only (styles.css), so both themes work. Motion: transform and opacity only, and none under reduced motion. */
+
+/* ---------------------------------------------------------------- header */
+.hm-head { margin-bottom: 1.6rem; }
+.hm-ws { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem .6rem; margin-bottom: 1.15rem; font-size: .84rem; color: var(--ink-soft); }
+.hm-ws-tile { width: 22px; height: 22px; flex: none; display: grid; place-items: center; border-radius: 6px; font-size: .7rem; font-weight: 650;
+  color: var(--on-primary); background: var(--primary); }
+.hm-ws-path { display: inline-flex; align-items: baseline; gap: .4rem; min-width: 0; }
+.hm-ws-org { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-ws-path strong { color: var(--ink); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-ws-sep { color: var(--ink-faint); }
+/* your role: navy, the secondary colour, so "who you are here" reads apart from the teal actions */
+.hm-role { display: inline-flex; align-items: center; height: 1.4rem; padding: 0 .55rem; border-radius: 999px; font-size: .72rem; font-weight: 600;
+  color: var(--secondary); background: var(--info-wash); box-shadow: inset 0 0 0 1px var(--info-line); }
+.hm-head-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 1rem 2rem; flex-wrap: wrap; }
+.hm-head-text { min-width: 0; max-width: 70ch; }
+.hm-head h1 { margin: 0; font-size: 1.75rem; line-height: 1.15; letter-spacing: -.03em; font-weight: 650; }
+.hm-sub { margin: .45rem 0 0; color: var(--ink-soft); font-size: .95rem; }
+.hm-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+
+/* ---------------------------------------------------------------- key figures */
+.hm-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem; margin-bottom: 2.4rem; }
+.hm-kpi { position: relative; display: grid; align-content: start; gap: .5rem; min-height: 116px; padding: 1rem 1.1rem 1.05rem; border-radius: var(--radius-l);
+  background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-xs); color: var(--ink); text-decoration: none;
+  transition: border-color .15s, box-shadow .15s, transform .2s var(--ease-out); }
+a.hm-kpi:hover { color: var(--ink); border-color: var(--line-strong); box-shadow: var(--shadow-s); transform: translateY(-1px); }
+.hm-kpi-top { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.hm-kpi-label { display: inline-flex; align-items: center; gap: .4rem; font-size: .76rem; font-weight: 600; color: var(--ink-soft); }
+.hm-kpi.is-attn .hm-kpi-label::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--warning); }
+.hm-kpi-go { color: var(--ink-faint); transition: transform .2s var(--ease-out), color .15s; }
+a.hm-kpi:hover .hm-kpi-go { color: var(--primary-text); transform: translateX(2px); }
+.hm-kpi-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; min-width: 0; }
+.hm-kpi-value { min-width: 0; font-size: 1.75rem; font-weight: 650; line-height: 1.05; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.hm-kpi-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 1.1rem; letter-spacing: -.015em; line-height: 1.6rem; }
+.hm-kpi-of { margin-left: .35rem; font-size: .84rem; font-weight: 500; letter-spacing: 0; color: var(--ink-soft); }
+.hm-kpi-foot { display: block; font-size: .8rem; color: var(--ink-soft); }
+.hm-kpi-foot .lc-progress { margin-top: .25rem; }
+.hm-kpi-foot .lc-progress i { height: 4px; }
+
+/* ---------------------------------------------------------------- the two columns */
+.hm-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 2.5rem; align-items: start; }
+.hm-main > .lc-section:first-child { margin-top: 0; }
+.hm-main > .lc-section { margin-top: 2.4rem; }
+.hm-aside { position: sticky; top: 76px; display: grid; gap: .85rem; }
+.hm-card { padding: 1rem 1.1rem 1.05rem; border-radius: var(--radius-l); background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-xs); }
+.hm-card-head { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; margin-bottom: .7rem; }
+.hm-card-head h2 { margin: 0; font-size: .72rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-soft); }
+.hm-card .lc-quiet { padding: .2rem 0; border: 0; background: none; }
+.hm-card-foot { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; margin: .8rem 0 0; padding-top: .7rem; border-top: 1px solid var(--line);
+  font-size: .8rem; color: var(--ink-soft); }
+.hm-card-link { display: inline-flex; align-items: center; gap: .4rem; margin-top: .8rem; font-size: .84rem; font-weight: 550; text-decoration: none; }
+.hm-card-link:hover { text-decoration: underline; }
+.hm-big { margin: 0; font-size: 2rem; font-weight: 650; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- the 30/60/90 milestones */
+.hm-phases { list-style: none; margin: 0; padding: 1.2rem 1.25rem 1.1rem; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
+  border: 1px solid var(--line); border-radius: var(--radius-l); background: var(--surface); box-shadow: var(--shadow-xs); }
+.hm-phase { position: relative; display: grid; align-content: start; gap: .3rem; min-width: 0; padding-right: 1rem; }
+/* the line from this milestone to the next: teal once this one is done */
+.hm-phase::before { content: ""; position: absolute; left: 22px; right: 4px; top: 8px; height: 2px; border-radius: 2px; background: var(--line); }
+.hm-phase:last-child::before { display: none; }
+.hm-phase.is-done::before { background: var(--primary-fill); }
+.hm-phase-node { position: relative; z-index: 1; width: 18px; height: 18px; margin-bottom: .45rem; display: grid; place-items: center; border-radius: 50%;
+  border: 1.5px solid var(--line-strong); background: var(--surface); color: var(--on-primary); }
+.hm-phase.is-done .hm-phase-node { background: var(--primary-fill); border-color: var(--primary-fill); }
+.hm-phase.is-current .hm-phase-node { border: 2px solid var(--primary-fill); box-shadow: 0 0 0 4px var(--focus-ring); }
+.hm-phase.is-current .hm-phase-node::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--primary-fill); }
+.hm-phase-day { display: inline-flex; align-items: center; gap: .4rem; font-size: .74rem; font-weight: 600; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.hm-now { padding: 0 .4rem; border-radius: 999px; font-size: .66rem; line-height: 1.1rem; font-weight: 650; color: var(--primary-text); background: var(--primary-wash);
+  box-shadow: inset 0 0 0 1px var(--primary-line); }
+.hm-phase-title { min-height: 2.6em; font-size: .9rem; font-weight: 600; line-height: 1.3; color: var(--ink); } /* two lines, so the bars line up */
+.hm-phase.is-upcoming .hm-phase-title { color: var(--ink-2); font-weight: 550; }
+.hm-phase-meta { display: flex; align-items: center; gap: .5rem; margin-top: .25rem; }
+.hm-bar { position: relative; flex: 1; max-width: 120px; height: 4px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.hm-bar i { position: absolute; inset: 0; border-radius: inherit; background: var(--primary-fill); transform-origin: left; transition: transform .6s var(--ease-out); }
+.hm-phase-n { font-size: .74rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- the current milestone's tasks */
+.hm-tasks, .hm-hires { list-style: none; margin: 0; padding: 0; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius-l);
+  background: var(--surface); box-shadow: var(--shadow-xs); }
+.hm-tasks li + li, .hm-hires li + li { border-top: 1px solid var(--line); }
+.hm-task a { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto 3.4rem; align-items: center; gap: .8rem; padding: .7rem 1rem;
+  color: var(--ink); text-decoration: none; transition: background .15s; }
+.hm-task a:hover { color: var(--ink); background: var(--hover); }
+.hm-task-mark { width: 16px; height: 16px; display: grid; place-items: center; border-radius: 50%; border: 1.5px solid var(--line-strong); color: var(--on-primary); }
+.hm-task.is-done .hm-task-mark { background: var(--primary-fill); border-color: var(--primary-fill); }
+.hm-task.is-doing .hm-task-mark { border-color: var(--primary-fill); background: linear-gradient(90deg, var(--primary-fill) 50%, transparent 50%); }
+.hm-task.is-review .hm-task-mark { border-color: var(--info); border-style: dashed; }
+.hm-task.is-attn .hm-task-mark { border-color: var(--warning); }
+.hm-task-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .92rem; }
+.hm-task.is-done .hm-task-title { color: var(--ink-soft); }
+.hm-task-kind { display: inline-flex; color: var(--ink-muted); }
+.hm-task-state { padding: 0 .5rem; border-radius: 999px; font-size: .72rem; line-height: 1.25rem; font-weight: 600; white-space: nowrap; color: var(--ink-soft);
+  box-shadow: inset 0 0 0 1px var(--line-strong); }
+.hm-task-state.s-doing { color: var(--primary-text); background: var(--primary-wash); box-shadow: inset 0 0 0 1px var(--primary-line); }
+.hm-task-state.s-review { color: var(--info); background: var(--info-wash); box-shadow: inset 0 0 0 1px var(--info-line); }
+.hm-task-state.s-attn { color: var(--warning); background: var(--warning-wash); box-shadow: inset 0 0 0 1px var(--warning-line); }
+.hm-task-state.s-done { color: var(--success); background: var(--success-wash); box-shadow: inset 0 0 0 1px var(--success-line); }
+.hm-task-due { text-align: right; font-size: .78rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- lists in the side cards */
+.hm-kt, .hm-decide, .hm-people, .hm-steps, .hm-docs { list-style: none; margin: 0; padding: 0; display: grid; gap: .1rem; }
+.hm-kt a, .hm-decide a { display: grid; align-items: center; margin: 0 -.55rem; padding: .5rem .55rem; border-radius: var(--radius-m); color: var(--ink);
+  text-decoration: none; transition: background .15s; }
+.hm-kt a:hover, .hm-decide a:hover { color: var(--ink); background: var(--hover); }
+.hm-kt a { grid-template-columns: auto minmax(0, 1fr) auto; gap: .7rem; }
+/* a KT session's date: its teal marker on the left edge, the KT badge on the right */
+.hm-date { width: 38px; height: 40px; display: grid; place-items: center; align-content: center; border-radius: 8px; font-size: .6rem; font-weight: 600;
+  line-height: 1.1; text-transform: uppercase; color: var(--ink-soft); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line), inset 3px 0 0 var(--kt); }
+.hm-date b { font-size: .98rem; font-weight: 650; color: var(--ink); }
+.hm-kt-text { display: grid; min-width: 0; line-height: 1.3; }
+.hm-kt-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .88rem; font-weight: 550; }
+.hm-kt-when { font-size: .76rem; color: var(--ink-soft); }
+.hm-decide a { grid-template-columns: minmax(0, 1fr) auto; gap: .15rem .7rem; }
+.hm-decide-k { grid-column: 1; display: inline-flex; align-items: center; gap: .35rem; font-size: .68rem; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--ink-soft); }
+.hm-decide-t { grid-column: 1; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; font-size: .87rem; font-weight: 500; line-height: 1.35; }
+.hm-decide-when { grid-column: 2; grid-row: 1 / span 2; font-size: .74rem; color: var(--ink-soft); white-space: nowrap; }
+.hm-person { display: flex; align-items: center; gap: .65rem; padding: .3rem 0; }
+.hm-person-text { display: grid; line-height: 1.25; }
+.hm-person-n { font-size: .9rem; font-weight: 600; }
+.hm-person-k { font-size: .76rem; color: var(--ink-soft); }
+.hm-q { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .5rem; margin: 0; }
+.hm-q div { display: grid; gap: .1rem; }
+.hm-q dt { font-size: .74rem; color: var(--ink-soft); }
+.hm-q dd { margin: 0; font-size: 1.35rem; font-weight: 650; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.hm-steps li { display: flex; align-items: center; gap: .55rem; padding: .25rem 0; font-size: .86rem; color: var(--ink-2); }
+.hm-card .lc-setup-mini-top { display: flex; align-items: center; justify-content: space-between; gap: .8rem; margin-bottom: .55rem; font-size: .88rem; }
+.hm-card .lc-setup-mini-top .lc-progress { flex: 1; max-width: 140px; }
+
+/* ---------------------------------------------------------------- hires and their stage */
+.hm-hires a { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.3fr) 8.4rem; align-items: center; gap: .9rem; padding: .8rem 1rem;
+  color: var(--ink); text-decoration: none; transition: background .15s; }
+.hm-hires a:hover { color: var(--ink); background: var(--hover); }
+.hm-hire-who { display: grid; min-width: 0; line-height: 1.3; }
+.hm-hire-n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .92rem; font-weight: 600; }
+.hm-hire-r { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; color: var(--ink-soft); }
+.hm-hire-stage { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: .2rem .7rem; min-width: 0; }
+.hm-hire-day { white-space: nowrap; font-size: .84rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hm-hire-of { font-weight: 400; color: var(--ink-soft); }
+.hm-bar.wide { max-width: none; }
+.hm-hires .lc-state { justify-self: end; }
+.hm-hire-next { grid-column: 1 / -1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: .78rem; color: var(--ink-soft); }
+
+/* ---------------------------------------------------------------- recent activity: newest first, one thread */
+.hm-activity { list-style: none; margin: 0; padding: 0; }
+.hm-activity li { position: relative; }
+.hm-activity li > a, .hm-activity li > div { position: relative; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .75rem;
+  margin: 0 -.6rem; padding: .55rem .6rem; border-radius: var(--radius-m); font-size: .9rem; color: var(--ink-2); text-decoration: none; transition: background .15s; }
+.hm-activity li > a:hover { color: var(--ink); background: var(--hover); }
+.hm-activity li:not(:last-child)::after { content: ""; position: absolute; left: 12.5px; top: calc(.55rem + 30px); height: calc(100% - 34px); width: 1px; background: var(--line); }
+.hm-act-text strong { color: var(--ink); font-weight: 600; }
+.hm-act-when { font-size: .76rem; color: var(--ink-soft); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- how we work here: compact and secondary */
+.hm-culture { margin-top: 3.25rem; padding-top: 1.75rem; border-top: 1px solid var(--line); }
+.hm-culture-head h2 { margin: 0; font-size: 1rem; letter-spacing: -.01em; }
+.hm-culture-head p { margin: .3rem 0 0; font-size: .88rem; color: var(--ink-soft); }
+.hm-culture-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; margin-top: 1.1rem; }
+.hm-culture-col { min-width: 0; padding: 1rem 1.1rem; border-radius: var(--radius-l); background: var(--surface-2); border: 1px solid var(--line); }
+.hm-culture-col h3 { display: flex; align-items: center; gap: .45rem; margin: 0 0 .7rem; font-size: .72rem; font-weight: 600; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--ink-soft); }
+.hm-culture-col p { margin: .3rem 0 0; font-size: .86rem; color: var(--ink-2); }
+.hm-faces { display: flex; padding-left: 6px; margin-bottom: .6rem; }
+.hm-faces > .dp-avatar { margin-left: -6px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 0 2px var(--surface-2); }
+.hm-docs a { display: inline-flex; align-items: center; gap: .45rem; max-width: 100%; padding: .2rem 0; font-size: .86rem; font-weight: 500; text-decoration: none; }
+.hm-docs a:hover { text-decoration: underline; }
+.hm-docs svg { flex: none; color: var(--ink-muted); }
+.hm-docs span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-path { font-family: var(--code); font-size: .8rem; }
+.hm-record strong { font-size: 1.05rem; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- loading */
+.hm-skel-head { display: grid; gap: .7rem; margin-bottom: 1.8rem; }
+.hm-skel-head i, .hm-skel-line, .hm-kpi.hm-skel { display: block; border-radius: 6px; background: var(--surface-2); animation: hm-pulse 1.4s ease-in-out infinite; }
+.hm-skel-head i { height: 14px; width: 220px; }
+.hm-skel-head i:nth-child(2) { height: 26px; width: 320px; }
+.hm-skel-head i:nth-child(3) { width: 260px; }
+.hm-kpi.hm-skel { border-radius: var(--radius-l); box-shadow: none; }
+.hm-skel-line { height: 44px; border-radius: var(--radius-m); }
+@keyframes hm-pulse { 50% { opacity: .55; } }
+
+/* ---------------------------------------------------------------- arrival: the figures, then the columns, then the rest */
+.hm .hm-kpis { animation: hm-in .45s var(--ease-out) both; }
+.hm .hm-grid { animation: hm-in .5s var(--ease-out) .06s both; }
+.hm .hm-culture { animation: hm-in .5s var(--ease-out) .12s both; }
+@keyframes hm-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------------------------------------------------------------- narrower screens */
+@media (max-width: 1240px) {
+  .hm-grid { grid-template-columns: minmax(0, 1fr) 270px; gap: 2rem; }
+}
+@media (max-width: 1040px) {
+  .hm-grid { grid-template-columns: minmax(0, 1fr); gap: 2.4rem; }
+  .hm-aside { position: static; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); align-items: start; }
+}
+@media (max-width: 640px) {
+  .hm-head h1 { font-size: 1.45rem; }
+  .hm-ws { margin-bottom: .9rem; }
+  .hm-actions { width: 100%; }
+  .hm-actions .dp-btn { flex: 1 1 auto; }
+  .hm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-bottom: 2rem; }
+  .hm-kpi { min-height: 0; padding: .85rem .9rem; gap: .4rem; }
+  .hm-kpi-value { font-size: 1.4rem; }
+  .hm-kpi .ring { display: none; }
+  /* the milestones become a column: the node and its line on the left */
+  .hm-phases { grid-auto-flow: row; grid-auto-columns: auto; padding: 1rem 1rem .2rem; }
+  .hm-phase { grid-template-columns: 18px minmax(0, 1fr) auto; column-gap: .8rem; row-gap: .1rem; padding: 0 0 1rem; }
+  .hm-phase-node { grid-row: 1 / span 2; margin: 0; }
+  .hm-phase::before { left: 8px; right: auto; top: 20px; bottom: 2px; width: 2px; height: auto; }
+  .hm-phase-day { grid-column: 2; }
+  .hm-phase-title { grid-column: 2; min-height: 0; }
+  .hm-phase-meta { grid-column: 3; grid-row: 1 / span 2; margin: 0; }
+  .hm-phase-meta .hm-bar { width: 56px; }
+  .hm-task a { grid-template-columns: auto minmax(0, 1fr) auto; padding: .7rem .85rem; gap: .65rem; }
+  .hm-task-kind, .hm-task-due { display: none; }
+  .hm-hires a { grid-template-columns: auto minmax(0, 1fr) auto; padding: .8rem .85rem; gap: .2rem .75rem; }
+  .hm-hire-stage { grid-column: 2 / -1; grid-row: 2; }
+  .hm-hires .lc-state { grid-column: 3; grid-row: 1; }
+  .hm-culture-grid { grid-template-columns: minmax(0, 1fr); }
+}

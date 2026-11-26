@@ -1,0 +1,107 @@
+# The web app (frontend/Dockerfile): the production build served by nginx with the Content-Security-Policy and security
+# headers of frontend/nginx.conf.template. The Ingress sends /api, /webhooks and /health/ready straight to the API, so
+# nginx serves the app and the API's traffic does not pass through it.
+#
+# nginx looks the API up through the cluster's DNS server, which does not apply search domains for it: API_URL is the
+# Service's full name. Change it if the namespace or the cluster domain (cluster.local) is different.
+# The root filesystem is read-only: nginx's entrypoint writes its configuration to conf.d, and nginx its pid file and
+# request buffers, into the emptyDirs below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: web
+spec:
+  revisionHistoryLimit: 5
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxSurge: 25%, maxUnavailable: 0 }
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: welcome-wave
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: welcome-wave
+        app.kubernetes.io/component: web
+    spec:
+      serviceAccountName: web
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101 # the image's nginx user; the image names it, so Kubernetes needs the number to verify it is not root
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile: { type: RuntimeDefault }
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: web }
+          matchLabelKeys: [pod-template-hash]
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: welcome-wave, app.kubernetes.io/component: web }
+          matchLabelKeys: [pod-template-hash]
+      containers:
+        - name: web
+          image: welcome-wave-web
+          ports:
+            - { name: http, containerPort: 8080 }
+          env:
+            - { name: PORT, value: "8080" }
+            - { name: API_URL, value: "http://api.welcome-wave.svc.cluster.local:8080" }
+          startupProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 1
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: { path: /health, port: http } # not /health/ready: that one asks the API, and the app shell does not need it
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet: { path: /health, port: http }
+            periodSeconds: 20
+            timeoutSeconds: 3
+          lifecycle:
+            preStop:
+              exec: { command: ["sleep", "5"] }
+          resources:
+            requests: { cpu: 100m, memory: 128Mi }
+            limits: { memory: 256Mi }
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: { drop: [ALL] }
+          volumeMounts:
+            - { name: conf, mountPath: /etc/nginx/conf.d }
+            - { name: cache, mountPath: /var/cache/nginx }
+            - { name: run, mountPath: /run }
+            - { name: tmp, mountPath: /tmp }
+      volumes:
+        - { name: conf, emptyDir: { sizeLimit: 1Mi } }
+        - { name: cache, emptyDir: { sizeLimit: 256Mi } }
+        - { name: run, emptyDir: { sizeLimit: 1Mi } }
+        - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: web
+  ports:
+    - { name: http, port: 8080, targetPort: http }

@@ -19,9 +19,9 @@ resource "google_sql_database_instance" "db" {
       ipv4_enabled = true # reached only through the Cloud SQL connector / Auth Proxy (IAM-authorised, TLS); no authorised networks
       ssl_mode     = "ENCRYPTED_ONLY"
     }
-    database_flags {
+    database_flags { # worst case ~245: ww-api 10 x 15 (pools, checkpoints, LISTEN) + KEDA's 13 worker pods x 7 + migrations
       name  = "max_connections"
-      value = var.env == "prod" ? "400" : "200"
+      value = var.env == "prod" ? "400" : "300"
     }
     database_flags {
       name  = "cloudsql.iam_authentication"
@@ -72,6 +72,13 @@ locals {
 }
 
 # ---------- Cloud Storage: recordings and uploaded documents ----------
+# The browser uploads KT recordings straight into the bucket with a signed URL (backend/app/api/uploads.py), so the bucket
+# accepts a PUT from the web app's origins with the headers that URL binds. The origins are the domain and ww-web's run.app
+# host (`domain`, `web_host`): set `web_host` after the first deploy when there is no domain, or uploads are refused.
+locals {
+  web_origins = compact([var.domain != "" ? "https://${var.domain}" : "", var.web_host != "" ? "https://${var.web_host}" : ""])
+}
+
 resource "google_storage_bucket" "data" {
   name                        = "${var.project_id}-${local.prefix}-data"
   location                    = var.region
@@ -84,6 +91,15 @@ resource "google_storage_bucket" "data" {
       matches_prefix = ["recordings/"]
     }
     action { type = "Delete" }
+  }
+  dynamic "cors" {
+    for_each = length(local.web_origins) > 0 ? [1] : []
+    content {
+      origin          = local.web_origins
+      method          = ["PUT"]
+      response_header = ["Content-Type", "x-goog-content-length-range", "x-goog-if-generation-match"]
+      max_age_seconds = 3600
+    }
   }
   soft_delete_policy { retention_duration_seconds = 0 } # deleted recordings must really be gone (30-day promise)
   depends_on = [time_sleep.apis]

@@ -1,10 +1,11 @@
 """The agents API (docs/AGENTS.md): who the agents are, what they did, how each writes, and the daily tick.
 
-    GET   /api/agents?project_id          managers, admins, executives: the roster with each agent's mode and recent runs
+    GET   /api/agents?project_id          managers, admins, executives: the roster with each agent's mode and recent runs,
+                                           and the Guide's research crew [{key, name, role}] (docs/specs/rag-crew.md)
     GET   /api/agents/runs?project_id&agent&limit   managers, admins: recent runs, each with a short, safe summary and its
                                            visibility ("private": the hire's private review, whose trace only they read)
     GET   /api/agents/runs/{run_id}       the run's own user, and the project's managers (not for a private run): {run, steps},
-                                           the agent loop's privacy-filtered trace (app/agents/runtime.shared_steps)
+                                           the agent loop's privacy-filtered trace (app/agents/core/runtime.shared_steps)
     PATCH /api/agents/{key} {mode}         admins: "ai" or "rules" for this organisation (audited); the Supervisor and the
                                            Librarian write no text and cannot be switched (409)
     POST  /api/agents/tick?project_id     managers, admins (demo and self-hosted): run the daily tick now
@@ -21,7 +22,7 @@ import json
 from fastapi import APIRouter, Depends, Header, HTTPException, Path, Query
 from pydantic import BaseModel
 
-from app.agents import registry as R
+from app.agents.core import registry as R
 from app.api.auth import check_project, container, current_user, require
 from app.ports import User
 
@@ -63,7 +64,8 @@ def _agent(c, org_id: str, key: str, runs: list[dict], pending: list) -> dict:
             "failed_7d": sum(r.get("status") == "failed" for r in week),
             "last_run": {"at": _at(last.get("at")), "status": last.get("status"), "trigger": last.get("trigger"),
                          "trace_id": last.get("trace_id")} if last else None,
-            "pending": sum(1 for x in pending if x.kind in a.approvals)}
+            "pending": sum(1 for x in pending if x.kind in a.approvals),
+            **({"crew": [dict(m) for m in R.CREWS[key]]} if key in R.CREWS else {})}  # the Guide's research crew
 
 
 def _roster(c, user: User, projects: list[str], only: str | None = None) -> list[dict]:
@@ -175,7 +177,7 @@ def tick_now(project_id: str | None = None, user: User = Depends(require("manage
 def scheduled_tick(authorization: str | None = Header(default=None), c=Depends(container)):
     """Cloud Scheduler, with a Google-signed OIDC token for its service account (exactly like /internal/outbox/flush); off
     without that setup. Every organisation with a program in progress, once per day each, whoever calls first."""
-    from app.agents import tick
+    from app.agents.supervisor import tick
     from app.api.outbox import _scheduler_only
 
     _scheduler_only(authorization, c)
