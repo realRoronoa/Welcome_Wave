@@ -1,0 +1,192 @@
+/* Handovers (lifecycle/Handovers.tsx), in the Ink + Teal system (docs/brand/BRAND.md): teal marks progress and what the
+   transfer moves; navy is the dialogs' surface (.dp-dialog is a .ww-panel); amber marks a gap, red a blocker; KT items keep
+   the teal marker and the KT badge. Motion animates transform and opacity only, and stops for prefers-reduced-motion. */
+
+.ho-list { display: grid; gap: 1.5rem; }
+.ho-card { display: grid; gap: 1.6rem; padding: 1.5rem 1.75rem 1.75rem; background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius-l); box-shadow: var(--shadow-xs); }
+.ho-card.is-done { padding-bottom: 1.5rem; }
+
+/* buttons here sit in their own rows: none of the global small-button margin */
+.ho-card .dp-btn, .ho-dialog .dp-btn:not(.dp-dialog-x) { margin: 0; }
+
+/* ---------- the person ---------- */
+.ho-head { display: flex; align-items: center; justify-content: space-between; gap: .8rem 1rem; flex-wrap: wrap; }
+.ho-who { display: flex; align-items: center; gap: .9rem; min-width: 0; }
+.ho-name { margin: 0; font-size: 1.15rem; line-height: 1.3; font-weight: 640; letter-spacing: -.018em; }
+.ho-when { margin: .1rem 0 0; font-size: .86rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.ho-when.soon { color: var(--warning); font-weight: 550; }
+.ho-head-side { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+
+.ho-body { display: grid; gap: 2rem; animation: ho-in .35s var(--ease-out) both; }
+@keyframes ho-in { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---------- completeness, the successor and the two actions ---------- */
+.ho-summary { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 1.5rem 3rem; padding: 1.4rem 1.5rem;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-l); }
+.ho-meter { display: grid; gap: .75rem; min-width: 0; }
+.ho-pct { display: flex; align-items: baseline; margin: 0; }
+.ho-pct-n { font-size: 2.5rem; line-height: 1; font-weight: 660; letter-spacing: -.045em; font-variant-numeric: tabular-nums; }
+.ho-pct-u { margin-left: .1rem; font-size: 1.15rem; font-weight: 600; color: var(--ink-soft); }
+.ho-pct-l { margin-left: .7rem; font-size: .9rem; color: var(--ink-soft); }
+.ho-bar { position: relative; height: 8px; overflow: hidden; border-radius: 999px; background: var(--line); }
+.ho-bar i { position: absolute; inset: 0; transform-origin: left center; transition: transform .7s var(--ease-out); }
+.ho-bar-done { background: var(--primary-fill); }
+.ho-bar-moves { background: repeating-linear-gradient(135deg, var(--primary-line) 0 4px, transparent 4px 7px); }
+.ho-legend { display: flex; flex-wrap: wrap; gap: .35rem 1.3rem; margin: 0; padding: 0; list-style: none; font-size: .84rem; color: var(--ink-soft); }
+.ho-legend li { display: inline-flex; align-items: center; gap: .5rem; }
+.ho-legend li::before { content: ""; width: 9px; height: 9px; border-radius: 3px; flex: none; }
+.ho-legend .l-done::before { background: var(--primary-fill); }
+.ho-legend .l-moves::before { background: var(--primary-line); }
+.ho-legend .l-todo::before { border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--warning); }
+
+.ho-controls { display: grid; justify-items: end; gap: .85rem; }
+.ho-successor { display: flex; align-items: center; gap: .7rem; font-size: .84rem; font-weight: 550; color: var(--ink-2); }
+.ho-successor select { min-width: 14rem; }
+.ho-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+
+/* ---------- section headings ---------- */
+.ho-h { display: flex; align-items: center; gap: .55rem; margin: 0 0 .85rem; font-size: .98rem; font-weight: 630; letter-spacing: -.012em; }
+.ho-holds-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .85rem; }
+.ho-holds-head .ho-h { margin: 0; }
+
+/* ---------- gaps: one calm list, an amber edge; a blocker's mark is red ---------- */
+.ho-gaps ul { display: grid; margin: 0; padding: 0; list-style: none; overflow: hidden; background: var(--surface);
+  border: 1px solid var(--warning-line); border-radius: var(--radius-l); box-shadow: inset 3px 0 0 var(--warning); }
+.ho-gap { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .85rem; padding: 1rem 1.15rem 1rem 1.3rem;
+  border-top: 1px solid var(--line); }
+.ho-gap:first-child { border-top: 0; }
+.ho-gap-mark { display: grid; place-items: center; margin-top: .15rem; color: var(--warning); }
+.ho-gap.is-blocker .ho-gap-mark { color: var(--danger); }
+.ho-gap-text { min-width: 0; }
+.ho-gap-title { margin: 0; font-weight: 600; color: var(--ink); }
+.ho-gap-detail { margin: .2rem 0 0; font-size: .86rem; line-height: 1.5; color: var(--ink-soft); }
+.ho-gap-act { align-self: center; }
+.ho-gap-act .dp-btn { white-space: nowrap; }
+.ho-clear { display: flex; align-items: center; gap: .55rem; margin: 0; padding: .85rem 1.05rem; border-radius: var(--radius-m); color: var(--ink);
+  background: var(--success-wash); border: 1px solid var(--success-line); font-size: .9rem; }
+.ho-clear svg { color: var(--success); flex: none; }
+
+/* the CODEOWNERS change: a diff to copy into a pull request (Welcome Wave never writes to a repository) */
+.ho-diff { display: grid; gap: .6rem; margin-top: .8rem; }
+.ho-diff pre { margin: 0; padding: .8rem 1rem; overflow-x: auto; border-radius: var(--radius-m); background: var(--code-bg); color: var(--code-ink);
+  font: .8rem/1.7 var(--code); }
+.ho-diff .del { display: block; color: #fca5a5; }
+.ho-diff .add { display: block; color: #86efac; }
+.ho-diff-note { margin: 0; font-size: .84rem; color: var(--ink-2); }
+.ho-diff-foot { display: flex; flex-wrap: wrap; gap: .4rem; }
+
+/* ---------- what they hold: one accordion row per section ---------- */
+.ho-acc .acc-item { box-shadow: none; }
+.ho-acc .acc-sub { white-space: normal; }
+.ho-tally { display: inline-flex; flex-wrap: wrap; justify-content: flex-end; gap: .35rem; }
+.ho-chip { display: inline-flex; align-items: center; gap: .3rem; height: 1.4rem; padding: 0 .55rem; border-radius: 999px; font-size: .74rem;
+  font-weight: 560; white-space: nowrap; }
+.ho-chip.t-todo { color: var(--warning); background: var(--warning-wash); box-shadow: inset 0 0 0 1px var(--warning-line); }
+.ho-chip.t-moves { color: var(--primary-text); background: var(--primary-wash); box-shadow: inset 0 0 0 1px var(--primary-line); }
+.ho-chip.t-done { color: var(--ink-soft); background: var(--surface-2); box-shadow: inset 0 0 0 1px var(--line); }
+
+.ho-items { display: grid; margin: 0; padding: 0; list-style: none; }
+.ho-item { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: .85rem; padding: .8rem 0;
+  border-top: 1px solid var(--line); }
+.ho-item:first-child { border-top: 0; padding-top: .25rem; }
+.ho-state { display: grid; place-items: center; width: 22px; height: 22px; margin-top: .05rem; border-radius: 50%; flex: none; }
+.ho-item.is-done .ho-state { color: var(--on-primary); background: var(--primary-fill); }
+.ho-item.is-moves .ho-state { color: var(--primary-text); background: var(--primary-wash); box-shadow: inset 0 0 0 1px var(--primary-line); }
+.ho-item.is-todo .ho-state { box-shadow: inset 0 0 0 1.5px var(--warning); }
+.ho-item-main { min-width: 0; }
+.ho-item-title { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; margin: 0; font-weight: 550; color: var(--ink);
+  overflow-wrap: anywhere; }
+.ho-item-title.mono > :first-child { font: 550 .86rem var(--code); }
+.ho-item-link { color: var(--ink); text-decoration: none; }
+.ho-item-link:hover { color: var(--primary-text); text-decoration: underline; }
+.ho-item-detail { margin: .2rem 0 0; font-size: .84rem; line-height: 1.5; color: var(--ink-soft); }
+.ho-item.is-done .ho-item-title { color: var(--ink-2); }
+.ho-item-side { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; }
+.ho-owner { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; font-weight: 550; color: var(--ink-2); white-space: nowrap; }
+.ho-item.is-moves .ho-owner svg { color: var(--primary-text); }
+.ho-owner .dp-avatar { font-size: 8px !important; }
+.ho-icon-btn { display: grid; place-items: center; width: 30px; height: 30px; border-radius: var(--radius-s); color: var(--ink-soft);
+  transition: background-color .15s var(--ease), color .15s var(--ease); }
+.ho-icon-btn:hover { color: var(--ink); background: var(--surface-2); }
+.ho-tick { gap: .3rem; }
+.ho-more, .ho-none { margin: .9rem 0 0; font-size: .86rem; color: var(--ink-soft); }
+.ho-nothing { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin: 1rem 0 0; font-size: .84rem; color: var(--ink-soft); }
+.ho-nothing > span:first-child { margin-right: .2rem; }
+.ho-holds .ho-none:first-child, .ho-holds-head + .ho-none { margin-top: 0; }
+
+/* ---------- loading the transfer set ---------- */
+.ho-loading { display: grid; gap: .7rem; }
+.ho-loading i { display: block; height: 3.2rem; border-radius: var(--radius-m); background: var(--surface-2); border: 1px solid var(--line);
+  animation: ho-pulse 1.4s var(--ease) infinite; }
+.ho-loading i:first-child { height: 6.5rem; }
+.ho-loading i:nth-child(2) { animation-delay: .15s; }
+.ho-loading i:nth-child(3) { animation-delay: .3s; }
+@keyframes ho-pulse { 50% { opacity: .55; } }
+
+/* ---------- completed ---------- */
+.ho-completed { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: .9rem; padding: 1rem 1.1rem;
+  background: var(--success-wash); border: 1px solid var(--success-line); border-radius: var(--radius-m); }
+.ho-completed p { margin: 0; }
+.ho-completed .lc-dim { margin-top: .15rem; font-size: .86rem; color: var(--ink-2); }
+.ho-completed-mark { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; color: #fff; background: var(--success); }
+:root[data-theme="dark"] .ho-completed-mark { color: #052e16; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .ho-completed-mark { color: #052e16; } }
+
+/* ---------- forms and dialogs (navy panels) ---------- */
+.ho-create { display: grid; gap: 1.1rem; }
+.ho-create-sub { margin: .2rem 0 0; font-size: .86rem; }
+.ho-dialog { width: min(560px, calc(100vw - 2rem)); }
+.ho-dialog .dp-dialog-inner { gap: 1.2rem; }
+.ho-dialog-sub { margin: .35rem 0 0; font-size: .9rem; color: var(--ink-soft); }
+.ho-dialog-note { margin: 0; font-size: .84rem; color: var(--ink-soft); }
+.ho-fieldset { display: grid; gap: .7rem; margin: 0; padding: .95rem 1.05rem 1.05rem; border: 1px solid var(--warning-line); border-radius: var(--radius-m);
+  background: var(--warning-wash); }
+.ho-fieldset legend { padding: 0 .35rem; margin-left: -.35rem; font-size: .84rem; font-weight: 600; color: var(--ink); }
+.ho-dialog-gaps { margin: 0; padding-left: 1.1rem; display: grid; gap: .2rem; font-size: .88rem; color: var(--ink-2); }
+.ho-check { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .65rem; font-size: .88rem; color: var(--ink); cursor: pointer; }
+.ho-check input { margin: .2rem 0 0; width: 16px; height: 16px; }
+.ho-check strong { display: block; margin-bottom: .1rem; font-weight: 600; }
+.ho-danger { padding: .9rem 1rem; border: 1px solid var(--line-strong); border-radius: var(--radius-m); background: var(--surface);
+  transition: border-color .2s var(--ease), background-color .2s var(--ease); }
+.ho-danger.on { border-color: var(--danger-line); background: var(--danger-wash); }
+.ho-danger input { accent-color: var(--danger); }
+.ho-danger span { color: var(--ink-2); }
+.ho-danger strong { color: var(--ink); }
+.ho-confirm-name { font-weight: 650; color: var(--ink); }
+.ho-optional { margin-left: .3rem; font-weight: 450; color: var(--ink-soft); }
+.dp-btn.primary.ho-danger-btn { background: var(--danger); color: #fff; }
+.dp-btn.primary.ho-danger-btn:hover { background: color-mix(in srgb, var(--danger) 86%, #000); }
+.dp-btn.primary.ho-danger-btn:disabled { background: var(--surface-2); color: var(--ink-faint); }
+/* dark theme: the red is light, so the words on it are dark (white on it would fall under 4.5:1) */
+:root[data-theme="dark"] .dp-btn.primary.ho-danger-btn:not(:disabled) { color: #2a0705; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .dp-btn.primary.ho-danger-btn:not(:disabled) { color: #2a0705; } }
+
+/* ---------- narrow screens ---------- */
+@media (max-width: 760px) {
+  .ho-list { gap: 2.5rem; }
+  .ho-card { padding: 0; gap: 1.3rem; background: none; border: 0; box-shadow: none; }
+  .ho-body { gap: 1.75rem; }
+  .ho-summary { grid-template-columns: minmax(0, 1fr); padding: 1.1rem; }
+  .ho-controls { justify-items: stretch; }
+  .ho-successor { display: grid; gap: .35rem; }
+  .ho-successor select { min-width: 0; width: 100%; }
+  .ho-actions { display: grid; grid-template-columns: 1fr; }
+  .ho-actions .dp-btn { width: 100%; }
+  .ho-gap { grid-template-columns: auto minmax(0, 1fr); }
+  .ho-gap-act { grid-column: 2; justify-self: start; }
+  .ho-gap-act:empty { display: none; }
+  .ho-item { grid-template-columns: auto minmax(0, 1fr); }
+  .ho-item-side { grid-column: 2; justify-content: flex-start; }
+  .ho-item-side:empty { display: none; }
+  .ho-holds-head { flex-wrap: wrap; }
+  .ho-holds-head .dp-btn.ghost { margin-left: -.6rem; }
+  .ho-completed { grid-template-columns: auto minmax(0, 1fr); }
+  .ho-completed > .dp-btn { grid-column: 2; justify-self: start; }
+  .ho-pct-n { font-size: 2.1rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ho-body, .ho-loading i { animation: none; }
+  .ho-bar i, .ho-danger, .ho-icon-btn { transition: none; }
+}

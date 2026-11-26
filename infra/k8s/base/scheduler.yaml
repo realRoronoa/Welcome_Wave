@@ -1,0 +1,236 @@
+# The API's scheduled work, as Kubernetes CronJobs: the four calls Cloud Scheduler makes on Google Cloud
+# (infra/terraform/events.tf), same schedules (UTC), same deadlines. Each Job runs scheduler/call.py from the API image:
+# one POST to the API's Service with a Google-signed token for the `scheduler` service account. /internal/* is never routed
+# by the Ingress, so these calls never leave the cluster.
+#   outbox-flush     every 2 min   re-sends events whose publish to Pub/Sub failed
+#   recordings-poll  every 10 min  imports ended Google Calendar sessions' recordings from Drive
+#   lifecycle-tick   hourly :23    the agents' daily work, once a day per organisation (later runs catch up a missed one)
+#   audit-purge      daily 03:17   deletes audit entries older than AUDIT_RETENTION_DAYS
+# A run never overlaps the one before it (Forbid). A failed run shows as a failed Job; the next run tries again.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: outbox-flush
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: scheduler
+spec:
+  schedule: "*/2 * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 60
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0 # the next run is two minutes away
+      activeDeadlineSeconds: 90
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: welcome-wave
+            app.kubernetes.io/component: scheduler
+        spec:
+          serviceAccountName: scheduler
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: call
+              image: welcome-wave-api
+              command: ["python", "/scripts/call.py", "/internal/outbox/flush"]
+              env:
+                - { name: HOME, value: /tmp }
+                - { name: WW_CALL_TIMEOUT_S, value: "60" }
+                - name: OUTBOX_FLUSH_AUDIENCE
+                  valueFrom: { configMapKeyRef: { name: ww-config, key: OUTBOX_FLUSH_AUDIENCE } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: scripts, configMap: { name: ww-scheduler } }
+            - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: recordings-poll
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: scheduler
+spec:
+  schedule: "*/10 * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid # an import can take long; the next run waits for it
+  startingDeadlineSeconds: 300
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 0 # the next run is ten minutes away
+      activeDeadlineSeconds: 1860
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: welcome-wave
+            app.kubernetes.io/component: scheduler
+        spec:
+          serviceAccountName: scheduler
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: call
+              image: welcome-wave-api
+              command: ["python", "/scripts/call.py", "/internal/recordings/poll"]
+              env:
+                - { name: HOME, value: /tmp }
+                - { name: WW_CALL_TIMEOUT_S, value: "1800" } # an import streams a whole recording from Drive
+                - name: OUTBOX_FLUSH_AUDIENCE
+                  valueFrom: { configMapKeyRef: { name: ww-config, key: OUTBOX_FLUSH_AUDIENCE } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: scripts, configMap: { name: ww-scheduler } }
+            - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: lifecycle-tick
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: scheduler
+spec:
+  schedule: "23 * * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1300
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: welcome-wave
+            app.kubernetes.io/component: scheduler
+        spec:
+          serviceAccountName: scheduler
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: call
+              image: welcome-wave-api
+              command: ["python", "/scripts/call.py", "/internal/lifecycle/tick"]
+              env:
+                - { name: HOME, value: /tmp }
+                - { name: WW_CALL_TIMEOUT_S, value: "600" }
+                - name: OUTBOX_FLUSH_AUDIENCE
+                  valueFrom: { configMapKeyRef: { name: ww-config, key: OUTBOX_FLUSH_AUDIENCE } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: scripts, configMap: { name: ww-scheduler } }
+            - { name: tmp, emptyDir: { sizeLimit: 64Mi } }
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: audit-purge
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: scheduler
+spec:
+  schedule: "17 3 * * *"
+  timeZone: Etc/UTC
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 3600
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 700
+      ttlSecondsAfterFinished: 86400
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: welcome-wave
+            app.kubernetes.io/component: scheduler
+        spec:
+          serviceAccountName: scheduler
+          automountServiceAccountToken: false
+          enableServiceLinks: false
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile: { type: RuntimeDefault }
+          containers:
+            - name: call
+              image: welcome-wave-api
+              command: ["python", "/scripts/call.py", "/internal/audit/purge"]
+              env:
+                - { name: HOME, value: /tmp }
+                - { name: WW_CALL_TIMEOUT_S, value: "300" }
+                - name: OUTBOX_FLUSH_AUDIENCE
+                  valueFrom: { configMapKeyRef: { name: ww-config, key: OUTBOX_FLUSH_AUDIENCE } }
+              resources:
+                requests: { cpu: 50m, memory: 128Mi }
+                limits: { memory: 256Mi }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities: { drop: [ALL] }
+              volumeMounts:
+                - { name: scripts, mountPath: /scripts, readOnly: true }
+                - { name: tmp, mountPath: /tmp }
+          volumes:
+            - { name: scripts, configMap: { name: ww-scheduler } }
+            - { name: tmp, emptyDir: { sizeLimit: 64Mi } }

@@ -18,5 +18,8 @@ backups/
 .env.*
 !.env.example
 *.pem
+.claude/settings.local.json
 .ruff_cache/
 .DS_Store
+# a self-hosted restore keeps the files it replaced next to the data folder (scripts/selfhost.sh restore)
+*.before-restore-*/

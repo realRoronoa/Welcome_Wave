@@ -35,11 +35,13 @@ export function CountUp({ value, duration = 900, format = (n: number) => String(
   return <span className="count-up">{format(shown)}</span>;
 }
 
-/** A progress ring, 0..1, the label in the middle. Ink by default; `tone="kt"` is teal and only for a share that a KT session explained. */
-export function Ring({ value, size = 44, stroke = 4, label, tone = "ink" }: { value: number; size?: number; stroke?: number; label?: ReactNode; tone?: "ink" | "kt" }) {
+/** A progress ring, 0..1, the label in the middle. Ink by default; `tone="primary"` is the brand teal (progress through a
+ *  program); `tone="kt"` is the KT teal, only for a share that a KT session explained (show the KT badge beside it). */
+export function Ring({ value, size = 44, stroke = 4, label, tone = "ink" }:
+  { value: number; size?: number; stroke?: number; label?: ReactNode; tone?: "ink" | "kt" | "primary" }) {
   const r = (size - stroke) / 2, c = 2 * Math.PI * r, v = Math.max(0, Math.min(1, value || 0));
   return (
-    <span className={`ring${tone === "kt" ? " ring-kt" : ""}`} style={{ width: size, height: size }}>
+    <span className={`ring${tone === "ink" ? "" : ` ring-${tone}`}`} style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} className="ring-track" strokeWidth={stroke} />
         <circle cx={size / 2} cy={size / 2} r={r} className="ring-value" strokeWidth={stroke}
@@ -70,16 +72,31 @@ export function Kbd({ children }: { children: ReactNode }) {
 export const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 export const modKey = isMac ? "⌘" : "Ctrl";
 
+/* One observer for every Reveal on the page (a list of rows is one observer, not one each); each element is dropped from
+   it the first time it is seen. */
+const revealed = new WeakMap<Element, () => void>();
+let revealIO: IntersectionObserver | null = null;
+const revealObserver = () => revealIO ??= new IntersectionObserver((entries) => {
+  for (const e of entries) {
+    if (!e.isIntersecting) continue;
+    revealIO!.unobserve(e.target);
+    revealed.get(e.target)?.();
+    revealed.delete(e.target);
+  }
+}, { rootMargin: "0px 0px -8% 0px" });
+
 /** Fades and lifts its children in when they scroll into view (once). */
 export function Reveal({ children, delay = 0, as: Tag = "div", className = "", id }:
   { children: ReactNode; delay?: number; as?: "div" | "section" | "li"; className?: string; id?: string }) {
   const ref = useRef<HTMLElement>(null);
   const [seen, setSeen] = useState(() => reducedMotion());
   useEffect(() => {
-    if (seen || !ref.current) return;
-    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setSeen(true); io.disconnect(); } }, { rootMargin: "0px 0px -8% 0px" });
-    io.observe(ref.current);
-    return () => io.disconnect();
+    const el = ref.current;
+    if (seen || !el) return;
+    const io = revealObserver();
+    revealed.set(el, () => setSeen(true));
+    io.observe(el);
+    return () => { io.unobserve(el); revealed.delete(el); };
   }, [seen]);
   return <Tag ref={ref as never} id={id} className={`reveal ${seen ? "in" : ""} ${className}`} style={{ transitionDelay: `${delay}ms` }}>{children}</Tag>;
 }

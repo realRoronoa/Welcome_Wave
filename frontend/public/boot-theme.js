@@ -6,14 +6,19 @@
    The browser chrome colour matches the intro's field edge (#0a0a0a dark, #f2f2f2 light, = --b-bg in index.html); src/boot.ts
    holds it there while the intro is up and restores the page's colour as the intro dissolves.
    A new hire's pre-boarding page (/welcome/<token>) has no intro: a link from an email should show the page, so the root gets
-   "ww-no-boot", which hides #ww-boot at once (index.html) and lets boot-words.js remove it. Everywhere else it plays on every load. */
+   "ww-no-boot", which hides #ww-boot at once (index.html) and lets boot-words.js remove it. The legal documents (LEGAL below:
+   /terms, /privacy, /recording, /acceptable-use, /dpa, /subprocessors, the paths of src/legal/paths.ts) have none either: they
+   open from a sign-up checkbox, a calendar invitation or a contract, to be read. Everywhere else it plays on every load. */
 (function () {
   var root = document.documentElement, meta = document.querySelector('meta[name="theme-color"]');
   var p = location.pathname;
   var app = /^\/(login|signup|github\/callback)\/?$/.test(p) || /^\/app(\/|$)/.test(p) || (p === "/" && /^#\//.test(location.hash))
     || /^\/welcome\/[^/]+\/?$/.test(p); // a new hire's pre-boarding page follows their light/dark choice, as the app does
+  // keep in step with src/legal/paths.ts (and nginx.conf.template, which serves the shell for the same six)
+  var LEGAL = /^\/(terms|privacy|recording|acceptable-use|dpa|subprocessors)\/?$/;
   if (!app) {
     root.setAttribute("data-theme", "light");
+    if (LEGAL.test(p)) root.classList.add("ww-no-boot");
     // the landing page (/) opens on a dark live-action film: its intro is dark so nothing flashes white before the hero
     var film = p === "/" || p === "/index.html";
     if (film) root.classList.add("ww-boot-dark");

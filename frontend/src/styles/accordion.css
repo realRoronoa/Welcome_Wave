@@ -11,8 +11,8 @@
 .acc-trigger { width: 100%; display: grid; grid-template-columns: auto auto 1fr auto; align-items: center; column-gap: .75rem;
   padding: .9rem 1.1rem; background: none; border: 0; border-radius: var(--radius-l); color: var(--ink); font: inherit;
   text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-.acc-trigger:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
-.acc-chev { color: var(--ink-faint); transition: transform .28s var(--ease-out), color .2s var(--ease); }
+.acc-trigger:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.acc-chev { color: var(--ink-muted); transition: transform .28s var(--ease-out), color .2s var(--ease); }
 .acc-trigger:hover .acc-chev, .acc-item.open > .acc-head .acc-chev { color: var(--ink); }
 .acc-item.open > .acc-head .acc-chev { transform: rotate(90deg); }
 .acc-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-m); color: var(--ink-2);

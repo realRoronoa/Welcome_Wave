@@ -1,0 +1,29 @@
+# One API pod with the data volume at /data (DATA_DIR). It runs the background workers too (LOCAL_WORKERS, 3 by default),
+# so it gets more memory and scratch space than the Google Cloud API. Recreate: the old pod lets go of the volume before
+# the new one mounts it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+    rollingUpdate: null
+  template:
+    spec:
+      terminationGracePeriodSeconds: 60 # in-flight requests and background jobs get time to finish
+      securityContext:
+        fsGroupChangePolicy: OnRootMismatch # the volume's owner is fixed once, not on every start
+      containers:
+        - name: api
+          resources:
+            requests: { cpu: "1", memory: 2Gi, ephemeral-storage: 4Gi }
+            limits: { memory: 2Gi, ephemeral-storage: 5Gi }
+          volumeMounts:
+            - { name: data, mountPath: /data }
+      volumes:
+        - name: data
+          persistentVolumeClaim: { claimName: ww-data }
+        - name: tmp
+          emptyDir: { sizeLimit: 4Gi } # repository archives while indexing

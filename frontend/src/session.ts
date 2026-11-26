@@ -15,3 +15,4 @@ export function useSession(): Session {
   if (!s) throw new Error("useSession must be used inside a project");
   return s;
 }
+

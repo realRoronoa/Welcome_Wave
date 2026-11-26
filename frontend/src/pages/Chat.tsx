@@ -10,7 +10,9 @@ import FeedbackButton from "../lifecycle/FeedbackButton";
 import WhyThis from "../lifecycle/WhyThis";
 import { STEP_GAP, Thinking } from "../lifecycle/Trace";
 import { AgentGlyph } from "../lifecycle/Agents";
-import { agentKey, agentName, explainOf, mergeSteps, normaliseStep, stepsOf, TraceStep } from "../lifecycle/agentModel";
+import {
+  agentKey, agentName, Crew, crewLine, crewOf, crewTitle, explainOf, mergeSteps, normaliseStep, stepsOf, TraceStep,
+} from "../lifecycle/agentModel";
 
 /** The person a question was handed to, and their answer once they wrote it (the history joins it to the turn). */
 type Expert = { status: "open" | "answered"; name: string | null; answer: string | null; answered_at: string | null };
@@ -18,6 +20,9 @@ type Answer = {
   id?: string; message_id?: string; feedback?: 1 | -1 | null; question: string; status: "answered" | "not_enough_information"; answer: string;
   citations: Citation[]; kt_clips: KTClip[]; confidence: number; stale?: boolean; expert?: Expert | null; routed_to?: string | null;
   key?: string; // this tab's key for a turn asked here (its run id), so the turn keeps its place when the answer lands
+  // kept with the turn by the server (GET /api/chat/history, POST /api/chat): who wrote it, and how its sources were found,
+  // so a new tab or plain chat labels the answer the same as the tab that asked it
+  writer?: "model" | "extractive" | null; crew?: unknown;
 };
 
 /** POST /api/ask/route (docs/specs/answer-routing.md): which tier answered, and what it needs to show. */
@@ -33,6 +38,8 @@ type Route = {
   run_id?: string | null; steps?: unknown[]; // the agent's run and its trace (agentic contract §2)
   thought_ms?: number; // how long it thought, as this tab measured it
   handled_by?: string | null; proposal?: unknown; actions?: unknown; // a free-form request another agent took (Coach, Planner, Scout)
+  crew?: unknown; // how the research crew found the evidence: counts only (docs/specs/rag-crew.md), read by crewOf
+  writer?: "model" | "extractive" | null; // who wrote a tier-1 answer: a model, or the offline writer quoting the sources
 };
 
 const DEMO_STARTERS = [
@@ -78,7 +85,7 @@ function spoken(r: Route) {
   if (r.handled_by && agentKey(r.handled_by) !== "guide") return `${agentName(r.handled_by)} answered`;
   if (r.status === "routed") return `Sent to ${plain(r.routed_to?.name) || "a person"}`;
   if (r.status === "unrouted" || r.status === "offered" || (r.check && !r.check.ok)) return "Not enough evidence";
-  return "Answered";
+  return r.status === "answered" && r.writer === "extractive" ? "Answered, quoted from the sources" : "Answered";
 }
 
 /** Where a source opens: the code at its line, the KT session at its moment, the document at its page. A verified answer has
@@ -133,12 +140,13 @@ type Pending = { key: string; question: string; person: boolean; steps: TraceSte
 /** q: a question handed over from the command palette; it is asked once, then dropped from the URL.
  *  focus: a turn to show (a notification that an expert answered it); it is scrolled to and marked, then dropped from the URL. */
 export default function Chat({ q: handed, focus }: { q?: string | null; focus?: string | null } = {}) {
-  const { project, demo } = useSession();
+  const { project, demo, config } = useSession();
+  const aiOff = config.ai === false; // self-hosted without a model: no written answers, so a question goes to a person
   const [items, setItems] = useState<Answer[] | null>(null);
   const [routes, setRoutes] = useState<Record<string, Route>>(() => readRoutes(project.id));
   const [votes, setVotes] = useState<Record<string, 1 | -1>>({});
   const [q, setQ] = useState("");
-  const [person, setPerson] = useState(false);
+  const [person, setPerson] = useState(aiOff);
   const [busy, setBusy] = useState<null | "ai" | "person">(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [said, setSaid] = useState(""); // the polite live region: "Searching…", then "Answered"
@@ -165,11 +173,16 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
   useEffect(() => { load(); }, [load]);
   useLive("inbox", () => { load(); }, project.id); // an expert's answer shows up as soon as it is given
   const landed = useRef<string | null>(null); // the turn whose answer just arrived
+  const shown = useRef(false); // the history has been shown: it opens at its newest turn at once, later steps glide in
   useEffect(() => {
     if (focus) return;
     const behavior = reducedMotion() ? "auto" : "smooth";
     const key = landed.current;
-    if (!key) { end.current?.scrollIntoView({ behavior, block: "end" }); return; } // the history, or the newest step
+    if (!key) { // the history (a jump, not a glide through all of it), or the newest step
+      end.current?.scrollIntoView({ behavior: shown.current ? behavior : "instant", block: "end" });
+      if (items) shown.current = true;
+      return;
+    }
     landed.current = null;
     // an answer: once its steps have folded, bring its start into view if it runs under the composer (not its end)
     const t = window.setTimeout(() => {
@@ -238,13 +251,14 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
           const r = free ?? await post<Route>("/ask/route", {
             project_id: project.id, question, ask_person: askPerson, run_id: runId, ...(offered ? { message_id: offered } : {}),
           });
+          const thought = Math.round(performance.now() - t0); // the run's own time, before the pacing below
           // a fast run streams its steps in one burst: let them be seen one by one before the answer folds them (≤ 1.2 s)
           const catchUp = Math.min(1200, shownBy + 350 - performance.now());
           if (liveSteps.current.length > 1 && catchUp > 0 && !reducedMotion()) await new Promise((ok) => window.setTimeout(ok, catchUp));
           const own = stepsOf(r);
           const steps = own.length ? own : liveSteps.current;
           // the run id is kept only when the server ran one (it answered with it, or streamed its steps)
-          const kept: Route = { ...r, run_id: r.run_id ?? (steps.length ? runId : null), steps, thought_ms: Math.round(performance.now() - t0) };
+          const kept: Route = { ...r, run_id: r.run_id ?? (steps.length ? runId : null), steps, thought_ms: thought };
           remember(r.message_id ?? runId, kept);
           turn = turnOf(question, r);
           handedOver = r.status === "routed";
@@ -338,6 +352,11 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
     const steps = r ? stepsOf(r) : [];
     const handled = r ? handledOf(r) : null;
     const isNew = fresh.current.has(key);
+    // how the sources were found, under an answer written from them (tier 1). An earlier verified answer (tier 2) and the offer
+    // of a person did not come from that search, so the line would describe work that did not produce what is on the card.
+    const crew = a.status !== "answered" || handled ? null
+      : r ? (r.status === "answered" && r.tier === 1 ? crewOf(r) : null)
+      : a.writer ? crewOf({ crew: a.crew }) : null; // a turn from the history: its own crew, when the server kept one
     return (
       <article key={key} id={mid ? `turn-${mid}` : undefined} data-turn={key} className={`ak-turn${mid && mid === here ? " here" : ""}${isNew ? " is-new" : ""}`}>
         <p className="ak-q">{a.question}</p>
@@ -357,6 +376,7 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
         ) : (
           <Unsure a={a} onAskPerson={!a.routed_to && !a.expert ? () => ask(a.question, true) : undefined} disabled={!!busy} />
         )}
+        {crew && <CrewLine crew={crew} cited={a.citations.length} />}
       </article>
     );
   });
@@ -386,6 +406,14 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
     </form>
   );
 
+  const offNote = aiOff && (
+    <p className="ai-off ak-ai-off" role="note">
+      <Glyph name="alert" size={16} />
+      <span><strong>The AI is off on this server</strong>, so there are no written answers yet. Questions go to a person: your
+        mentor or the code owner, who answers here.</span>
+    </p>
+  );
+
   return (
     <section className={`chat ask${empty ? " is-empty" : ""}`}>
       {empty ? (
@@ -395,6 +423,7 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
             <h1>Ask the project</h1>
             <p>Answers cite the code, documents and KT sessions.</p>
           </header>
+          {offNote}
           {composer}
           <div className="ak-empty">
             <p className="ak-empty-label" id="ak-try">Try one of these</p>
@@ -426,6 +455,7 @@ export default function Chat({ q: handed, focus }: { q?: string | null; focus?: 
             {turns}
             <div ref={end} className="ak-end" />
           </div>
+          {offNote}
           {composer}
         </>
       )}
@@ -451,27 +481,36 @@ function Tier({ icon, children, r, end, tag = true }: { icon: ReactNode; childre
     <div className="ak-tier">
       <span className="ak-tier-start">
         <span className="ak-tier-label">{icon}{children}</span>
-        {r && <WhyThis explain={explainOf(r)} why={r.why} tag={tag} />}
+        {r && <WhyThis explain={explainOf(r)} why={r.why} tag={tag} writer={r.status === "answered" ? r.writer : null} />}
       </span>
       {end}
     </div>
   );
 }
 
-/** The answer's words, with its numbered markers ("[2]") as small links to the source they cite. */
+/** Code spans (```block``` or `inline`), as the backend reads them (routing.CODE_SPAN): their text is code, not prose. */
+const CODE_SPAN = /(```[\s\S]*?```|`[^`\n]+`)/g;
+
+/** The answer's words, with its numbered markers ("[2]") as small links to the source they cite. Code spans show as code,
+ *  without their backticks, and a "[1]" inside one is code too (an index, not a citation). */
 function AnswerText({ text, citations }: { text: string; citations: Citation[] }) {
-  const parts = text.split(/(\[\d{1,2}\])/g);
+  const prose = (chunk: string, at: number) => chunk.split(/(\[\d{1,2}\])/g).map((part, i) => {
+    const m = /^\[(\d{1,2})\]$/.exec(part);
+    const c = m ? citations[Number(m[1]) - 1] : undefined;
+    if (!m || !c) return part;
+    const href = sourceHref(c);
+    const cls = `ak-cite${isKt(c) ? " is-kt" : ""}`;
+    return href
+      ? <a key={`${at}.${i}`} className={cls} href={href} title={c.label} aria-label={`Source ${m[1]}: ${c.label}`}>{m[1]}</a>
+      : <span key={`${at}.${i}`} className={cls} title={c.label}>{m[1]}</span>;
+  });
   return (
     <p className="ak-text">
-      {parts.map((part, i) => {
-        const m = /^\[(\d{1,2})\]$/.exec(part);
-        const c = m ? citations[Number(m[1]) - 1] : undefined;
-        if (!m || !c) return part;
-        const href = sourceHref(c);
-        const cls = `ak-cite${isKt(c) ? " is-kt" : ""}`;
-        return href
-          ? <a key={i} className={cls} href={href} title={c.label} aria-label={`Source ${m[1]}: ${c.label}`}>{m[1]}</a>
-          : <span key={i} className={cls} title={c.label}>{m[1]}</span>;
+      {text.split(CODE_SPAN).map((chunk, i) => {
+        if (i % 2 === 0) return prose(chunk, i);
+        const block = chunk.startsWith("```");
+        const body = block ? chunk.slice(3, -3).replace(/^[\w+-]*\n/, "").replace(/\n$/, "") : chunk.slice(1, -1);
+        return block ? <code key={i} className="ak-code is-block">{body}</code> : <code key={i} className="ak-code">{body}</code>;
       })}
     </p>
   );
@@ -483,11 +522,18 @@ function AnswerCard({ a, r, vote, onAskPerson, disabled }: { a: Answer; r?: Rout
   const failed = r?.check && !r.check.ok;
   if (failed) return <NotEnough r={r} onAskPerson={onAskPerson} disabled={disabled} />;
   const numbered = /\[\d{1,2}\]/.test(a.answer);
+  // no model on the server: the offline writer copied each sentence from a cited source, and the label says so
+  const quoted = (r ? r.writer : a.writer) === "extractive";
   return (
     <div className="ak-card">
       <Tier icon={<Logo size={14} />} r={r}
             end={checked ? <span className="ak-checked" title="Every sentence matches a cited source"><Glyph name="check" size={13} />Sources checked</span> : undefined}>
         Answer
+        {quoted && (
+          <span className="ak-quoted" title="No AI model wrote this: it quotes the cited sources and names each one">
+            Quoted from the sources<span className="sr-only">: no AI model wrote this answer; it quotes the cited sources and names each one</span>
+          </span>
+        )}
       </Tier>
       {a.stale && <p className="ak-stale"><Glyph name="alert" size={14} />The code this cites has changed since. Ask again for a fresh answer.</p>}
       <AnswerText text={a.answer} citations={a.citations} />
@@ -499,6 +545,19 @@ function AnswerCard({ a, r, vote, onAskPerson, disabled }: { a: Answer; r?: Rout
         <button type="button" className="ak-quiet" onClick={onAskPerson} disabled={disabled}><Glyph name="user" size={14} />Ask a person</button>
       </div>
     </div>
+  );
+}
+
+/** How the Guide's research crew found the sources, in one quiet line under the turn: "3 searches · 21 sources: code 14, docs 4,
+ *  KT 3 · kept 6 · 38 ms". Counts only, in ink: it says how the evidence was gathered, not that a KT session explains it. */
+function CrewLine({ crew, cited }: { crew: Crew; cited: number }) {
+  const line = crewLine(crew, cited);
+  if (!line) return null;
+  return (
+    <p className="ak-crew" title={crewTitle(crew)}>
+      <Glyph name="search" size={12} />
+      <span><span className="sr-only">How the sources were found: </span>{line}</span>
+    </p>
   );
 }
 

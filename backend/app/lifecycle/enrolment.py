@@ -39,9 +39,15 @@ def enrol(ctx: Ctx, project_id: str, email: str, name: str, github_login: str | 
         store.add_member(project_id, hire.id)
     else:  # not in the organisation yet: the approved plan creates their invitation, whose acceptance binds this row
         hire = lc.ensure_user(org, email, name, github_login)
-    if any(o.new_hire_id == hire.id for o in store.onboardings(project_id)):
+    existing = next((o for o in store.onboardings(project_id) if o.new_hire_id == hire.id), None)
+    adopted = existing is not None and lc.get_program(existing.id) is None
+    if existing and not adopted:
         raise EnrolConflict(hire.name)
-    ob = store.create_onboarding(project_id, hire.id, manager.id, start, role_title or template.title)
+    if adopted:  # an onboarding started before programs existed (or by an older client): it gets its program now
+        _forget_finished_plan(ctx, existing)
+        ob = existing
+    else:
+        ob = store.create_onboarding(project_id, hire.id, manager.id, start, role_title or template.title)
     program = lc.create_program(
         OnboardingProgram(onboarding_id=ob.id, org_id=org, project_id=project_id, template_id=template.id,
                           template_version=template.version,
@@ -49,12 +55,31 @@ def enrol(ctx: Ctx, project_id: str, email: str, name: str, github_login: str | 
         [], [], T.acknowledgements_for(template, ob.id))
     enrolment = {"invite": invite, "email": email, "name": name, "github_login": github_login, "manager_id": manager.id,
                  "mentor_id": mentor_id, "template_id": template.id}
-    return {"onboarding": ob, "program": program, "invitation": None,
+    return {"onboarding": ob, "program": program, "invitation": None, "adopted": adopted,
             "next": "The 30/60/90 plan waits in Approvals. Approving it creates the milestones, the access requests and "
-                    + ("the invitation (no email is sent: you share its link)." if invite else "the tasks."),
+                    + ("the invitation (no email is sent: you share its link)." if invite else "the tasks.")
+                    + (f" Their onboarding keeps its start date, {ob.start_date:%d %b %Y}." if adopted else ""),
             "plan_event": {"type": "onboarding.started", "project_id": project_id, "onboarding_id": ob.id, "dedupe": f"ob:{ob.id}",
                            "enrolment": enrolment,
                            "template_tasks": [t.model_dump() for t in T.plan_tasks(template, template.duration_days)]}}
+
+
+class PlanInProgress(EnrolConflict):
+    """An onboarding without a program is being planned right now (or its plan waits in Approvals): enrol it once that is
+    settled, or the enrolment's plan would be a duplicate the event's dedupe key drops."""
+
+
+def _forget_finished_plan(ctx: Ctx, ob: Onboarding) -> None:
+    """Before an onboarding without a program is enrolled: its first plan run must be finished, and its plan decided, so the
+    enrolment's 30/60/90 plan can run under the same key (`ob:<id>`), which plan_status reads."""
+    store = ctx.store
+    if any(p.get("onboarding_id") == ob.id for a in store.approvals(ob.project_id, "pending") if a.kind == "task_plan"
+           for p in a.payload.get("plans", [])):
+        raise PlanInProgress("A plan for this person waits in Approvals: decide it first, then enrol them")
+    key = f"ob:{ob.id}"
+    status = store.event_status(key)
+    if status == "busy" or (status == "done" and not store.reset_event(key)):
+        raise PlanInProgress("A plan for this person is still being drafted: try again in a minute")
 
 
 def phases(duration_days: int) -> list[dict]:
@@ -125,7 +150,10 @@ def plan_status(ctx: Ctx, ob: Onboarding, program: OnboardingProgram) -> dict:
     """approved (a manager approved a plan for this hire, in Approvals or at enrolment), awaiting_approval, drafting (the
     Planner is writing it) or not_started. A further proposal (after a KT call) can wait while the plan is approved."""
     approvals = plan_approvals(ctx, ob)
-    decided = [a.decided_at for a in approvals if a.status in APPROVED and a.decided_at]
+    # a plan approved before the program existed (an onboarding started without one, then adopted by enrol) is not this
+    # program's 30/60/90 plan: its milestones and access requests come only with the plan drafted at enrolment
+    since = program.created_at
+    decided = [a.decided_at for a in approvals if a.status in APPROVED and a.decided_at and (since is None or a.decided_at >= since)]
     approved_at = program.plan_approved_at or (min(decided) if decided else None)
     pending = next((a for a in reversed(approvals) if a.status == "pending"), None)
     if approved_at:
