@@ -1,0 +1,248 @@
+# CI/CD. Trigger "main -> dev" (in the dev project) and "tag vX.Y.Z -> prod" (in the prod project) run this file;
+# Terraform creates both triggers (compute.tf). Runs as the ww-build service account.
+#
+#   test (unit + Postgres integration) + Terraform check -> evaluate -> build images -> migrate (Cloud Run job)
+#   -> deploy API + web (Cloud Run) -> deploy workers (GKE) -> smoke test
+#
+# Non-secret configuration is passed as substitutions on the trigger; secrets come from Secret Manager.
+#
+# The API is deployed with --update-env-vars, not --set-env-vars: the variables named below are re-applied on every deploy, and
+# every other variable already on the service (FEATURES, RATE_LIMIT_*, AUDIT_*, anything an admin set in the console or with
+# `gcloud run services update`) is left alone. (--set-env-vars would replace the whole list and silently reset them.)
+# To remove a variable from the service, use `gcloud run services update ww-api --remove-env-vars NAME`.
+# Email (SMTP_*) is set here, not on the service: the API and the review worker, which sends invitations, must agree on it.
+#
+# Cloud Run settings, and why:
+#   * Every signed-in tab holds one Server-Sent Events stream (GET /api/live, ended by the API every 15 minutes). A stream holds
+#     a request slot on ww-web (nginx, when it proxies /api) and on ww-api, so both take many concurrent requests, and their
+#     --timeout (60 min) outlasts a stream: Cloud Run's default of 5 minutes would cut every stream early.
+#   * ww-api: --session-affinity, so a person's stream and the requests that publish to it (the Guide's live steps) tend to
+#     reach the same instance.
+#   * _INGRESS: "all" without a load balancer (the run.app URLs are the app). With the domain's load balancer (Terraform sets
+#     "internal-and-cloud-load-balancing" on the trigger) the run.app URLs refuse the internet, so Cloud Armor cannot be
+#     bypassed; the load balancer sends /api, /webhooks and /health/ready to ww-api and the rest to ww-web. Cloud Scheduler's
+#     calls to ww-api count as internal.
+#   * Recordings never pass through Cloud Run (32 MiB request cap): the browser uploads them to Cloud Storage with a signed
+#     URL (backend/app/api/uploads.py), and Drive imports stream into Cloud Storage in chunks.
+substitutions:
+  _ENV: dev
+  _REGION: asia-south1
+  _REPO: ww-images
+  _VERTEX_LOCATION: global
+  # The code's defaults (backend/app/config.py): generally available ids, and a fallback chain of other models. Check them
+  # in the project and VERTEX_LOCATION before relying on them: python -m scripts.check_models (docs/DEPLOY.md, step 6).
+  _MODEL_FAST: gemini-3.5-flash-lite
+  _MODEL_SMART: gemini-3.5-flash
+  _MODEL_FALLBACK: gemini-3.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash
+  _GITHUB_APP_ID: ""
+  _GITHUB_APP_SLUG: ""
+  _GITHUB_CLIENT_ID: ""
+  _GOOGLE_OAUTH_CLIENT_ID: "" # Google Calendar + Meet for KT sessions (docs/specs/scheduling.md); empty = held elsewhere
+  _FIREBASE_API_KEY: "" # terraform output -raw firebase_api_key (public by design)
+  _PUBLIC_URL: "" # https://app.example.com once the domain is live (Terraform fills it in when `domain` is set)
+  # Proxies that append to X-Forwarded-For before ww-api: Google's front end for ww-web (nginx forwards the one address it
+  # appended) and ww-api's own front end; through the load balancer, client then load balancer. 2 either way (docs/DEPLOY.md).
+  _RATE_LIMIT_TRUSTED_HOPS: "2"
+  _INGRESS: all # Terraform sets internal-and-cloud-load-balancing when `domain` is set (the header above)
+  _API_MIN_INSTANCES: "0" # set 1 on demo day to avoid cold starts
+  _SMTP_HOST: "" # email (optional): invitations, digests, summaries. Empty = nothing is sent (docs/INTEGRATIONS.md)
+  _SMTP_PORT: "587" # 587 = STARTTLS, 465 = SSL; the password is the ww-smtp-password secret
+  _SMTP_USER: ""
+  _SMTP_FROM: "" # the From address; defaults to _SMTP_USER
+  _SIGNUP_ENABLED: "true" # "false" = invitation-only (set it here, not on the service: every deploy re-applies these)
+  _LANGSMITH_TRACING: "false" # opt-in: "true" sends agent prompts and outputs to LangSmith (API and workers; docs/SECURITY.md)
+  _LANGSMITH_ENDPOINT: https://api.smith.langchain.com # EU: https://eu.api.smith.langchain.com
+  _DB_INSTANCE: ww-db-dev # the trigger sets ww-db-<env>; change it to point every service at a restored instance
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_8
+timeout: 2400s
+
+steps:
+  # When this build started (seconds), kept in the workspace. A deploy labels ww-api with it (ww_build), and every step that
+  # changes something first checks the label: when two builds run at once, the older one stops instead of deploying last.
+  - id: stamp
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args: ["-c", "date -u +%s > /workspace/ww_build_started"]
+    waitFor: ["-"]
+
+  # ---------------- test ----------------
+  - id: postgres
+    name: gcr.io/cloud-builders/docker
+    args: ["run", "-d", "--name", "pg", "--network", "cloudbuild", "-e", "POSTGRES_USER=ww", "-e", "POSTGRES_PASSWORD=ww",
+           "pgvector/pgvector:pg16"]
+    waitFor: ["-"]
+
+  - id: backend-tests
+    name: python:3.12-slim
+    dir: backend
+    entrypoint: bash
+    env: ["TEST_PG_ADMIN_URL=postgresql://ww:ww@pg:5432/postgres"]
+    args:
+      - -c
+      - |
+        set -e
+        pip install -q -r requirements.lock -r requirements-dev.txt
+        ruff check app workers tests eval scripts
+        python - <<'PY'
+        import time, psycopg
+        for _ in range(60):
+            try:
+                psycopg.connect("postgresql://ww:ww@pg:5432/postgres").close(); break
+            except Exception:
+                time.sleep(1)
+        PY
+        pytest -q
+    waitFor: [postgres]
+
+  - id: eval
+    name: python:3.12-slim
+    dir: backend
+    entrypoint: bash
+    args: ["-c", "pip install -q -r requirements.lock && python -m eval.run_eval"] # fails the build below target
+    waitFor: [postgres]
+
+  - id: terraform-check # the infrastructure code is formatted and valid (no state, no credentials, nothing applied)
+    name: hashicorp/terraform:1.9.8
+    entrypoint: sh
+    args: ["-c", "cd infra/terraform && terraform fmt -check -recursive -diff && terraform init -backend=false -input=false >/dev/null && terraform validate"]
+    waitFor: ["-"]
+
+  # ---------------- build ----------------
+  - id: image-backend
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA", "backend"]
+    waitFor: ["-"]
+
+  - id: image-web # the image build runs tsc + vite build, so a type error fails here
+    name: gcr.io/cloud-builders/docker
+    args: ["build", "-t", "${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA", "frontend"]
+    waitFor: ["-"]
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    entrypoint: bash
+    args: ["-c", "docker push -q ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA && docker push -q ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA"]
+    waitFor: [backend-tests, eval, terraform-check, image-backend, image-web]
+
+  # ---------------- migrate (owner role, once per deploy) ----------------
+  - id: migrate
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        # a build that started after this one has already deployed: stop, so an older image never goes live last
+        live=$$(gcloud run services describe ww-api --region ${_REGION} --format 'value(metadata.labels.ww_build)' 2>/dev/null || true)
+        if [ -n "$$live" ] && [ "$$live" -gt "$$(cat /workspace/ww_build_started)" ]; then echo "a newer build is live: nothing to do"; exit 0; fi
+        gcloud run jobs deploy ww-migrate --region ${_REGION} \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA \
+          --command python --args=-m,app.migrate \
+          --service-account ww-migrate@$PROJECT_ID.iam.gserviceaccount.com \
+          --set-cloudsql-instances $PROJECT_ID:${_REGION}:${_DB_INSTANCE} \
+          --set-secrets DATABASE_URL_OWNER=ww-database-url-owner:latest,APP_DB_PASSWORD=ww-app-db-password:latest \
+          --max-retries 0 --task-timeout 600s
+        gcloud run jobs execute ww-migrate --region ${_REGION} --wait
+    waitFor: [push, stamp]
+
+  # ---------------- deploy ----------------
+  - id: deploy-api
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        # a build that started after this one has already deployed: stop, so an older image never goes live last
+        live=$$(gcloud run services describe ww-api --region ${_REGION} --format 'value(metadata.labels.ww_build)' 2>/dev/null || true)
+        if [ -n "$$live" ] && [ "$$live" -gt "$$(cat /workspace/ww_build_started)" ]; then echo "a newer build is live: nothing to do"; exit 0; fi
+        gcloud run deploy ww-api --region ${_REGION} \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA \
+          --service-account ww-api@$PROJECT_ID.iam.gserviceaccount.com \
+          --add-cloudsql-instances $PROJECT_ID:${_REGION}:${_DB_INSTANCE} \
+          --update-env-vars "^|^MODE=gcp|ENV=${_ENV}|GCP_PROJECT=$PROJECT_ID|GCP_REGION=${_REGION}|VERTEX_LOCATION=${_VERTEX_LOCATION}|GCS_BUCKET=$PROJECT_ID-ww-data|MODEL_FAST=${_MODEL_FAST}|MODEL_SMART=${_MODEL_SMART}|MODEL_FALLBACK=${_MODEL_FALLBACK}|GITHUB_APP_ID=${_GITHUB_APP_ID}|GITHUB_APP_SLUG=${_GITHUB_APP_SLUG}|GITHUB_CLIENT_ID=${_GITHUB_CLIENT_ID}|GOOGLE_OAUTH_CLIENT_ID=${_GOOGLE_OAUTH_CLIENT_ID}|FIREBASE_API_KEY=${_FIREBASE_API_KEY}|PUBLIC_URL=${_PUBLIC_URL}|SIGNUP_ENABLED=${_SIGNUP_ENABLED}|LANGSMITH_TRACING=${_LANGSMITH_TRACING}|LANGSMITH_ENDPOINT=${_LANGSMITH_ENDPOINT}|LANGSMITH_PROJECT=welcome-wave-${_ENV}|OUTBOX_FLUSH_AUDIENCE=https://ww-api-$PROJECT_NUMBER.${_REGION}.run.app|OUTBOX_FLUSH_INVOKER=ww-scheduler@$PROJECT_ID.iam.gserviceaccount.com|SMTP_HOST=${_SMTP_HOST}|SMTP_PORT=${_SMTP_PORT}|SMTP_USER=${_SMTP_USER}|SMTP_FROM=${_SMTP_FROM}|RATE_LIMIT_TRUSTED_HOPS=${_RATE_LIMIT_TRUSTED_HOPS}" \
+          --set-secrets DATABASE_URL=ww-database-url:latest,GITHUB_PRIVATE_KEY=ww-github-app-private-key:latest,GITHUB_WEBHOOK_SECRET=ww-github-webhook-secret:latest,GITHUB_CLIENT_SECRET=ww-github-client-secret:latest,GOOGLE_OAUTH_CLIENT_SECRET=ww-google-oauth-client-secret:latest,CALENDLY_WEBHOOK_SIGNING_KEY=ww-calendly-webhook-signing-key:latest,TOKEN_ENCRYPTION_KEY=ww-token-encryption-key:latest,LANGSMITH_API_KEY=ww-langsmith-api-key:latest,SMTP_PASSWORD=ww-smtp-password:latest \
+          --min-instances ${_API_MIN_INSTANCES} --max-instances 10 --concurrency 80 --cpu 1 --memory 1Gi --timeout 3600 \
+          --session-affinity --ingress ${_INGRESS} --update-labels ww_build=$$(cat /workspace/ww_build_started) \
+          --cpu-boost --execution-environment gen2 \
+          --allow-unauthenticated   # sign-in is enforced by the app (Identity Platform tokens); webhooks are signed; the outbox flush and recording poll need ww-scheduler's OIDC token
+        gcloud run services update-traffic ww-api --region ${_REGION} --to-latest   # undo any rollback pin
+    waitFor: [migrate]
+
+  - id: deploy-web
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        # ww-api carries the label of the newest deploy (this build's own when it got there first): newer means stop
+        live=$$(gcloud run services describe ww-api --region ${_REGION} --format 'value(metadata.labels.ww_build)' 2>/dev/null || true)
+        if [ -n "$$live" ] && [ "$$live" -gt "$$(cat /workspace/ww_build_started)" ]; then echo "a newer build is live: nothing to do"; exit 0; fi
+        API=$$(gcloud run services describe ww-api --region ${_REGION} --format 'value(status.url)')
+        gcloud run deploy ww-web --region ${_REGION} \
+          --image ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA \
+          --service-account ww-web@$PROJECT_ID.iam.gserviceaccount.com \
+          --set-env-vars API_URL=$$API --min-instances 0 --max-instances 10 --concurrency 400 --cpu 1 --memory 512Mi \
+          --timeout 3600 --ingress ${_INGRESS} --allow-unauthenticated   # 400: nginx's 1,024 connections per worker, two per proxied stream
+        gcloud run services update-traffic ww-web --region ${_REGION} --to-latest
+    waitFor: [deploy-api]
+
+  - id: deploy-workers
+    name: gcr.io/cloud-builders/kubectl
+    entrypoint: bash
+    env: ["CLOUDSDK_COMPUTE_REGION=${_REGION}", "CLOUDSDK_CONTAINER_CLUSTER=ww-workers-${_ENV}"]
+    args:
+      - -c
+      - |
+        set -e
+        # a build that started after this one has already deployed: stop, so an older image never goes live last
+        live=$$(gcloud run services describe ww-api --region ${_REGION} --format 'value(metadata.labels.ww_build)' 2>/dev/null || true)
+        if [ -n "$$live" ] && [ "$$live" -gt "$$(cat /workspace/ww_build_started)" ]; then echo "a newer build is live: nothing to do"; exit 0; fi
+        gcloud container clusters get-credentials ww-workers-${_ENV} --region ${_REGION}
+        sed -e "s#__IMAGE__#${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA#g" \
+            -e "s#__PROJECT_ID__#$PROJECT_ID#g" -e "s#__ENV__#${_ENV}#g" -e "s#__REGION__#${_REGION}#g" \
+            -e "s#__VERTEX_LOCATION__#${_VERTEX_LOCATION}#g" -e "s#__MODEL_FAST__#${_MODEL_FAST}#g" \
+            -e "s#__MODEL_SMART__#${_MODEL_SMART}#g" -e "s#__MODEL_FALLBACK__#${_MODEL_FALLBACK}#g" \
+            -e "s#__GITHUB_APP_ID__#${_GITHUB_APP_ID}#g" -e "s#__DB_CONNECTION__#$PROJECT_ID:${_REGION}:${_DB_INSTANCE}#g" \
+            -e "s#__LANGSMITH_TRACING__#${_LANGSMITH_TRACING}#g" -e "s#__LANGSMITH_ENDPOINT__#${_LANGSMITH_ENDPOINT}#g" \
+            -e "s#__PUBLIC_URL__#${_PUBLIC_URL}#g" -e "s#__SMTP_HOST__#${_SMTP_HOST}#g" -e "s#__SMTP_PORT__#${_SMTP_PORT}#g" \
+            -e "s#__SMTP_USER__#${_SMTP_USER}#g" -e "s#__SMTP_FROM__#${_SMTP_FROM}#g" \
+            infra/k8s/workers.yaml | kubectl apply -f -
+        # Ready = subscribed to its queue (readinessProbe). KEDA keeps the meeting and ingestion workers at zero when idle;
+        # then there is nothing to wait for, and the alerts on worker errors and restarts watch them once they start.
+        for d in review-worker meeting-worker ingestion-worker; do
+          kubectl -n welcome-wave rollout status deploy/$$d --timeout=300s
+        done
+    waitFor: [migrate]
+
+  # ---------------- smoke test ----------------
+  - id: smoke
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        set -e
+        API=$$(gcloud run services describe ww-api --region ${_REGION} --format 'value(status.url)')
+        WEB=$$(gcloud run services describe ww-web --region ${_REGION} --format 'value(status.url)')
+        if [ "${_INGRESS}" = "internal-and-cloud-load-balancing" ]; then
+          # only the load balancer's domain answers; the run.app URLs refuse callers from the internet
+          test -n "${_PUBLIC_URL}" || { echo "_PUBLIC_URL is needed to test through the load balancer"; exit 1; }
+          curl -fsS "${_PUBLIC_URL}/health" && curl -fsS "${_PUBLIC_URL}/health/ready" && curl -fsS "${_PUBLIC_URL}/api/config" >/dev/null
+          test "$$(curl -s -o /dev/null -w '%{http_code}' "${_PUBLIC_URL}/api/me")" = "401"   # sign-in is enforced
+          for u in "$$API/health" "$$WEB/health"; do
+            test "$$(curl -s -o /dev/null -w '%{http_code}' "$$u")" != "200" || { echo "$$u answers from the internet"; exit 1; }
+          done
+        else
+          curl -fsS "$$API/health/ready" && curl -fsS "$$WEB/health" && curl -fsS "$$WEB/health/ready" && curl -fsS "$$WEB/api/config" >/dev/null
+          test "$$(curl -s -o /dev/null -w '%{http_code}' "$$API/api/me")" = "401"   # sign-in is enforced
+        fi
+        echo "smoke test passed"
+    waitFor: [deploy-web, deploy-workers]
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/backend:$SHORT_SHA
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/web:$SHORT_SHA

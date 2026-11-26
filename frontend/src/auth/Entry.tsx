@@ -3,6 +3,7 @@
     lines; without WebGL, a still field of strokes weaving the mark), the form on the right. Phones: one column, a 232 px terrain band above the form. */
 import { InputHTMLAttributes, MouseEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { bootVisible, hideBoot } from "../boot";
+import { LEGAL_PATH } from "../legal/paths";
 import { focusIn, handedOver, navigateWithTransition, reducedMotion, takeArrival } from "../surface";
 import { Logo } from "../ui";
 import { pulseTerrain, TerrainScene } from "./terrain";
@@ -204,6 +205,11 @@ export function EntryLayout({ title, lead, children, footer, wide }:
           {children}
           {footer && <div className="en-foot">{footer}</div>}
         </div>
+        <nav className="en-legal" aria-label="Legal">
+          <a href={LEGAL_PATH.terms} target="_blank" rel="noopener">Terms<span className="sr-only"> (opens in a new tab)</span></a>
+          <a href={LEGAL_PATH.privacy} target="_blank" rel="noopener">Privacy<span className="sr-only"> (opens in a new tab)</span></a>
+          <a href={LEGAL_PATH.recording} target="_blank" rel="noopener">Recording notice<span className="sr-only"> (opens in a new tab)</span></a>
+        </nav>
       </div>
     </main>
   );

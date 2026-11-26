@@ -2,18 +2,25 @@ import { FormEvent, useState } from "react";
 import { errorMessage } from "../api";
 import { Msg, Note } from "../ui";
 import type { Fb } from ".";
+import { Agree } from "./Agree";
 import { Busy, EntryLayout, GoogleGlyph, PasswordInput } from "./Entry";
 
 // closing the Google window is a choice, not an error
 const QUIET = new Set(["auth/popup-closed-by-user", "auth/cancelled-popup-request", "auth/user-cancelled"]);
 
-/** `initialCreating`: opened at /signup, so the form starts in "Create account" mode. */
+/** `initialCreating`: opened at /signup, so the form starts in "Create account" mode. Creating a login, by email or with
+ *  Google, asks for the agreement first (Agree.tsx); signing in to an existing one does not. The agreement is recorded with
+ *  the account itself, on the next screen (Setup.tsx, Invited.tsx), which asks for it in the request the API records. */
 export default function SignIn({ fb, initialCreating = false }: { fb: Fb; initialCreating?: boolean }) {
   const [creating, setCreating] = useState(initialCreating);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<Msg>(null);
+  const [agreed, setAgreed] = useState(false);
+  const [missed, setMissed] = useState(0);
+  /** Creating an account needs the box ticked: say so at the box, and do nothing else. */
+  const blocked = () => { if (!creating || agreed) return false; setMsg(null); setMissed((n) => n + 1); return true; };
 
   async function run(action: () => Promise<unknown>, done?: string) {
     setBusy(true); setMsg(null);
@@ -27,6 +34,7 @@ export default function SignIn({ fb, initialCreating = false }: { fb: Fb; initia
 
   function submit(e: FormEvent) {
     e.preventDefault();
+    if (blocked()) return;
     run(() => (creating ? fb.createAccount(email.trim(), password) : fb.signIn(email.trim(), password)));
   }
 
@@ -36,7 +44,7 @@ export default function SignIn({ fb, initialCreating = false }: { fb: Fb; initia
   }
 
   const toggle = () => {
-    setCreating(!creating); setMsg(null);
+    setCreating(!creating); setMsg(null); setAgreed(false); setMissed(0);
     // the address follows the mode (/login and /signup), so a reload or a shared link opens the same form
     if (/^\/(login|signup)\/?$/.test(location.pathname)) history.replaceState(history.state, "", `${creating ? "/login" : "/signup"}${location.search}`);
   };
@@ -48,7 +56,7 @@ export default function SignIn({ fb, initialCreating = false }: { fb: Fb; initia
         <p>{creating ? "Already have an account?" : "New to Welcome Wave?"}{" "}
           <button type="button" className="en-link" onClick={toggle}>{creating ? "Sign in" : "Create an account"}</button></p>
       }>
-      <button type="button" className="en-provider" onClick={() => run(fb.google)} disabled={busy}>
+      <button type="button" className="en-provider" onClick={() => { if (!blocked()) run(fb.google); }} disabled={busy}>
         <GoogleGlyph /> Continue with Google
       </button>
       <p className="en-divider"><span>or with email</span></p>
@@ -68,6 +76,7 @@ export default function SignIn({ fb, initialCreating = false }: { fb: Fb; initia
           <span className="en-invalid">{creating ? "Use at least 6 characters." : "Enter your password."}</span>
           {creating && <span id="pw-hint" className="en-hint">At least 6 characters. We will email you a link to confirm the address.</span>}
         </div>
+        {creating && <Agree id="si-agree" checked={agreed} onChange={setAgreed} disabled={busy} missed={missed} />}
         <button type="submit" className="en-primary" disabled={busy}>
           <Busy busy={busy} label="Please wait…">{creating ? "Create account" : "Sign in"}</Busy>
         </button>

@@ -1,0 +1,62 @@
+# GKE Ingress: Google's global HTTPS load balancer, sending traffic straight to the pods (network endpoint groups).
+#
+# The certificate: Google-managed, for PUBLIC_URL's host (filled in by kustomization.yaml). It becomes active 15-60 minutes
+# after the host's DNS A record points at the static address (ingress-patch.yaml).
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: ww-web
+spec:
+  domains: [app.example.com]
+---
+# HTTP is redirected to HTTPS. For a minimum TLS version, create an SSL policy once
+# (gcloud compute ssl-policies create ww-tls --profile MODERN --min-tls-version 1.2) and add `sslPolicy: ww-tls` here.
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: ww-web
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+---
+# The API's backend. Every signed-in tab holds a live-update stream (GET /api/live) that the API ends every 15 minutes, and a
+# Drive import can take long: the timeout outlasts both. The cookie keeps a person's stream and the requests that publish
+# to it (an agent's live steps) on one pod; when they differ, the answer still arrives, only the live view of its steps is
+# missed. The health check is /health: a database outage must not take every pod out of the load balancer at once (each
+# pod's readiness, /health/ready, still gates its own traffic). Request logs: 20 %, and URLs that carry a credential are
+# kept out of Cloud Logging by Terraform's exclusion (credential_urls, infra/terraform/observability.tf).
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: api
+spec:
+  timeoutSec: 3600
+  connectionDraining: { drainingTimeoutSec: 30 }
+  sessionAffinity: { affinityType: GENERATED_COOKIE, affinityCookieTtlSec: 3600 }
+  healthCheck:
+    type: HTTP
+    requestPath: /health
+    port: 8080
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+  logging: { enable: true, sampleRate: 0.2 }
+---
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: web
+spec:
+  timeoutSec: 120
+  connectionDraining: { drainingTimeoutSec: 30 }
+  healthCheck:
+    type: HTTP
+    requestPath: /health
+    port: 8080
+    checkIntervalSec: 10
+    timeoutSec: 5
+    healthyThreshold: 1
+    unhealthyThreshold: 3
+  logging: { enable: true, sampleRate: 0.2 }

@@ -1,5 +1,5 @@
 # Secrets. Database credentials and the key that encrypts stored Google refresh tokens are generated here; the rest are
-# third-party values a human adds once (scripts/set-secrets.sh). Access is granted per secret, per workload.
+# third-party values a human adds once (infra/scripts/set-secrets.sh). Access is granted per secret, per workload.
 
 # Encrypts each organisation's Google Calendar refresh token before it is stored (TOKEN_ENCRYPTION_KEY). Changing it
 # makes every organisation connect Google again.
@@ -11,15 +11,17 @@ resource "random_password" "token_encryption_key" {
 locals {
   generated_secrets = merge(local.db_urls, { "token-encryption-key" = random_password.token_encryption_key.result })
   generated_names   = ["database-url", "database-url-proxy", "database-url-owner", "app-db-password", "token-encryption-key"]
-  human_secrets = ["github-app-private-key", "github-webhook-secret", "github-client-secret", "google-oauth-client-secret",
-  "calendly-webhook-signing-key", "langsmith-api-key"]
+  human_secrets = [
+    "github-app-private-key", "github-webhook-secret", "github-client-secret", "google-oauth-client-secret",
+    "calendly-webhook-signing-key", "langsmith-api-key", "smtp-password",
+  ]
 
   # which workload may read which secret (keys are static names so the first plan works before accounts exist)
   readers = {
-    "database-url"           = ["api"]
-    "database-url-proxy"     = ["worker"]
-    "database-url-owner"     = ["migrate"]
-    "app-db-password"        = ["migrate"]
+    "database-url"                 = ["api"]
+    "database-url-proxy"           = ["worker"]
+    "database-url-owner"           = ["migrate"]
+    "app-db-password"              = ["migrate"]
     "token-encryption-key"         = ["api"]
     "github-app-private-key"       = ["api", "worker"]
     "github-webhook-secret"        = ["api"]
@@ -27,6 +29,7 @@ locals {
     "google-oauth-client-secret"   = ["api"]
     "calendly-webhook-signing-key" = ["api"]
     "langsmith-api-key"            = ["api", "worker"]
+    "smtp-password"                = ["api", "worker"]
   }
   workload_emails = {
     api = google_service_account.api.email, worker = google_service_account.worker.email, migrate = google_service_account.migrate.email
@@ -49,6 +52,13 @@ resource "google_secret_manager_secret_version" "generated" {
   for_each    = toset(local.generated_names)
   secret      = google_secret_manager_secret.s[each.value].id
   secret_data = local.generated_secrets[each.value]
+}
+
+# Email is optional, and newer than some installations: the SMTP password starts as "unused" (no email), so a deploy never
+# waits for a version of it. set-secrets.sh adds the real one as a newer version; the services read the newest.
+resource "google_secret_manager_secret_version" "smtp_password_unused" {
+  secret      = google_secret_manager_secret.s["smtp-password"].id
+  secret_data = "unused"
 }
 
 resource "google_secret_manager_secret_iam_member" "readers" {

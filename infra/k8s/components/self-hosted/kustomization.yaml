@@ -1,0 +1,69 @@
+# Any Kubernetes cluster, no Google Cloud: MODE=self_hosted, the mode scripts/selfhost.sh runs on one machine. Postgres
+# (16 + pgvector, yours: managed or an operator such as CloudNativePG), Firebase sign-in, Gemini by API key, files on a
+# volume. Background work (indexing, call notes, reviews, plans), repository polling, recording imports, the daily tick and
+# the audit purge run inside the API process, so the Pub/Sub workers and the scheduled calls are removed.
+#
+# The API keeps documents and recordings on one ReadWriteOnce volume, so it runs as ONE pod, replaced (not rolled) on a
+# release: a few seconds without the API while the new pod starts. Scale the web app freely.
+#
+# Include it before the overlay's settings, so the overlay can still change anything set here.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - data-volume.yaml
+
+configMapGenerator:
+  - name: ww-config
+    behavior: merge
+    literals:
+      - MODE=self_hosted
+      - DATA_DIR=/data
+      - OUTBOX_FLUSH_AUDIENCE= # the scheduled calls run inside the API here: /internal/* stays off
+
+patches:
+  - path: api.yaml
+  # nothing here uses Pub/Sub or Google's scheduler
+  - target: { kind: Deployment, name: ^(meeting|ingestion|review)-worker$ }
+    patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata: { name: removed }
+  - target: { kind: CronJob }
+    patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata: { name: removed }
+  - target: { kind: ServiceAccount, name: ^(worker|scheduler)$ }
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ServiceAccount
+      metadata: { name: removed }
+  - target: { kind: ConfigMap, name: ^ww-scheduler$ }
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata: { name: removed }
+  - target: { kind: NetworkPolicy, name: ^scheduler-egress$ }
+    patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata: { name: removed }
+  # one API pod: no autoscaler, and no disruption budget to block a node drain
+  - target: { kind: HorizontalPodAutoscaler, name: ^api$ }
+    patch: |-
+      $patch: delete
+      apiVersion: autoscaling/v2
+      kind: HorizontalPodAutoscaler
+      metadata: { name: removed }
+  - target: { kind: PodDisruptionBudget, name: ^api$ }
+    patch: |-
+      $patch: delete
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata: { name: removed }
