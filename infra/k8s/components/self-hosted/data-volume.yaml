@@ -1,0 +1,15 @@
+# Uploaded documents, KT call recordings (up to MAX_RECORDING_MB each, 2 GB by default) and, unless they are set in the
+# ww-api Secret, the keys the API generates (BLOB_SIGNING_KEY, TOKEN_ENCRYPTION_KEY). Back it up with the database
+# (docs/KUBERNETES.md, "Backups"): without .token-key, every organisation must connect Google again.
+# The cluster's default storage class; set storageClassName in the overlay for another.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ww-data
+  labels:
+    app.kubernetes.io/name: welcome-wave
+    app.kubernetes.io/component: api
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests: { storage: 50Gi }

@@ -14,7 +14,7 @@ These were written before drawing and used to judge every concept.
 2. **A letter first, a symbol second.** It reads as W at 16 px. The idea rewards a closer look at 64 px and above.
 3. **Constructed, not drawn.** It sits on a grid with exact radii and one stroke weight. Every dimension can be written down.
 4. **Distinct in silhouette.** It must not be a generic rounded "w", a water glyph, a person, an equaliser, a terminal prompt or a chevron badge.
-5. **Monochrome at heart.** It works in pure black and pure white. Teal is allowed only where it means what it means in the product: explained in a KT session.
+5. **Monochrome at heart.** It works in pure black and pure white. In colour, only the first stroke is teal, the brand colour (section 6).
 6. **Warm and precise together.** Round ends for the people, straight cuts for the code.
 7. **It has to move.** The construction is also the motion: the strokes arrive in order.
 8. **Quiet next to Geist.** The wordmark is the product's own typeface, spaced by hand, with no custom glyph tricks.
@@ -72,17 +72,49 @@ All paths are exact lines and arcs, with no masks. They come from one generator;
 - **Stacked:** cap height 0.36 ×, gap 0.30 ×, centred.
 - **Clear space:** 0.25 × the mark's ink height on every side of any lockup. That is roughly the width of one stroke pair.
 
-## 6. Colour
+## 6. Colour: Ink + Teal
+
+Three colours, each with one job. The tokens live at the top of `frontend/src/styles.css`. Components use the role tokens (`--primary`, `--panel`, `--success`), never the raw scales.
+
+| Role | What it is for | Light | Dark |
+|---|---|---|---|
+| **Ink** (base) | The canvas, type, hairlines and the black rail | `#ffffff` page, `#0a0a0a` text | `#0a0a0a` page, `#ededed` text |
+| **Teal** (primary, the brand) | Primary buttons, links, focus, selection, progress, toggles, checkboxes and where you are in the navigation | `--primary` `#0f766e`, white text; marks `#0d9488` | `--primary` `#2dd4bf`, text `#042f2e` |
+| **Navy** (secondary) | The surface of every form panel, dialog, popover and sheet; your role; the info state | `--panel` `#f4f6fb`, inputs white with a `#7486ad` edge | `--panel` `#111c33`, inputs `#0a1222` with a `#5a6f9c` edge |
+
+Secondary actions stay neutral: a white (or near-black) button with a grey edge. A page has one teal button at most.
+
+**The scales.**
+
+| | 50 | 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 | 950 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| Teal | `#f0fdfa` | `#ccfbf1` | `#99f6e4` | `#5eead4` | `#2dd4bf` | `#14b8a6` | `#0d9488` | `#0f766e` | `#115e59` | `#134e4a` | `#042f2e` |
+| Navy | `#f4f6fb` | `#e8edf6` | `#d3dbea` | `#aebcd6` | `#7d8fb6` | `#566a96` | `#3d5079` | `#2a3b61` | `#1b2a4a` | `#111c33` | `#0a1222` |
+
+`#2dd4bf` (teal 400) is the light in the intro and the first stroke of the mark on dark grounds.
+
+**States** are for states only, never decoration:
+
+| | Light | Dark | Used for |
+|---|---|---|---|
+| Success | `#15803d` on `#f0fdf4` | `#4ade80` | Done, approved, on track |
+| Warning | `#b45309` on `#fffbeb` | `#fbbf24` | Needs a look, stale, due soon |
+| Danger | `#c9281c` on `#fef3f2` | `#f97066` | Overdue, failed, critical, errors |
+| Info | navy `#3d5079` on `#f4f6fb` | navy `#aebcd6` | In progress, in review, scheduled |
+
+**KT keeps its meaning.** "Explained in a recorded KT session" used to be the only teal in the product. Now that teal is the brand, every KT mark has two signals: the teal marker it always had (the line in the code view, the edge of a session's date tile, the clip tile), and a small **KT badge** (`<KtBadge />` in `src/ui.tsx`, class `.kt-badge`). The code view's first explained line shows a "play KT" tab, and KT timestamps carry the badge in front of the time. Anything that comes from a recorded session gets the badge.
+
+**Panels are navy.** A form or dialog never sits black on black (or white on white). Every dialog, popover, sheet and form panel uses `--panel`, with inputs and cards inside it on `--field`, edges that hold 3:1 against the panel, and a navy eyebrow. New ones join by adding the class `ww-panel`.
+
+**Every pairing passes WCAG AA.** `node docs/brand/contrast.mjs` reads the tokens from `styles.css` and checks 88 pairs in both themes, in the panel scope and on the rail: 4.5:1 for text, 3:1 for control edges and marks. It exits non-zero if any pair fails. At the time of writing, the tightest pairs are the quietest grey on an inset fill (4.54:1, dark), the focus ring on a light panel (3.46:1) and an input edge on a dark panel (3.38:1).
+
+**The mark in colour** paints only the first stroke teal: the explanation that the other three reuse. Use it on the app icon, the favicon, the lockup files, the rail and top bar of the app, and marketing moments. Everywhere else, the mark takes the text colour of its surface. Never colour more than that one stroke, and never use a colour other than teal.
 
 | | Light ground | Dark ground |
 |---|---|---|
 | Ink | `#0a0a0a` | `#fafafa` |
-| First stroke, full colour | `#0c7c72` | `#2dd4bf` |
-| App tile | — | `#0a0a0a` tile, `#fafafa` mark, `#2dd4bf` first stroke |
-
-**Monochrome is the default.** The product chrome (rail, top bar, sign-in, portal, site nav) uses the mark in the current text colour.
-
-**Full colour** paints only the first stroke teal: the explanation that the other three reuse. Use it on the app icon, the favicon, the lockup files and marketing moments. Never use teal on more than that one stroke, and never use another colour.
+| First stroke, full colour | `#0c7c72` (the brand files; within a hair of teal 700) | `#2dd4bf` |
+| App tile | | `#0a0a0a` tile, `#fafafa` mark, `#2dd4bf` first stroke |
 
 ## 7. Wordmark
 
@@ -156,7 +188,9 @@ In React, use `<Logo size={…} />` from `src/ui.tsx`:
 
 - Put the mark in a tile inside the product. The tile is for app icons only.
 - Rotate, skew, outline or add a shadow or gradient.
-- Colour more than the first stroke, or use any colour other than the teal pair.
+- Colour more than the first stroke, or use any colour other than teal on the mark.
+- Use teal for decoration. It means "act here", "you are here" or, with the KT badge, "explained in a recorded session".
+- Put a form or a dialog on the page's own black or white: panels are navy.
 - Close the seams at 24 px and up.
 - Re-space the wordmark, or set it in another face.
 - Reintroduce the old spiral as the logo.

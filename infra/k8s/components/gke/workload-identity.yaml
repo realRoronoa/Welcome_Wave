@@ -1,0 +1,30 @@
+# Workload Identity: each workload's Google service account (Terraform, infra/terraform/iam.tf). The project part after the
+# @ is filled in from OUTBOX_FLUSH_INVOKER (kustomization.yaml). Each needs a roles/iam.workloadIdentityUser binding for
+# <project>.svc.id.goog[welcome-wave/<name>] (docs/KUBERNETES.md). The web app calls no Google API and has none.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api
+  annotations:
+    iam.gke.io/gcp-service-account: ww-api@PROJECT_ID.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: worker
+  annotations:
+    iam.gke.io/gcp-service-account: ww-worker@PROJECT_ID.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: migrate
+  annotations:
+    iam.gke.io/gcp-service-account: ww-migrate@PROJECT_ID.iam.gserviceaccount.com
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: scheduler
+  annotations:
+    iam.gke.io/gcp-service-account: ww-scheduler@PROJECT_ID.iam.gserviceaccount.com

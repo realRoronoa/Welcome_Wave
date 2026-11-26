@@ -33,7 +33,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Literal
 
 from app import ports
-from app.agents.schemas import Chunk, KTLink
+from app.agents.core.schemas import Chunk, KTLink
 from app.ports import AppStore, Index, Meeting, TaskRow, User
 from app.services import knowledge as K
 from app.services.chunking import language_of, module_of

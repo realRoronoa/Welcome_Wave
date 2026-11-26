@@ -1,4 +1,4 @@
-from app.agents.schemas import KTLink, ScreenMoment, Utterance
+from app.agents.core.schemas import KTLink, ScreenMoment, Utterance
 from app.adapters.memory import MemoryIndex
 from app.services.chunking import chunk_code, module_of, split_identifiers
 from app.services.codeowners import owners_for, parse_codeowners

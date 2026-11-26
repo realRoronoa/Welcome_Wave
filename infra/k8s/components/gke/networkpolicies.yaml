@@ -1,0 +1,32 @@
+# Workload Identity's GKE metadata server: 169.254.169.254:80 with GKE Dataplane V2, 169.254.169.252:988 otherwise.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: gke-metadata-egress
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, meeting-worker, ingestion-worker, review-worker, migrate, scheduler]
+  policyTypes: [Egress]
+  egress:
+    - to: [{ ipBlock: { cidr: 169.254.169.254/32 } }]
+      ports: [{ protocol: TCP, port: 80 }]
+    - to: [{ ipBlock: { cidr: 169.254.169.252/32 } }]
+      ports: [{ protocol: TCP, port: 988 }]
+---
+# The Cloud SQL Auth Proxy connects to the instance on 3307 (its API calls use 443, already allowed).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloud-sql-egress
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/component
+        operator: In
+        values: [api, meeting-worker, ingestion-worker, review-worker, migrate]
+  policyTypes: [Egress]
+  egress:
+    - ports: [{ protocol: TCP, port: 3307 }]

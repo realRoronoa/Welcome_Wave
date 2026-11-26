@@ -50,11 +50,11 @@ def test_requests_without_a_valid_token_are_refused(client):
 def test_signup_creates_an_organisation_and_admin(client):
     r = client.get("/api/me", headers=bearer("tok-new"))
     assert r.status_code == 403 and r.json()["detail"]["code"] == "no_account"
-    r = client.post("/api/signup", json={"name": "Fatima", "org_name": "Acme", "project_name": "Payments"}, headers=bearer("tok-new"))
+    r = client.post("/api/signup", json={"name": "Fatima", "org_name": "Acme", "project_name": "Payments", "accept": ["terms", "privacy"]}, headers=bearer("tok-new"))
     assert r.status_code == 201
     me = r.json()
     assert me["role"] == "admin" and me["org_name"] == "Acme" and [p["name"] for p in me["projects"]] == ["Payments"]
-    assert client.post("/api/signup", json={"name": "F", "org_name": "Again", "project_name": "x"}, headers=bearer("tok-new")).status_code == 409
+    assert client.post("/api/signup", json={"name": "F", "org_name": "Again", "project_name": "x", "accept": ["terms", "privacy"]}, headers=bearer("tok-new")).status_code == 409
 
     # the admin invites a new hire; on first sign-in the hire SEES the invitation and chooses to join (never silently)
     pid = me["projects"][0]["id"]
@@ -65,7 +65,7 @@ def test_signup_creates_an_organisation_and_admin(client):
     assert detail["invitations"] == [{"org_id": me["org_id"], "org_name": "Acme", "role": "new_hire", "invited_by_name": "Fatima",
                                       "invited_by_email": "founder@acme.dev", "org_created_at": date.today().isoformat(),
                                       "projects": ["Payments"]}]
-    hire = client.post("/api/invitations/accept", json={"org_id": me["org_id"]}, headers=bearer("tok-invited")).json()
+    hire = client.post("/api/invitations/accept", json={"org_id": me["org_id"], "accept": ["terms", "privacy"]}, headers=bearer("tok-invited")).json()
     assert hire["role"] == "new_hire" and hire["org_id"] == me["org_id"] and [p["id"] for p in hire["projects"]] == [pid]
     assert client.get("/api/me", headers=bearer("tok-invited")).status_code == 200
     # and cannot see the demo organisation's project
@@ -75,7 +75,7 @@ def test_signup_creates_an_organisation_and_admin(client):
 def test_unverified_email_cannot_sign_up_or_accept(client):
     r = client.get("/api/me", headers=bearer("tok-unverified"))
     assert r.status_code == 403 and r.json()["detail"]["code"] == "email_not_verified"
-    r = client.post("/api/signup", json={"name": "x", "org_name": "y", "project_name": "z"}, headers=bearer("tok-unverified"))
+    r = client.post("/api/signup", json={"name": "x", "org_name": "y", "project_name": "z", "accept": ["terms", "privacy"]}, headers=bearer("tok-unverified"))
     assert r.status_code == 403
 
 
@@ -89,7 +89,7 @@ def test_expired_invitation_never_sets_the_role(client):
     TOKENS["tok-late"] = {"uid": "fb-late", "email": "late@acme.dev", "email_verified": True}
     pending = client.get("/api/me", headers=bearer("tok-late")).json()["detail"]["invitations"]
     assert [p["role"] for p in pending] == ["expert"]
-    me = client.post("/api/invitations/accept", json={"org_id": "org-demo"}, headers=bearer("tok-late")).json()
+    me = client.post("/api/invitations/accept", json={"org_id": "org-demo", "accept": ["terms", "privacy"]}, headers=bearer("tok-late")).json()
     assert me["role"] == "expert"
 
 
@@ -104,6 +104,6 @@ def test_invitations_from_two_organisations_are_a_choice(client):
     TOKENS["tok-both"] = {"uid": "fb-both", "email": "both@acme.dev", "email_verified": True}
     pending = client.get("/api/me", headers=bearer("tok-both")).json()["detail"]["invitations"]
     assert {p["org_name"] for p in pending} == {"Evil Corp", "Mini Policy Engine"}
-    me = client.post("/api/invitations/accept", json={"org_id": "org-demo"}, headers=bearer("tok-both")).json()
+    me = client.post("/api/invitations/accept", json={"org_id": "org-demo", "accept": ["terms", "privacy"]}, headers=bearer("tok-both")).json()
     assert me["org_id"] == "org-demo" and me["role"] == "new_hire"
-    assert client.post("/api/invitations/accept", json={"org_id": "org-evil"}, headers=bearer("tok-both")).status_code == 409
+    assert client.post("/api/invitations/accept", json={"org_id": "org-evil", "accept": ["terms", "privacy"]}, headers=bearer("tok-both")).status_code == 409

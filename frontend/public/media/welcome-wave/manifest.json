@@ -1,0 +1,443 @@
+{
+ "version": 3,
+ "generated": "2026-11-14",
+ "note": "The landing film's assets. src/site/cinematic/film.ts holds the same edit in code: every shot sits on one timeline in film seconds (F); the film is locked to a smooth, velocity-capped scroll (0.7 screens of scroll per film second, at most 2.2 screens a second), and settles on the story's beats when the reader stops. Stock footage, temporary until the custom shoot (docs/landing/PRODUCTION.md). Sizes in bytes.",
+ "source": {
+  "creator": "cottonbro studio",
+  "platform": "Pexels",
+  "license": "Pexels License (https://www.pexels.com/license/)",
+  "series": "one tech-office shoot, the same actors in every clip"
+ },
+ "encoding": {
+  "desktop": "H.264 High, 1920x1080 (16:9 crop of the 2K original) and 960x540, CRF 27 (loops) / 30 (scrub), yuv420p, +faststart, no audio; VP9 WebM 1920x1080",
+  "scrub": "15 fps, keyframe every 5 frames, no B-frames: every non-hero clip is seeked to the scroll's position (one seek in flight, requestVideoFrameCallback); fetched whole into a blob, its decoder set up while the page is still",
+  "loop": "the hero only: 25 fps, the last second cross-faded into the first; it plays by itself on the cover",
+  "mobile": "540x960 9:16 crop framed on the subject, H.264",
+  "posters": "first frame: JPEG 1920/960/portrait, AVIF 1920/portrait",
+  "grade": "eq contrast 1.06, brightness -0.035, saturation 1.04, gamma 0.97; colorbalance cool shadows, warm mids"
+ },
+ "loading": "The hero's poster and video load first; every other clip's poster and whole file a few film seconds before it shows (a loop's metadata earlier), its decoder only while the page is still (or at once if the film needs it). World screens use the 960 cut on every screen. Reduced motion or Save-Data: posters only.",
+ "shots": [
+  {
+   "name": "hero",
+   "section": "#cover",
+   "kind": "loop",
+   "duration": 9.0,
+   "description": "Establishing: the tech office, four engineers at one desk.",
+   "source": {
+    "pexels_id": 6803583,
+    "page": "https://www.pexels.com/video/four-men-working-in-an-office-6803583/",
+    "cut_seconds": "1.0-11.0"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/hero/hero-1920.mp4",
+    "mp4_960": "/media/welcome-wave/hero/hero-960.mp4",
+    "webm_1920": "/media/welcome-wave/hero/hero-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/hero-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/hero-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/hero-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/hero-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/hero-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/hero-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 1550134,
+    "mp4_960": 580085,
+    "webm_1920": 1187101,
+    "mp4_portrait": 504719,
+    "jpg_1920": 146714,
+    "avif_1920": 53818,
+    "jpg_960": 58476,
+    "jpg_portrait": 46291,
+    "avif_portrait": 19130
+   },
+   "place": "stage",
+   "F": [
+    0,
+    2.0
+   ],
+   "clip_time_at_F0": 0
+  },
+  {
+   "name": "first-day",
+   "section": "#product",
+   "kind": "scrub",
+   "duration": 5.6,
+   "description": "Employee at desk; scroll drives the camera's approach (plus a CSS push-in).",
+   "source": {
+    "pexels_id": 6804647,
+    "page": "https://www.pexels.com/video/young-workers-in-tech-office-6804647/",
+    "cut_seconds": "0.0-5.6"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/first-day/first-day-1920.mp4",
+    "mp4_960": "/media/welcome-wave/first-day/first-day-960.mp4",
+    "webm_1920": "/media/welcome-wave/first-day/first-day-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/first-day-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/first-day-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/first-day-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/first-day-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/first-day-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/first-day-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 1112513,
+    "mp4_960": 597760,
+    "webm_1920": 1420069,
+    "mp4_portrait": 641762,
+    "jpg_1920": 105088,
+    "avif_1920": 36264,
+    "jpg_960": 42462,
+    "jpg_portrait": 41295,
+    "avif_portrait": 16582
+   },
+   "place": "stage",
+   "F": [
+    1.2,
+    6.4
+   ],
+   "clip_time_at_F0": 0
+  },
+  {
+   "name": "first-day-close",
+   "section": "#product",
+   "kind": "scrub",
+   "duration": 8.0,
+   "description": "Close-up: the confused new engineer.",
+   "source": {
+    "pexels_id": 6804651,
+    "page": "https://www.pexels.com/video/professionals-in-technology-office-6804651/",
+    "cut_seconds": "8.2-16.2"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/first-day/first-day-close-1920.mp4",
+    "mp4_960": "/media/welcome-wave/first-day/first-day-close-960.mp4",
+    "webm_1920": "/media/welcome-wave/first-day/first-day-close-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/first-day-close-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/first-day-close-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/first-day-close-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/first-day-close-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/first-day-close-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/first-day-close-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 1632210,
+    "mp4_960": 875260,
+    "webm_1920": 2574897,
+    "mp4_portrait": 932133,
+    "jpg_1920": 125057,
+    "avif_1920": 52474,
+    "jpg_960": 43761,
+    "jpg_portrait": 54523,
+    "avif_portrait": 23502
+   },
+   "place": "stage",
+   "F": [
+    5.2,
+    9.6
+   ],
+   "clip_time_at_F0": 0.4
+  },
+  {
+   "name": "walking",
+   "section": "#struggle",
+   "kind": "scrub",
+   "duration": 10.2,
+   "description": "He writes notes, gets up and walks away from the desk; scroll drives the walk.",
+   "source": {
+    "pexels_id": 6804119,
+    "page": "https://www.pexels.com/video/a-man-placing-sticky-notes-on-the-brick-wall-6804119/",
+    "cut_seconds": "12.4-22.6"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/walking/walking-1920.mp4",
+    "mp4_960": "/media/welcome-wave/walking/walking-960.mp4",
+    "webm_1920": "/media/welcome-wave/walking/walking-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/walking-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/walking-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/walking-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/walking-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/walking-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/walking-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 2100597,
+    "mp4_960": 1220075,
+    "webm_1920": 2342483,
+    "mp4_portrait": 1148897,
+    "jpg_1920": 91116,
+    "avif_1920": 26708,
+    "jpg_960": 36619,
+    "jpg_portrait": 29762,
+    "avif_portrait": 9518
+   },
+   "place": "stage",
+   "F": [
+    8.7,
+    15.2
+   ],
+   "clip_time_at_F0": 3.4
+  },
+  {
+   "name": "mentor-notice",
+   "section": "#mentor",
+   "kind": "scrub",
+   "duration": 9.0,
+   "description": "The seniors notice and stand by his desk.",
+   "source": {
+    "pexels_id": 6804110,
+    "page": "https://www.pexels.com/video/men-watching-the-coder-working-6804110/",
+    "cut_seconds": "0.5-9.5"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/mentor/mentor-notice-1920.mp4",
+    "mp4_960": "/media/welcome-wave/mentor/mentor-notice-960.mp4",
+    "webm_1920": "/media/welcome-wave/mentor/mentor-notice-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/mentor-notice-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/mentor-notice-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/mentor-notice-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/mentor-notice-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/mentor-notice-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/mentor-notice-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 1864976,
+    "mp4_960": 1094126,
+    "webm_1920": 2752473,
+    "mp4_portrait": 799185,
+    "jpg_1920": 111434,
+    "avif_1920": 40647,
+    "jpg_960": 45955,
+    "jpg_portrait": 30990,
+    "avif_portrait": 12112
+   },
+   "place": "stage",
+   "F": [
+    14.4,
+    17.3
+   ],
+   "clip_time_at_F0": 1.0
+  },
+  {
+   "name": "mentor",
+   "section": "#mentor",
+   "kind": "scrub",
+   "duration": 9.0,
+   "description": "The senior points at the code and explains; scroll drives it. Ends over the shoulder on the monitor.",
+   "source": {
+    "pexels_id": 6804109,
+    "page": "https://www.pexels.com/video/people-coding-on-computer-6804109/",
+    "cut_seconds": "0.0-9.0"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/mentor/mentor-1920.mp4",
+    "mp4_960": "/media/welcome-wave/mentor/mentor-960.mp4",
+    "webm_1920": "/media/welcome-wave/mentor/mentor-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/mentor-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/mentor-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/mentor-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/mentor-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/mentor-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/mentor-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 1980916,
+    "mp4_960": 1090551,
+    "webm_1920": 2349918,
+    "mp4_portrait": 846091,
+    "jpg_1920": 110570,
+    "avif_1920": 38733,
+    "jpg_960": 44801,
+    "jpg_portrait": 34415,
+    "avif_portrait": 13519
+   },
+   "place": "stage",
+   "F": [
+    16.5,
+    21.5
+   ],
+   "clip_time_at_F0": 0
+  },
+  {
+   "name": "product-transition",
+   "section": "#knowledge",
+   "kind": "scrub",
+   "duration": 6.6,
+   "description": "Over-the-shoulder monitor; pushes into the screen, then the light product stage takes over.",
+   "source": {
+    "pexels_id": 6804109,
+    "page": "https://www.pexels.com/video/people-coding-on-computer-6804109/",
+    "cut_seconds": "9.0-15.6"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/product-transition/product-transition-1920.mp4",
+    "mp4_960": "/media/welcome-wave/product-transition/product-transition-960.mp4",
+    "webm_1920": "/media/welcome-wave/product-transition/product-transition-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/product-transition-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/product-transition-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/product-transition-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/product-transition-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/product-transition-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/product-transition-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 1330069,
+    "mp4_960": 717212,
+    "webm_1920": 1675451,
+    "mp4_portrait": 546181,
+    "jpg_1920": 101873,
+    "avif_1920": 36809,
+    "jpg_960": 41331,
+    "jpg_portrait": 34370,
+    "avif_portrait": 14362
+   },
+   "place": "stage",
+   "F": [
+    20.5,
+    23.3
+   ],
+   "clip_time_at_F0": 0.4
+  },
+  {
+   "name": "first-contribution",
+   "section": "#contribution",
+   "kind": "scrub",
+   "duration": 10.0,
+   "description": "Back at the desk, typing with confidence; shown in a frame beside the journey; scroll drives it to the merge.",
+   "source": {
+    "pexels_id": 6803593,
+    "page": "https://www.pexels.com/video/an-employee-focused-at-work-6803593/",
+    "cut_seconds": "8.0-18.0"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/first-contribution/first-contribution-1920.mp4",
+    "mp4_960": "/media/welcome-wave/first-contribution/first-contribution-960.mp4",
+    "webm_1920": "/media/welcome-wave/first-contribution/first-contribution-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/first-contribution-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/first-contribution-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/first-contribution-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/first-contribution-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/first-contribution-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/first-contribution-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 2033718,
+    "mp4_960": 1197498,
+    "webm_1920": 2931850,
+    "mp4_portrait": 1333432,
+    "jpg_1920": 87845,
+    "avif_1920": 26462,
+    "jpg_960": 36262,
+    "jpg_portrait": 29120,
+    "avif_portrait": 10252
+   },
+   "place": "world",
+   "F": [
+    25.7,
+    31.7
+   ],
+   "clip_time_at_F0": 0.5
+  },
+  {
+   "name": "team-impact",
+   "section": "#impact",
+   "kind": "scrub",
+   "duration": 10.0,
+   "description": "Team collaboration round his desk, under the leadership report.",
+   "source": {
+    "pexels_id": 6804124,
+    "page": "https://www.pexels.com/video/colleagues-helping-at-work-6804124/",
+    "cut_seconds": "6.0-16.0"
+   },
+   "desktop": {
+    "mp4_1920": "/media/welcome-wave/team-impact/team-impact-1920.mp4",
+    "mp4_960": "/media/welcome-wave/team-impact/team-impact-960.mp4",
+    "webm_1920": "/media/welcome-wave/team-impact/team-impact-1920.webm"
+   },
+   "mobile": {
+    "mp4_portrait": "/media/welcome-wave/mobile/team-impact-portrait.mp4"
+   },
+   "posters": {
+    "jpg_1920": "/media/welcome-wave/posters/team-impact-1920.jpg",
+    "avif_1920": "/media/welcome-wave/posters/team-impact-1920.avif",
+    "jpg_960": "/media/welcome-wave/posters/team-impact-960.jpg",
+    "jpg_portrait": "/media/welcome-wave/posters/team-impact-portrait.jpg",
+    "avif_portrait": "/media/welcome-wave/posters/team-impact-portrait.avif"
+   },
+   "bytes": {
+    "mp4_1920": 2037147,
+    "mp4_960": 1201854,
+    "webm_1920": 2857480,
+    "mp4_portrait": 1162794,
+    "jpg_1920": 95948,
+    "avif_1920": 34231,
+    "jpg_960": 39888,
+    "jpg_portrait": 35243,
+    "avif_portrait": 14481
+   },
+   "place": "world",
+   "F": [
+    30.9,
+    33.7
+   ],
+   "clip_time_at_F0": 1.0
+  }
+ ],
+ "timeline": {
+  "unit": "F = film seconds; scroll = 0.7 screens per film second",
+  "beats": [
+   0,
+   4.4,
+   8.0,
+   14.0,
+   18.3,
+   23.7,
+   25.5,
+   27.5,
+   30.5,
+   32.5
+  ],
+  "sections": {
+   "cover": 0,
+   "product": 4.4,
+   "struggle": 14.0,
+   "mentor": 18.3,
+   "knowledge": 23.7,
+   "contribution": 27.5,
+   "impact": 32.5
+  },
+  "world": "scenes 4-6 are a CSS 3D world of real product panels; the footage hands over at F 22.1-23.1 (the push into the monitor)"
+ }
+}

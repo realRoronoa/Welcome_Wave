@@ -1,0 +1,24 @@
+# The three Secrets the pods read (ww-api, ww-worker, ww-migrate), kept in step with Google Secret Manager by the External
+# Secrets Operator. Terraform and infra/scripts/set-secrets.sh already store every value there; nothing is copied by hand
+# and nothing secret is in git.
+#
+# Each Secret is read with its own workload's Google identity (Workload Identity, components/gke), so Terraform's per-secret
+# access (infra/terraform/secrets.tf, `readers`) still decides who can read what: the API's store cannot read the owner's
+# database password. The project comes from GCP_PROJECT in the overlay's settings.
+#
+# Needs the External Secrets Operator in the cluster, once (docs/KUBERNETES.md, "Secrets"). Changed values reach the
+# Secrets within refreshInterval; pods read them when they start, so restart them after a rotation.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+resources:
+  - externalsecrets.yaml
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: ww-config
+      fieldPath: data.GCP_PROJECT
+    targets:
+      - select: { kind: SecretStore }
+        fieldPaths: [spec.provider.gcpsm.projectID]

@@ -1,0 +1,9 @@
+# This environment's settings, merged into the base's ww-config. A component (not plain overlay fields) so that it is
+# applied before the components listed after it in ../kustomization.yaml, which read these values.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+configMapGenerator:
+  - name: ww-config
+    behavior: merge
+    envs: [config.env]
