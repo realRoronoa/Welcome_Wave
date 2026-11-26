@@ -6,7 +6,7 @@
 # nginx. It runs as nginx's own user (uid 101), never root, and works with a read-only root filesystem given writable
 # /etc/nginx/conf.d, /var/cache/nginx, /run and /tmp (infra/k8s/base/web.yaml).
 # Base images are pinned by digest, so a rebuild gets exactly what was tested; .github/dependabot.yml proposes updates.
-FROM node:22-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS build
+FROM node:25-slim@sha256:81db02c4b671288a03915da9534dbd54f96d0e7c24d80ccc54f5b36b2e684370 AS build
 WORKDIR /web
 COPY package*.json .npmrc ./
 RUN npm ci --no-audit --no-fund
