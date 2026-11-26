@@ -3,4 +3,4 @@
 # release builds). Move them on purpose.
 pytest==9.1.1
 ruff==0.17.1
-locust==2.46.7
+locust==2.47.0
