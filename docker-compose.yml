@@ -1,0 +1,31 @@
+# Local development.
+#   docker compose up                  -> demo mode: in-memory data, offline LLM, sample repo (no keys)
+#   docker compose --profile db up -d db
+#   TEST_PG_ADMIN_URL=postgresql://ww:ww@localhost:5432/postgres pytest   # + the Postgres integration tests
+services:
+  api:
+    build: ./backend
+    environment:
+      MODE: ${MODE:-demo}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+    ports: ["8080:8080"]
+
+  web:
+    build: ./frontend
+    environment:
+      API_URL: http://api:8080
+    ports: ["5173:8080"]
+    depends_on: [api]
+
+  db:
+    profiles: [db]
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ww
+      POSTGRES_PASSWORD: ww
+    ports: ["5432:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

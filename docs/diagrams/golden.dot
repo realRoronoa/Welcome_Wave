@@ -1,0 +1,20 @@
+digraph G {
+  graph [rankdir=TB, fontname="Carlito", nodesep=0.35, ranksep=0.45, pad=0.2];
+  node [shape=box, style="rounded,filled", fillcolor="white", color="#9aa6c2", fontname="Carlito", fontsize=12, fontcolor="#1d2742", margin="0.12,0.07", width=1.7];
+  edge [color="#55607a", arrowsize=0.7, fontname="Carlito", fontsize=10, fontcolor="#55607a"];
+  a [label="1  Connect\nmanager links repo,\nuploads docs"];
+  b [label="2  Index\ncode, docs,\ncode owners"];
+  c [label="3  KT call\nsenior explains on\na recorded call"];
+  d [label="4  Notes + KT links\nmoments linked to code;\ngaps found", color="#0b7a75", penwidth=1.6, fillcolor="#e3f2f0"];
+  e [label="5  Plan + first PR\nmanager approves", fillcolor="#fff4e0", color="#b7791f", penwidth=1.6];
+  f [label="6  Learn\ncited chat with\nKT clips"];
+  g [label="7  Review\nevidence-backed;\nmanager decides", fillcolor="#fff4e0", color="#b7791f", penwidth=1.6];
+  h [label="8  Health\nprogress, blockers,\ncoverage"];
+  {rank=same; a; b; c; d}
+  {rank=same; e; f; g; h}
+  a -> b -> c -> d;
+  a -> e [style=invis];
+  d -> e [constraint=false];
+  e -> f -> g -> h;
+  h -> c [style=dashed, label="gaps set the next KT agenda", constraint=false];
+}

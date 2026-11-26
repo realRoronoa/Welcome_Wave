@@ -1,0 +1,17 @@
+{"q": "Where is a resource checked against every rule of a policy?", "expect": ["engine/validate.py"], "answerable": true}
+{"q": "Which function reports missing labels?", "expect": ["engine/validate.py"], "answerable": true}
+{"q": "How are privileged containers rejected?", "expect": ["engine/validate.py"], "answerable": true}
+{"q": "How is a policy loaded from YAML?", "expect": ["engine/policy.py"], "answerable": true}
+{"q": "What fields does a Rule have?", "expect": ["engine/policy.py"], "answerable": true}
+{"q": "Where do default labels like managed-by get added?", "expect": ["engine/mutate.py"], "answerable": true}
+{"q": "What does the admission webhook return when a resource breaks a rule?", "expect": ["webhooks/server.py"], "answerable": true}
+{"q": "Which port does the webhook server listen on?", "expect": ["webhooks/server.py"], "answerable": true}
+{"q": "Does mutation run before or after validation?", "expect": ["webhooks/server.py", "engine/mutate.py"], "answerable": true}
+{"q": "How should I name my branch?", "expect": ["docs/CONTRIBUTING.md"], "answerable": true}
+{"q": "Do engine changes need tests?", "expect": ["docs/CONTRIBUTING.md"], "answerable": true}
+{"q": "Is there an example test for validation?", "expect": ["tests/test_validate.py"], "answerable": true}
+{"q": "How do I run the project?", "expect": ["README.md"], "answerable": true}
+{"q": "Why does validation return a list instead of raising?", "expect": ["engine/validate.py"], "answerable": true}
+{"q": "What database does the engine use for caching?", "expect": [], "answerable": false}
+{"q": "Who approves production deployments on weekends?", "expect": [], "answerable": false}
+{"q": "What is the AWS account ID for staging?", "expect": [], "answerable": false}

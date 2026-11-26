@@ -1,0 +1,40 @@
+/* Shared motion and state primitives (src/fx.tsx). Tokens only, so light and dark themes both work. */
+.skeleton { display: grid; gap: 10px; }
+.skeleton span { display: block; border-radius: 6px; background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 40%, var(--surface-2) 80%);
+  background-size: 300% 100%; animation: sk-shimmer 1.4s ease-in-out infinite; }
+@keyframes sk-shimmer { from { background-position: 100% 0; } to { background-position: -50% 0; } }
+
+.count-up { font-variant-numeric: tabular-nums; }
+
+.ring { position: relative; display: inline-grid; place-items: center; flex: none; }
+.ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.ring circle { fill: none; }
+.ring-track { stroke: var(--line); }
+.ring-value { stroke: var(--ink); stroke-linecap: round; stroke-dashoffset: var(--ring-off); animation: ring-in 1s var(--ease) both; }
+@keyframes ring-in { from { stroke-dashoffset: var(--ring-c); } }
+.ring-kt .ring-value { stroke: var(--kt); } /* the share of code a KT session explained */
+.ring-label { position: relative; font-size: .72rem; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+
+.empty-state { display: grid; justify-items: center; text-align: center; gap: .35rem; padding: 2.6rem 1rem; border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-l); background: var(--surface); }
+.empty-mark { color: var(--ink-faint); opacity: .7; margin-bottom: .55rem; } /* ui.tsx Logo: the strokes arrive in order (styles.css) */
+.empty-title { margin: 0; font-weight: 600; color: var(--ink); }
+.empty-text { margin: 0; max-width: 46ch; color: var(--ink-soft); font-size: .92rem; }
+.empty-action { margin-top: .7rem; }
+
+.kbd { display: inline-grid; place-items: center; min-width: 1.45em; height: 1.45em; padding: 0 .35em; font: 500 .72rem/1 var(--code);
+  color: var(--ink-soft); background: var(--surface); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: 5px; }
+.kbd + .kbd { margin-left: 3px; }
+
+.reveal { opacity: 0; transform: translateY(10px); transition: opacity .5s var(--ease), transform .5s var(--ease); }
+.reveal.in { opacity: 1; transform: none; }
+
+.spot { position: relative; isolation: isolate; }
+.spot::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: -1; opacity: 0;
+  background: radial-gradient(360px circle at var(--mx, 50%) var(--my, 50%), color-mix(in srgb, var(--ink) 6%, transparent), transparent 60%); transition: opacity .25s; }
+.spot:hover::after { opacity: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton span, .ring-value { animation: none; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+}
