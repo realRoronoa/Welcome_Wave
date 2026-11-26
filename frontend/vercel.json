@@ -17,7 +17,43 @@
       "destination": "https://welcome-wave-api.onrender.com/webhooks/:path*"
     },
     {
-      "source": "/(about|login|signup|github/callback|terms|privacy|recording|acceptable-use|dpa|subprocessors)/?",
+      "source": "/about",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/login",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/signup",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/github/callback",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/terms",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/privacy",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/recording",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/acceptable-use",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/dpa",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/subprocessors",
       "destination": "/index.html"
     },
     {
