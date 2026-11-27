@@ -472,8 +472,14 @@ def _seed_showcase(c) -> None:
 
     deps, store, lc = c.deps, c.store, c.lifecycle
     today, now = date.today(), datetime.now(timezone.utc)
+    default_titles = {
+        "backend-junior": "Junior Backend Engineer",
+        "backend-mid": "Mid Backend Engineer",
+        "backend-senior": "Senior Backend Engineer",
+        "sre-mid": "Mid SRE / Platform Engineer",
+    }
+    _seed_base_rows(c, today, now, default_titles)
     tpl = {t.key: t for t in T.list_for(lc, SHOWCASE_ORG_ID)} if lc is not None else {}
-    _seed_base_rows(c, today, now, {k: v.title for k, v in tpl.items()})
 
     repo_root = Path(c.settings.demo_repo_path)
     if not repo_root.is_absolute():
