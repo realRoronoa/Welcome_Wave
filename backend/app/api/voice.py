@@ -236,9 +236,9 @@ def _recap(c, row: dict, summary: dict) -> dict:
                          "completed": summary["completed_actions"], "outstanding": summary["outstanding_actions"]}, default=str)[:10000]
     try:
         with call_budget(8):
-            result = c.llm.structured(prompt, VoiceRecap, system="Summarise this employee onboarding conversation in at most three factual sentences. "
-                                      "List up to five concrete next steps. Use only the supplied conversation and action statuses. "
-                                      "Do not claim an access request was granted, a KT request was booked, or a proposed task was approved.")
+            result = c.deps.llm.structured(prompt, VoiceRecap, system="Summarise this employee onboarding conversation in at most three factual sentences. "
+                                           "List up to five concrete next steps. Use only the supplied conversation and action statuses. "
+                                           "Do not claim an access request was granted, a KT request was booked, or a proposed task was approved.")
         return result.model_dump()
     except Exception:
         return fallback
