@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useRef, useState } from "react";
-import { api, ApiError, Config, errorMessage, Me, setIdToken, setTokenSource } from "../api";
+import { api, ApiError, Config, errorMessage, getShowcaseToken, Me, setIdToken, setShowcaseToken, setTokenSource } from "../api";
 import { setSignedIn } from "../surface";
 import { Booting } from "../ui";
 import { EntryLayout } from "./Entry";
@@ -39,6 +39,13 @@ export default function AuthGate({ config, children, onSignedIn, onSignedOut }: 
     } catch (e) {
       if (n !== seq.current) return;
       const err = e instanceof ApiError && e.status === 403 ? e : null;
+      if (getShowcaseToken() && e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+        setShowcaseToken(null);
+        sawForm.current = true;
+        setSignedIn(false);
+        setPhase({ kind: "signed_out" });
+        return;
+      }
       if (err?.code === "email_not_verified") setPhase({ kind: "unverified" });
       else if (err?.code === "invitation_pending") setPhase({ kind: "invited", invitations: err.detail?.invitations ?? [] });
       else if (err?.code === "no_account") setPhase({ kind: "no_account" });
@@ -52,6 +59,11 @@ export default function AuthGate({ config, children, onSignedIn, onSignedOut }: 
       setPhase({ kind: "error", message: "Sign-in is not configured for this deployment (missing Identity Platform API key)." });
       return;
     }
+    if (config.showcase?.enabled && getShowcaseToken()) {
+      loadMe();
+    } else if (!config.showcase?.enabled && getShowcaseToken()) {
+      setShowcaseToken(null);
+    }
     let alive = true, unsubscribe = () => {};
     import("./firebase").then((m) => {
       if (!alive) return;
@@ -59,6 +71,7 @@ export default function AuthGate({ config, children, onSignedIn, onSignedOut }: 
       setTokenSource(m.token);
       setFb(m);
       unsubscribe = m.onUser(async (user) => {
+        if (!user && config.showcase?.enabled && getShowcaseToken()) return;
         setIdToken(user ? await user.getIdToken().catch(() => null) : null);
         if (!user) {
           uid.current = null;
@@ -75,7 +88,17 @@ export default function AuthGate({ config, children, onSignedIn, onSignedOut }: 
     return () => { alive = false; unsubscribe(); };
   }, [config]);
 
-  const signOut = () => { onSignedOut?.(); fb?.logOut().catch(() => {}); };
+  const signOut = () => {
+    const hadShowcase = !!getShowcaseToken();
+    setShowcaseToken(null);
+    uid.current = null;
+    seq.current++;
+    sawForm.current = true;
+    setSignedIn(false);
+    onSignedOut?.();
+    if (hadShowcase) setPhase({ kind: "signed_out" });
+    fb?.logOut().catch(() => {});
+  };
 
   const ready = (me: Me) => setPhase({ kind: "ready", me }); // the account changed (setMe)
   const enter = (me: Me) => { onSignedIn?.(me, sawForm.current); setPhase({ kind: "ready", me }); }; // signed in, joined or created
@@ -94,7 +117,16 @@ export default function AuthGate({ config, children, onSignedIn, onSignedOut }: 
   if (phase.kind === "loading" || !fb) return <Booting />;
   // the form's mode follows the address at the moment it shows: /signup opens "Create account"; after a sign-out the address
   // is /login (onSignedOut), so the next person gets the sign-in form even if this page started at /signup
-  if (phase.kind === "signed_out") return <SignIn fb={fb} initialCreating={/^\/signup\/?$/.test(location.pathname)} />;
+  if (phase.kind === "signed_out") {
+    return (
+      <SignIn
+        fb={fb}
+        initialCreating={/^\/signup\/?$/.test(location.pathname)}
+        showcase={config.showcase ?? null}
+        onShowcaseSignedIn={(me) => { sawForm.current = true; enter(me); }}
+      />
+    );
+  }
   if (phase.kind === "unverified") return <VerifyEmail fb={fb} onVerified={loadMe} signOut={signOut} />;
   if (phase.kind === "invited" && !phase.creating) {
     return <Invited fb={fb} invitations={phase.invitations} signupEnabled={config.signup_enabled} onJoined={enter}

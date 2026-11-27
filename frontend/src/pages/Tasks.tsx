@@ -58,6 +58,7 @@ type Brief = {
 
 export default function Tasks() {
   const { project, me, demo } = useSession();
+  const canSimulatePr = demo || me.org_id === "00000000-0000-4000-8000-000000000001";
   const hire = me.role === "new_hire";
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export default function Tasks() {
   async function simulate(t: Task) {
     setBusy(t.id); setError(null);
     try {
-      const r = await post<{ task: Task; review_id: string | null }>("/demo/pull-request", { task_id: t.id });
+      const r = await post<{ task: Task; review_id: string | null }>(demo ? "/demo/pull-request" : "/showcase/pull-request", { task_id: t.id });
       toast(t.pr_number ? "New commit pushed and reviewed." : "Pull request opened and reviewed.");
       setMoved(t.id);
       if (r.review_id) location.hash = `#/reviews/${r.review_id}`;
@@ -141,17 +142,17 @@ export default function Tasks() {
   const hireActions = (t: Task, big = false) => (
     <>
       {canReview(t) && (
-        <button type="button" className={`dp-btn dp-review-btn${big ? (t.status === "in_progress" && !demo ? " primary" : "") : " ghost small"}`} onClick={() => setReviewing(t)}>
+        <button type="button" className={`dp-btn dp-review-btn${big ? (t.status === "in_progress" && !canSimulatePr ? " primary" : "") : " ghost small"}`} onClick={() => setReviewing(t)}>
           <LockGlyph size={big ? 14 : 13} />{big ? "Run private review" : "Private review"}
         </button>
       )}
-      {demo && t.kind === "code" && t.status !== "approved" && (OPEN.has(t.status) || t.status === "submitted") && (
+      {canSimulatePr && t.kind === "code" && t.status !== "approved" && (OPEN.has(t.status) || t.status === "submitted") && (
         <button className={`dp-btn${t.status === "in_progress" ? " primary" : ""}`} onClick={() => simulate(t)} disabled={busy === t.id}
                 title="Demo: stands in for opening a pull request on GitHub">
           <Glyph name="pr" size={14} />{busy === t.id ? "Opening…" : t.pr_number ? "Push a new commit" : "Open a pull request"}
         </button>
       )}
-      {NEXT[t.status] && !(t.kind === "code" && demo && t.status === "in_progress") && (
+      {NEXT[t.status] && !(t.kind === "code" && canSimulatePr && t.status === "in_progress") && (
         <button className={`dp-btn${t.status === "in_progress" ? "" : " primary"}`} onClick={() => move(t, NEXT[t.status].to)} disabled={busy === t.id}>
           {busy === t.id ? "Saving…" : NEXT[t.status].label}
         </button>

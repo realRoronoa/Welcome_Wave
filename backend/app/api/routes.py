@@ -64,6 +64,8 @@ def public_config(c=Depends(container)):
         "email": bool(c.deps.mailer is not None and c.deps.mailer.enabled),
         # demo only: the shared password the demo sign-in page shows and fills in for its one-click accounts
         "demo_password": s.demo_password if s.is_demo else None,
+        # optional showcase accounts underneath the production sign-in form (off unless DEMO_SHOWCASE=true)
+        "showcase": {"enabled": True, "password": s.demo_password} if s.demo_showcase and not s.is_demo else None,
         # who operates this server, as the legal documents name them (each null until its LEGAL_* setting is set: the pages
         # then say "the company that operates this service"), and the current version of every document (app/legal.py)
         "legal": legal.public(s),

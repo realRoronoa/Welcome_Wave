@@ -123,8 +123,8 @@ The same builder is compiled twice: `graph` with a checkpointer, and `chat_graph
 
 | Mode | `graph` | Where |
 |---|---|---|
-| `demo` | `MemorySaver`: in memory. A paused run lasts as long as the process, and the demo resets on restart anyway | `` `saver = MemorySaver()` `` ([container.py:303](../backend/app/container.py#L303)) |
-| `self_hosted` | `PostgresSaver` on the Postgres in Docker | `` `checkpointer = PostgresSaver(pool)` `` ([container.py:215](../backend/app/container.py#L215)), from `` `def _self_hosted` `` ([container.py:219](../backend/app/container.py#L219)) |
+| `demo` | `MemorySaver`: in memory. A paused run lasts as long as the process, and the demo resets on restart anyway | `` `saver = MemorySaver()` `` ([container.py:323](../backend/app/container.py#L323)) |
+| `self_hosted` | `PostgresSaver` on the Postgres in Docker | `` `checkpointer = PostgresSaver(pool)` `` ([container.py:215](../backend/app/container.py#L215)), from `` `def _self_hosted` `` ([container.py:233](../backend/app/container.py#L233)) |
 | `gcp` | `PostgresSaver` on Cloud SQL, through the same `_postgres` helper | `container.py`, `build_container` |
 | every mode | `chat_graph` and every subgraph: no checkpointer | |
 
@@ -200,7 +200,7 @@ the same step, and `more` waits for both. `` `g.add_edge(["retrieve", "model_pla
 ## 9. Tracing
 
 When an organisation turns tracing on, LangSmith records every graph run. Each run record keeps its `trace_id`, the link
-from `GET /api/runs` to the trace. `` `langsmith.configure(` `` ([container.py:261](../backend/app/container.py#L261)),
+from `GET /api/runs` to the trace. `` `langsmith.configure(` `` ([container.py:281](../backend/app/container.py#L281)),
 `` `def trace_id()` `` ([graph.py:59](../backend/app/agents/supervisor/graph.py#L59))
 
 ## 10. What LangGraph does not do here

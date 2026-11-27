@@ -240,10 +240,21 @@ def fallback_models(settings, primary: str) -> list[str]:
     return out
 
 
+def claude_fallback_models(settings, primary: str) -> list[str]:
+    """CLAUDE_MODEL_FALLBACK chain for Anthropic / FableAI Claude models."""
+    out = []
+    for m in (getattr(settings, "claude_model_fallback", "") or "").split(","):
+        m = m.strip()
+        if m and m != primary and m not in out:
+            out.append(m)
+    return out
+
+
 def transient(e: Exception) -> bool:
-    """A momentary server-side failure (503 UNAVAILABLE, 500 INTERNAL): worth one retry on the same model."""
+    """A momentary server-side failure (503 UNAVAILABLE, 529 overloaded, 500 INTERNAL): worth one retry on the same model."""
     text = str(e)[:200]
-    return getattr(e, "code", None) in (500, 503) or "UNAVAILABLE" in text or "503" in text[:30] or "INTERNAL" in text
+    status = getattr(getattr(e, "response", None), "status_code", None) or getattr(e, "code", None)
+    return status in (500, 502, 503, 529) or "UNAVAILABLE" in text or "503" in text[:30] or "529" in text[:30] or "INTERNAL" in text
 
 
 TRANSIENT_RETRY_S = 1.5
@@ -505,6 +516,249 @@ class GeminiLLM:
                     types.Part(function_response=types.FunctionResponse(id=r.get("id") or None, name=r["name"], response={"result": r["text"]}))
                     for r in m["results"]]))
         return out
+
+
+def _object_schema(raw: dict) -> dict:
+    out = dict(raw or {})
+    out.setdefault("type", "object")
+    out.setdefault("properties", {})
+    return out
+
+
+class ClaudeLLM:
+    """Anthropic Messages API (/v1/messages) implementation for Claude models, compatible with direct Anthropic and FableAI
+    gateways. Uses forced tool_choice on `final_answer` for guaranteed Pydantic schema validation in `structured()`, and
+    native tool_use / tool_result blocks in `agent_turn()`."""
+
+    def __init__(self, settings, sleep: Callable[[float], None] = time.sleep, client=None):
+        import httpx
+
+        base = (getattr(settings, "anthropic_base_url", "") or "https://api.anthropic.com").strip().rstrip("/")
+        if base.endswith("/v1"):
+            base = base[:-3]
+        self.base_url = base
+        self.api_key = settings.anthropic_api_key.strip()
+        self.settings = settings
+        self.sleep = sleep
+        self.http = client or httpx.Client(timeout=float(settings.llm_timeout_s))
+
+    def _headers(self) -> dict[str, str]:
+        return {
+            "x-api-key": self.api_key,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+        }
+
+    def _post(self, payload: dict, timeout_s: float) -> dict:
+        resp = self.http.post(f"{self.base_url}/v1/messages", headers=self._headers(), json=payload,
+                              timeout=max(2.0, float(timeout_s)))
+        if resp.status_code >= 400:
+            err = LLMError(f"Claude HTTP {resp.status_code}")
+            err.code = resp.status_code  # type: ignore[attr-defined]
+            err.response = resp  # type: ignore[attr-defined]
+            raise err
+        return resp.json()
+
+    def _call(self, model: str, prompt: str, schema: type[T], media, system: str | None, timeout_s: float | None = None) -> T:
+        if media:
+            raise LLMError("ClaudeLLM does not analyse video files directly")
+        payload: dict[str, Any] = {
+            "model": model,
+            "max_tokens": AGENT_MAX_OUTPUT_TOKENS,
+            "temperature": 0.2,
+            "tools": [{"name": FINAL, "description": FINAL_DESCRIPTION, "input_schema": _object_schema(schema_of(schema))}],
+            "tool_choice": {"type": "tool", "name": FINAL},
+            "messages": [{"role": "user", "content": prompt}],
+        }
+        if system:
+            payload["system"] = system
+        started = time.perf_counter()
+        data = self._post(payload, timeout_s or float(self.settings.llm_timeout_s))
+        usage = data.get("usage") or {}
+        log.info("llm call", extra={"extra_fields": {
+            "model": data.get("model") or model, "schema": schema.__name__,
+            "latency_ms": round((time.perf_counter() - started) * 1000),
+            "input_tokens": usage.get("input_tokens"), "output_tokens": usage.get("output_tokens")}})
+        blocks = data.get("content") or []
+        for b in blocks:
+            if isinstance(b, dict) and b.get("type") == "tool_use" and b.get("name") == FINAL:
+                return schema.model_validate(b.get("input") or {})
+        text = "".join(b.get("text", "") for b in blocks if isinstance(b, dict) and b.get("type") == "text").strip()
+        if text:
+            return schema.model_validate_json(text)
+        raise LLMError(f"empty response from {model} ({data.get('stop_reason')})")
+
+    def structured(self, prompt, schema, *, smart=False, media=None, system=None, deadline: float | None = None):
+        model = self.settings.claude_model_smart if smart else self.settings.claude_model_fast
+        if deadline is None and (budget := _CALL_BUDGET.get()) is not None:
+            deadline = time.monotonic() + budget
+        if deadline is not None:
+            return self._bounded(model, prompt, schema, media, system, deadline)
+        last: Exception | None = None
+        for attempt in range(self.settings.llm_retries):
+            try:
+                return self._call(model, prompt, schema, media, system)
+            except Exception as e:  # noqa: BLE001
+                last = e
+                log.warning("llm call failed", extra={"extra_fields": {"model": model, "attempt": attempt + 1, "error": describe_error(e)}})
+                self.sleep(self.settings.retry_sleep_s * 2**attempt)
+        for fallback in claude_fallback_models(self.settings, model):
+            try:
+                return self._call(fallback, prompt, schema, media, system)
+            except Exception as e:  # noqa: BLE001
+                last = e
+        raise LLMError(f"{schema.__name__}: {describe_error(last) if last else 'no attempt made'}") from last
+
+    def _bounded(self, model: str, prompt: str, schema: type[T], media, system, deadline: float) -> T:
+        last: Exception | None = None
+        for m in [model] + claude_fallback_models(self.settings, model):
+            left = deadline - time.monotonic()
+            if left < MIN_CALL_S:
+                break
+            try:
+                return self._call(m, prompt, schema, media, system, timeout_s=min(float(self.settings.llm_timeout_s), left))
+            except Exception as e:  # noqa: BLE001
+                last = e
+                log.warning("llm call failed", extra={"extra_fields": {"model": m, "bounded": True, "error": describe_error(e)}})
+        raise LLMError(f"{schema.__name__}: {describe_error(last) if last else 'out of time'}") from last
+
+    def agent_turn(self, system, messages, tools, output_schema, *, agent="", smart=False, deadline=None, final_only=False):
+        primary = self.settings.claude_model_smart if smart else self.settings.claude_model_fast
+        models = [primary] + claude_fallback_models(self.settings, primary)
+        deadline = deadline or time.monotonic() + self.settings.llm_timeout_s
+        last: Exception | None = None
+        i = waits = 0
+        retried: set[str] = set()
+        while True:
+            left = deadline - time.monotonic()
+            if left < MIN_TURN_S:
+                raise LLMError(f"agent turn ({agent}): out of time ({describe_error(last) if last else 'no attempt made'})")
+            model = models[i]
+            try:
+                return self._agent_call(model, system, messages, tools, output_schema, final_only, min(left, AGENT_TURN_S))
+            except Exception as e:  # noqa: BLE001
+                last = e
+                log.warning("llm agent turn failed", extra={"extra_fields": {"model": model, "agent": agent, "error": describe_error(e)}})
+                if transient(e) and model not in retried and deadline - time.monotonic() > MIN_TURN_S + TRANSIENT_RETRY_S:
+                    retried.add(model)
+                    self.sleep(TRANSIENT_RETRY_S)
+                    continue
+                if i + 1 < len(models):
+                    i += 1
+                    continue
+                wait = retry_after(e)
+                pause = min(wait or 0.0, AGENT_MAX_WAIT_S, deadline - time.monotonic() - MIN_TURN_S)
+                if wait is None or waits >= 2 or pause <= 0:
+                    raise LLMError(f"agent turn ({agent}): {describe_error(e)}") from e
+                waits, i = waits + 1, 0
+                self.sleep(pause)
+
+    def _agent_call(self, model, system, messages, tools, output_schema, final_only, left_s) -> Turn:
+        tool_defs = [{"name": t.name, "description": t.description, "input_schema": _object_schema(t.parameters)} for t in tools]
+        tool_defs.append({"name": FINAL, "description": FINAL_DESCRIPTION, "input_schema": _object_schema(schema_of(output_schema))})
+        payload: dict[str, Any] = {
+            "model": model,
+            "max_tokens": AGENT_MAX_OUTPUT_TOKENS,
+            "tools": tool_defs,
+            "tool_choice": {"type": "tool", "name": FINAL} if final_only else {"type": "any"},
+            "messages": self._agent_messages(messages),
+        }
+        if system:
+            payload["system"] = system
+        started = time.perf_counter()
+        data = self._post(payload, max(MIN_TURN_S, float(left_s)))
+        usage = data.get("usage") or {}
+        in_tok = int(usage.get("input_tokens") or 0)
+        out_tok = int(usage.get("output_tokens") or 0)
+        log.info("llm agent turn", extra={"extra_fields": {
+            "model": data.get("model") or model, "latency_ms": round((time.perf_counter() - started) * 1000),
+            "input_tokens": in_tok or None, "output_tokens": out_tok or None}})
+        blocks = data.get("content") or []
+        if not blocks:
+            raise LLMError(f"empty response from {model} ({data.get('stop_reason')})")
+        thought = " ".join(str(b.get("thinking") or "").strip() for b in blocks if isinstance(b, dict) and b.get("type") == "thinking").strip()
+        said = " ".join(str(b.get("text") or "").strip() for b in blocks if isinstance(b, dict) and b.get("type") == "text").strip()
+        calls = [ToolCall(id=str(b.get("id") or ""), name=str(b.get("name") or ""), args=dict(b.get("input") or {}))
+                 for b in blocks if isinstance(b, dict) and b.get("type") == "tool_use"]
+        return finish(output_schema, calls, thought or said, raw=blocks, model=str(data.get("model") or model), tokens=in_tok + out_tok)
+
+    @staticmethod
+    def _agent_messages(messages: list[dict]) -> list[dict]:
+        out: list[dict] = []
+        last_ids: list[str] = []
+        for idx, m in enumerate(messages):
+            role = m.get("role")
+            if role == "user":
+                block = {"type": "text", "text": str(m.get("text") or "")}
+                if out and out[-1]["role"] == "user":
+                    out[-1]["content"].append(block)
+                else:
+                    out.append({"role": "user", "content": [block]})
+            elif role == "model":
+                raw = m.get("raw")
+                if isinstance(raw, list) and all(isinstance(b, dict) for b in raw):
+                    blocks = list(raw)
+                    last_ids = [str(b.get("id") or f"toolu_{idx}_{ci}") for ci, b in enumerate(blocks) if b.get("type") == "tool_use"]
+                else:
+                    blocks = []
+                    if m.get("thought"):
+                        blocks.append({"type": "text", "text": str(m["thought"])})
+                    last_ids = []
+                    for ci, c in enumerate(m.get("calls", [])):
+                        cid = str(c.get("id") or f"toolu_{idx}_{ci}")
+                        last_ids.append(cid)
+                        blocks.append({"type": "tool_use", "id": cid, "name": c["name"], "input": c.get("args") or {}})
+                    if not blocks:
+                        blocks.append({"type": "text", "text": "(no call)"})
+                out.append({"role": "assistant", "content": blocks})
+            elif role == "tool":
+                results = []
+                for ri, r in enumerate(m.get("results", [])):
+                    tid = str(r.get("id") or (last_ids[ri] if ri < len(last_ids) else f"toolu_{idx}_{ri}"))
+                    results.append({"type": "tool_result", "tool_use_id": tid, "content": str(r.get("text") or "")})
+                if out and out[-1]["role"] == "user":
+                    out[-1]["content"].extend(results)
+                else:
+                    out.append({"role": "user", "content": results})
+        return out
+
+
+class HybridLLM:
+    """Primary LLM (Claude) with automatic delegation of video/media calls and resilient fallback to a secondary LLM (Gemini)."""
+
+    def __init__(self, primary, secondary=None):
+        self.primary = primary
+        self.secondary = secondary
+
+    def release_media(self, uri: str) -> bool:
+        fn = getattr(self.secondary, "release_media", None)
+        return bool(fn(uri)) if fn else False
+
+    def structured(self, prompt, schema, *, smart=False, media=None, system=None, **kw):
+        if media:
+            if self.secondary is not None:
+                return self.secondary.structured(prompt, schema, smart=smart, media=media, system=system, **kw)
+            from app.ports import AI_OFF
+
+            raise AIUnavailable(AI_OFF)
+        try:
+            return self.primary.structured(prompt, schema, smart=smart, media=None, system=system, **kw)
+        except Exception as e:  # noqa: BLE001
+            if self.secondary is None:
+                raise
+            log.warning("primary llm failed; falling back to secondary",
+                        extra={"extra_fields": {"schema": schema.__name__, "error": describe_error(e)}})
+            return self.secondary.structured(prompt, schema, smart=smart, media=None, system=system, **kw)
+
+    def agent_turn(self, system, messages, tools, output_schema, **kw):
+        try:
+            return self.primary.agent_turn(system, messages, tools, output_schema, **kw)
+        except Exception as e:  # noqa: BLE001
+            if self.secondary is None:
+                raise
+            log.warning("primary agent_turn failed; falling back to secondary",
+                        extra={"extra_fields": {"agent": kw.get("agent", ""), "error": describe_error(e)}})
+            return self.secondary.agent_turn(system, messages, tools, output_schema, **kw)
 
 
 @dataclass

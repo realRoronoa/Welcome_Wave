@@ -130,6 +130,10 @@ async def lifespan(app: FastAPI):
         from app import selfhost
 
         background += selfhost.start(container)
+    if settings.demo_showcase and not settings.is_demo:
+        from app import showcase
+
+        showcase.start_background_seed(container)
     background += audit.on_start(container)  # audit-log timestamps in memory; the retention purge in self-hosted mode
     log.info("started", extra={"extra_fields": {"mode": settings.mode, "env": settings.env, "ai": settings.ai_ready}})
     yield
@@ -217,6 +221,10 @@ def create_app() -> FastAPI:
         from app.api import demo
 
         app.include_router(demo.router, prefix="/api")
+    elif settings.demo_showcase:  # optional isolated showcase accounts underneath the production sign-in form
+        from app import showcase
+
+        app.include_router(showcase.router, prefix="/api")
     return app
 
 

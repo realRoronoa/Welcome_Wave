@@ -9,7 +9,7 @@ from pathlib import Path
 
 from app.agents.core.deps import Deps
 from app.adapters.mailer import mailer_for
-from app.agents.core.llm import SYNC_CALL_S, GeminiLLM, NoLLM, OfflineLLM, call_budget
+from app.agents.core.llm import SYNC_CALL_S, ClaudeLLM, GeminiLLM, HybridLLM, NoLLM, OfflineLLM, call_budget
 from app.agents.supervisor.graph import SYNC_EVENTS, build_supervisor, resume, run_event
 from app.config import Settings
 from app.services.redaction import RegexRedactor
@@ -216,27 +216,47 @@ def _postgres(settings: Settings):
     return engine, store, pool, checkpointer
 
 
+def llm_for(settings: Settings, local_files=None):
+    """Build the runtime LLM: Claude as primary when ANTHROPIC_API_KEY is set, paired with Gemini (for video media and
+    resilient fallback) when GEMINI_API_KEY or Vertex AI is also available."""
+    claude = ClaudeLLM(settings) if settings.anthropic_api_key else None
+    gemini = GeminiLLM(settings, local_files=local_files) if (settings.gemini_api_key or settings.mode == "gcp") else None
+    if claude and gemini:
+        return HybridLLM(claude, gemini)
+    if claude:
+        return claude
+    if gemini:
+        return gemini
+    return OfflineLLM() if settings.is_demo else NoLLM()
+
+
 def _self_hosted(settings: Settings) -> Container:
-    """The real application on one machine: Postgres, Firebase sign-in, Gemini through an API key (or nothing, said plainly),
+    """The real application on one machine: Postgres, Firebase sign-in, Claude/Gemini through an API key (or nothing, said plainly),
     files on disk, background work in this process (app/selfhost.py), repositories connected by URL and watched for changes."""
     from app.adapters.github import GitHubApp
     from app.adapters.github_url import GitHubByUrl, RepoRouter
     from app.adapters.lifecycle_pg import PgLifecycleStore
-    from app.adapters.memory import ServedLocalStorage, signing_key
+    from app.adapters.memory import LocalRepoSource, ServedLocalStorage, signing_key
     from app.adapters.postgres import PgIndex
+    from app.seed import DEMO_ISSUES, DEMO_PR_FILES
     from app.selfhost import LocalQueue
-    from app.services.embeddings import NoEmbedder, VertexEmbedder
+    from app.services.embeddings import HashEmbedder, NoEmbedder, VertexEmbedder
 
     engine, store, pool, checkpointer = _postgres(settings)
     lifecycle = PgLifecycleStore(engine)
     blobs = ServedLocalStorage(settings.data_path, signing_key(settings.data_path, settings.blob_signing_key))
     app_client = GitHubApp(settings.github_app_id, settings.github_private_key) if settings.github_app_id and settings.github_private_key else None
+    repo_root = Path(settings.demo_repo_path)
+    if not repo_root.is_absolute():
+        repo_root = Path(__file__).resolve().parents[1] / repo_root
+    local_repo = LocalRepoSource(str(repo_root), issues=DEMO_ISSUES, default_pr=DEMO_PR_FILES) if settings.demo_showcase and repo_root.exists() else None
+    embedder = VertexEmbedder(settings) if settings.gemini_api_key else (HashEmbedder(settings.embedding_dim) if settings.anthropic_api_key else NoEmbedder(settings.embedding_dim))
     deps = Deps(
         settings=settings,
-        llm=GeminiLLM(settings, local_files=blobs) if settings.gemini_api_key else NoLLM(),
-        index=PgIndex(engine, VertexEmbedder(settings) if settings.gemini_api_key else NoEmbedder(settings.embedding_dim)),
+        llm=llm_for(settings, local_files=blobs),
+        index=PgIndex(engine, embedder),
         store=store,
-        repos=RepoRouter(GitHubByUrl(settings.github_token), app_client),
+        repos=RepoRouter(GitHubByUrl(settings.github_token), app_client, local=local_repo),
         blobs=blobs,
         redactor=RegexRedactor(),
         bus=LocalQueue(settings.local_workers),
@@ -290,7 +310,7 @@ def build_container(settings: Settings, serves_http: bool = True, live=None) -> 
         lifecycle = MemoryLifecycleStore(core, live.publish if live is not None else None)
         deps = Deps(
             settings=settings,
-            llm=GeminiLLM(settings) if settings.gemini_api_key else OfflineLLM(),
+            llm=llm_for(settings),
             index=MemoryIndex(HashEmbedder(settings.embedding_dim)),
             store=store,
             repos=LocalRepoSource(str(repo_root), issues=DEMO_ISSUES, default_pr=DEMO_PR_FILES),

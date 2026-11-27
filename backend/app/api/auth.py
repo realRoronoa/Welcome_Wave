@@ -87,6 +87,10 @@ def _resolve(c, authorization: str | None, x_demo_user: str | None, allow_deacti
         if not user:
             raise HTTPException(403, "Unknown demo user")
         return check(user)
+    if c.settings.demo_showcase and authorization and authorization.startswith("Bearer wwdemo."):
+        from app import showcase
+
+        return check(showcase.resolve_user(c, authorization.removeprefix("Bearer ")))
     who = _verify(c, authorization)
     user = c.store.user_by_firebase(who.uid)
     if user:

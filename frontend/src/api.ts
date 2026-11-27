@@ -2,8 +2,11 @@ import type { LegalDetails } from "./legal/types";
 
 // Demo mode's session: the signed-in member's id, sent as X-Demo-User. A stored id means signed in; none means the sign-in page.
 const DEMO_USER_KEY = "ww-demo-user";
+const SHOWCASE_TOKEN_KEY = "ww-showcase-token";
 let demoUser: string | null = null;
+let showcaseToken: string | null = null;
 try { demoUser = localStorage.getItem(DEMO_USER_KEY) || null; } catch { /* storage blocked: sign in for this page only */ }
+try { showcaseToken = localStorage.getItem(SHOWCASE_TOKEN_KEY) || null; } catch { /* storage blocked */ }
 let demo = false; // set from GET /api/config before anything else is rendered
 let idToken: string | null = null; // kept current by Identity Platform's onIdTokenChanged
 let tokenSource: ((forceRefresh: boolean) => Promise<string | null>) | null = null;
@@ -17,7 +20,16 @@ export function setDemoUser(id: string | null) {
 export function getDemoUser() { return demoUser; }
 /** Demo mode's sign-out: the next page load (and this one) shows the sign-in page. */
 export function demoSignOut() { setDemoUser(null); }
-export function setIdToken(t: string | null) { idToken = t; }
+/** Production showcase demo session (`Bearer wwdemo.*`), kept separate from Firebase tokens. */
+export function setShowcaseToken(token: string | null) {
+  showcaseToken = token;
+  try { if (token) localStorage.setItem(SHOWCASE_TOKEN_KEY, token); else localStorage.removeItem(SHOWCASE_TOKEN_KEY); } catch { /* private mode */ }
+}
+export function getShowcaseToken() { return showcaseToken; }
+export function setIdToken(t: string | null) {
+  idToken = t;
+  if (t) setShowcaseToken(null);
+}
 /** Production: asked for a fresh ID token before every request (Firebase caches it and refreshes it near expiry). */
 export function setTokenSource(fn: typeof tokenSource) { tokenSource = fn; }
 
@@ -30,7 +42,9 @@ async function send(path: string, init: RequestInit, refresh: boolean) {
   const headers: Record<string, string> = { ...(init.headers as Record<string, string>) };
   if (typeof init.body === "string") headers["Content-Type"] = "application/json"; // FormData sets its own boundary
   if (demo) { if (demoUser) headers["X-Demo-User"] = demoUser; }
-  else {
+  else if (showcaseToken) {
+    headers.Authorization = `Bearer ${showcaseToken}`;
+  } else {
     const token = tokenSource ? await tokenSource(refresh).catch(() => idToken) : idToken;
     if (token) headers.Authorization = `Bearer ${token}`;
   }
@@ -90,7 +104,9 @@ export async function download(path: string, fallbackName: string) {
 export async function upload<T = any>(path: string, form: FormData, onProgress?: (fraction: number) => void): Promise<T> {
   const headers: Record<string, string> = {};
   if (demo) { if (demoUser) headers["X-Demo-User"] = demoUser; }
-  else {
+  else if (showcaseToken) {
+    headers.Authorization = `Bearer ${showcaseToken}`;
+  } else {
     const token = tokenSource ? await tokenSource(false).catch(() => idToken) : idToken;
     if (token) headers.Authorization = `Bearer ${token}`;
   }
@@ -201,6 +217,7 @@ export type Config = {
   calendly?: boolean; // Calendly bookings arrive by webhook
   email?: boolean; // this server sends email (invitations): the pages then say who a link was emailed to
   demo_password?: string | null; // demo only: the one password every demo account signs in with (shown on the sign-in page)
+  showcase?: { enabled: boolean; password: string } | null; // optional showcase demo accounts underneath production sign-in
   /** Who operates this server, as the legal documents name them (each null until its LEGAL_* setting is set), and the
    *  current version of every document (backend/app/legal.py `public`). */
   legal?: LegalDetails;

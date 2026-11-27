@@ -179,34 +179,37 @@ class GitHubByUrl:
 
 
 class RepoRouter:
-    """The GitHub App client for repositories installed through it, the URL client for every other."""
+    """The GitHub App client for repositories installed through it, a local sample repo for `demo/mini-policy-engine` when
+    provided, and the URL client for every other."""
 
-    def __init__(self, by_url: GitHubByUrl, app=None):
-        self.by_url, self.app = by_url, app
+    def __init__(self, by_url: GitHubByUrl, app=None, local=None):
+        self.by_url, self.app, self.local = by_url, app, local
 
-    def _for(self, installation_id):
+    def _for(self, installation_id, full_name: str = ""):
+        if self.local is not None and (full_name or "").lower() == "demo/mini-policy-engine":
+            return self.local
         return self.app if (installation_id and self.app) else self.by_url
 
     def files(self, full_name, ref, installation_id=None):
-        return self._for(installation_id).files(full_name, ref, installation_id)
+        return self._for(installation_id, full_name).files(full_name, ref, installation_id)
 
     def file(self, full_name, path, ref, installation_id=None):
-        return self._for(installation_id).file(full_name, path, ref, installation_id)
+        return self._for(installation_id, full_name).file(full_name, path, ref, installation_id)
 
     def head_sha(self, full_name, ref, installation_id=None):
-        return self._for(installation_id).head_sha(full_name, ref, installation_id)
+        return self._for(installation_id, full_name).head_sha(full_name, ref, installation_id)
 
     def pr_files(self, full_name, number, installation_id=None):
-        return self._for(installation_id).pr_files(full_name, number, installation_id)
+        return self._for(installation_id, full_name).pr_files(full_name, number, installation_id)
 
     def check_runs(self, full_name, sha, installation_id=None):
-        return self._for(installation_id).check_runs(full_name, sha, installation_id)
+        return self._for(installation_id, full_name).check_runs(full_name, sha, installation_id)
 
     def repo_info(self, full_name, installation_id=None):
-        return self._for(installation_id).repo_info(full_name, installation_id)
+        return self._for(installation_id, full_name).repo_info(full_name, installation_id)
 
     def good_first_issues(self, full_name, installation_id=None):
-        return self._for(installation_id).good_first_issues(full_name, installation_id)
+        return self._for(installation_id, full_name).good_first_issues(full_name, installation_id)
 
     def installation_repositories(self, installation_id):
         return self.app.installation_repositories(installation_id) if self.app else []

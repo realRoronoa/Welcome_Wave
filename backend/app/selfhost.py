@@ -302,6 +302,8 @@ class RepoWatcher:
         _set_org(None)
         published = 0
         for repo in self.container.store.watched_repositories():
+            if str(repo.get("full_name") or "").lower() == "demo/mini-policy-engine":
+                continue
             rid = str(repo["id"])
             _set_org(str(repo["org_id"]))
             try:

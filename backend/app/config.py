@@ -57,6 +57,11 @@ class Settings(BaseSettings):
     model_fast: str = "gemini-3.5-flash-lite"
     model_smart: str = "gemini-3.5-flash"
     model_fallback: str = "gemini-3.5-flash,gemini-3.1-flash-lite,gemini-2.5-flash"
+    anthropic_api_key: str = ""  # optional: Claude / Anthropic-compatible API key (primary text/code model when set)
+    anthropic_base_url: str = "https://api.anthropic.com"
+    claude_model_fast: str = "claude-haiku-4-5-20251001"
+    claude_model_smart: str = "claude-sonnet-4-5-20250929"
+    claude_model_fallback: str = "claude-sonnet-4-6,claude-haiku-4-5-20251001"
     embedding_model: str = "gemini-embedding-001"
     embedding_dim: int = 768
     embedding_batch: int = 64
@@ -207,6 +212,8 @@ class Settings(BaseSettings):
     # MODE=demo only: the one password every demo account signs in with (POST /api/demo/login). It is shown on the demo
     # sign-in page, so it is a gate for the form, not a secret; production signs in through Identity Platform instead.
     demo_password: str = "welcome-wave"
+    # Optional showcase demo accounts underneath the production sign-in form (/api/showcase/*, off by default).
+    demo_showcase: bool = False
 
     @field_validator("google_oauth_client_secret", "calendly_webhook_signing_key", "token_encryption_key", "github_webhook_secret",
                      mode="before")
@@ -221,7 +228,7 @@ class Settings(BaseSettings):
         """SIGNUP_ENABLED= (empty, as a deploy template may pass it) means the mode's default, not an error."""
         return None if isinstance(value, str) and not value.strip() else value
 
-    @field_validator("legal_enforce", mode="before")
+    @field_validator("legal_enforce", "demo_showcase", mode="before")
     @classmethod
     def _blank_is_off(cls, value):
         """LEGAL_ENFORCE= (empty, as a deploy template may pass it) means off, not a server that refuses to start."""
@@ -277,9 +284,9 @@ class Settings(BaseSettings):
 
     @property
     def ai_ready(self) -> bool:
-        """A model answers: a Gemini API key, Vertex AI on Google Cloud, or the demo's offline stand-in. Without one, self-hosted
-        mode still runs, and says the AI is off where it is needed."""
-        return bool(self.gemini_api_key) or self.mode in {"gcp", "demo"}
+        """A model answers: a Claude or Gemini API key, Vertex AI on Google Cloud, or the demo's offline stand-in. Without one,
+        self-hosted mode still runs, and says the AI is off where it is needed."""
+        return bool(self.anthropic_api_key or self.gemini_api_key) or self.mode in {"gcp", "demo"}
 
     @property
     def smtp_sender(self) -> str:
